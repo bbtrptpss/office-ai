@@ -24,7 +24,7 @@ public record WorkflowEventDto(long Id, Guid? TaskId, string Kind, string Messag
 public record ReviewDto(Guid Id, Guid TaskId, Guid? DeliverableId, string? ReviewerName, ReviewOutcome Outcome, string Comments, bool IsSimulated, DateTimeOffset CreatedAt);
 
 /// <summary>The human approval inbox. Agents can never decide, and nobody approves their own request.</summary>
-public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvider clock, IRealtimeNotifier notifier)
+public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvider clock, IRealtimeNotifier notifier, Code.ICodeRepositoryStore code)
 {
     public static string PermissionFor(ApprovalKind kind) => kind switch
     {
@@ -32,6 +32,7 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
         ApprovalKind.TaskCompletion => Permissions.TaskApprove,
         ApprovalKind.ToolAction => Permissions.AgentManage,
         ApprovalKind.Estimate => Permissions.ProjectManage,
+        ApprovalKind.Merge => Permissions.ProjectManage,
         _ => Permissions.TaskManage,
     };
 
@@ -94,6 +95,9 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
                 break;
             case ApprovalKind.Estimate:
                 await ApplyEstimateDecisionAsync(approval, req.Approve, ct);
+                break;
+            case ApprovalKind.Merge:
+                await ApplyMergeDecisionAsync(approval, req.Approve, now, ct);
                 break;
             case ApprovalKind.ToolAction:
                 // Executed by the workflow engine (exactly once) on its next tick.
@@ -192,6 +196,44 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
         {
             AddHumanReview(taskId, note);
         }
+    }
+
+    /// <summary>Merges exactly the commit that was reviewed; if the branch moved since, the request is refused.</summary>
+    private async Task ApplyMergeDecisionAsync(ApprovalRequest approval, bool approve, DateTimeOffset now, CancellationToken ct)
+    {
+        var payload = System.Text.Json.JsonDocument.Parse(approval.PayloadJson).RootElement;
+        var mr = await db.MergeRequests.FirstAsync(m => m.Id == payload.GetProperty("mergeRequestId").GetGuid(), ct);
+        if (mr.Status != Domain.Code.MergeRequestStatus.Open) throw new DomainException("approval.closed", $"The merge request is {mr.Status}.");
+        if (!approve)
+        {
+            mr.Status = Domain.Code.MergeRequestStatus.Closed;
+            if (mr.TaskId is { } t) AddHumanReview(t, approval.DecisionNote ?? $"Merge request !{mr.Number} was not approved.");
+            return;
+        }
+        var repo = await db.CodeRepositories.AsNoTracking().FirstAsync(r => r.Id == mr.RepositoryId, ct);
+        var heads = await code.BranchesAsync(repo, ct);
+        if (!heads.Contains(mr.SourceBranch)) throw new DomainException("approval.changed", "The source branch no longer exists.");
+        var layout = (Code.IRepositoryLayout)code;
+        var tip = (await code.GitAsync(System.IO.Path.GetFullPath("."), ["--git-dir", layout.OriginPath(repo), "rev-parse", mr.SourceBranch], ct)).Output.Trim();
+        if (tip != mr.HeadSha)
+            throw new DomainException("approval.changed", "New commits were pushed after this merge request was opened. Ask for a fresh merge request.");
+
+        var outcome = await code.MergeAsync(repo, mr.SourceBranch, mr.TargetBranch, $"Merge !{mr.Number}: {mr.Title}", (current.Name ?? "CEO", "ceo@officeai.local"), ct);
+        if (outcome.Merged)
+        {
+            mr.Status = Domain.Code.MergeRequestStatus.Merged;
+            mr.MergedSha = outcome.Sha;
+            mr.MergedAt = now;
+        }
+        else
+        {
+            mr.Status = Domain.Code.MergeRequestStatus.Conflict;
+            approval.DecisionNote = (approval.DecisionNote is null ? "" : approval.DecisionNote + "\n") + "Merge failed: " + outcome.Error;
+            if (mr.TaskId is { } t) AddHumanReview(t, $"Merge request !{mr.Number} conflicts with {mr.TargetBranch}. Update the branch and open a new merge request.");
+        }
+        if (approval.WorkflowExecutionId is { } wf)
+            Approvals.Event(db, wf, mr.TaskId, mr.Status == Domain.Code.MergeRequestStatus.Merged ? "merged" : "merge_conflict",
+                mr.Status == Domain.Code.MergeRequestStatus.Merged ? $"!{mr.Number} merged into {mr.TargetBranch}." : $"!{mr.Number} could not be merged.", now);
     }
 
     private void AddHumanReview(Guid taskId, string comments) =>

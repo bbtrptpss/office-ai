@@ -22,6 +22,7 @@ public sealed class ApiFixture : IAsyncLifetime
     private readonly PostgreSqlContainer _db = new PostgreSqlBuilder("postgres:17-alpine").Build();
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
     public ScriptedProvider Scripted { get; } = new();
+    public string RepoRoot { get; } = Path.Combine(Path.GetTempPath(), "officeai-tests", Guid.NewGuid().ToString("N"));
     public string ConnectionString => _db.GetConnectionString();
 
     public async Task InitializeAsync()
@@ -39,6 +40,9 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("AiProviders:Simulated:Enabled", "true");
             b.UseSetting("AiProviders:Anthropic:ApiKey", "");
             b.UseSetting("Workflow:AutoTick", "false"); // tests drive the engine explicitly
+            b.UseSetting("Repositories:Root", RepoRoot);
+            b.UseSetting("Sandbox:UseLocalDocker", "true");
+            b.UseSetting("Sandbox:TestTimeoutSeconds", "8");
             b.ConfigureTestServices(s =>
             {
                 s.AddSingleton<IAiProvider>(Scripted);

@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Application.Abstractions;
 using OfficeAI.Application.Agents;
+using OfficeAI.Application.Code;
+using OfficeAI.Infrastructure.Code;
 using OfficeAI.Application.Delivery;
 using OfficeAI.Application.Organization;
 using OfficeAI.Application.Work;
@@ -55,6 +57,24 @@ public static class DependencyInjection
         services.AddSingleton<IAgentTool, AddRequirementTool>();
         services.AddSingleton<IAgentTool, ProposeDecisionTool>();
         services.AddSingleton<IAgentTool, SubmitEstimateTool>();
+
+        // Code: local Git repositories and the test sandbox.
+        services.Configure<RepositoryOptions>(config.GetSection("Repositories"));
+        services.Configure<SandboxOptions>(config.GetSection("Sandbox"));
+        services.AddSingleton<GitStore>();
+        services.AddSingleton<ICodeRepositoryStore>(sp => sp.GetRequiredService<GitStore>());
+        services.AddSingleton<IRepositoryLayout>(sp => sp.GetRequiredService<GitStore>());
+        services.AddSingleton<ISandbox, DockerSandbox>();
+        services.AddSingleton<CodeWorkspace>();
+        services.AddSingleton<IAgentTool, ListFilesTool>();
+        services.AddSingleton<IAgentTool, ReadFileTool>();
+        services.AddSingleton<IAgentTool, SearchCodeTool>();
+        services.AddSingleton<IAgentTool, WriteFileTool>();
+        services.AddSingleton<IAgentTool, DeleteFileTool>();
+        services.AddSingleton<IAgentTool, DiffTool>();
+        services.AddSingleton<IAgentTool, CommitTool>();
+        services.AddSingleton<IAgentTool, RunTestsTool>();
+        services.AddSingleton<IAgentTool, OpenMergeRequestTool>();
         services.AddSingleton<ToolRegistry>();
 
         services.AddScoped<AgentAdminService>();
@@ -66,6 +86,7 @@ public static class DependencyInjection
         services.AddScoped<ObjectiveService>();
         services.AddScoped<WorkflowEngine>();
         services.AddScoped<DeliveryService>();
+        services.AddScoped<CodeService>();
         return services;
     }
 }

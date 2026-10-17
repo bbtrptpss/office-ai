@@ -121,7 +121,8 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
         {
             var employees = await db.AgentConfigurations.Join(db.Employees, c => c.EmployeeId, e => e.Id, (c, e) => new { e.Id, e.RoleDefinition!.Level, e.RoleDefinition.Code }).ToListAsync(ct);
             var existing = (await db.AgentToolPermissions.Select(p => new { p.EmployeeId, p.ToolId }).ToListAsync(ct)).ToHashSet();
-            var phase4 = new[] { ReadRequirementsTool.ToolId, AddRequirementTool.ToolId, ProposeDecisionTool.ToolId, SubmitEstimateTool.ToolId };
+            var phase4 = new[] { ReadRequirementsTool.ToolId, AddRequirementTool.ToolId, ProposeDecisionTool.ToolId, SubmitEstimateTool.ToolId }
+                .Concat(AgentDefaults.CodeReadTools).Concat(AgentDefaults.CodeWriteTools).ToArray();
             foreach (var e in employees)
                 foreach (var tool in phase4.Intersect(AgentDefaults.ToolsFor(e.Level, e.Code)))
                     if (!existing.Contains(new { EmployeeId = e.Id, ToolId = tool }))

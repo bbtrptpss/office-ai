@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OfficeAI.Api.Infrastructure;
 using OfficeAI.Application.Abstractions;
 using OfficeAI.Application.Agents;
+using OfficeAI.Application.Code;
 using OfficeAI.Application.Delivery;
 using OfficeAI.Application.Organization;
 using OfficeAI.Application.Work;
@@ -31,6 +32,7 @@ public static class Endpoints
         MapAgents(api);
         MapWorkflows(api);
         MapDelivery(api);
+        MapCode(api);
         app.MapHub<EventsHub>("/hubs/events");
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
     }
@@ -174,6 +176,21 @@ public static class Endpoints
         api.MapPut("/rate-card/{roleDefinitionId:guid}", (Guid roleDefinitionId, SetRoleRateRequest r, DeliveryService s, CancellationToken ct) => s.SetRateAsync(roleDefinitionId, r, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapGet("/company-settings", (DeliveryService s, CancellationToken ct) => s.GetSettingsAsync(ct)).RequirePermission(Permissions.ProjectRead);
         api.MapPut("/company-settings", (SaveSettingsRequest r, DeliveryService s, CancellationToken ct) => s.SaveSettingsAsync(r, ct)).RequirePermission(Permissions.ProjectManage);
+    }
+
+    private static void MapCode(RouteGroupBuilder api)
+    {
+        api.MapGet("/sandbox", (CodeService s) => s.SandboxInfo()).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/projects/{id:guid}/repositories", (Guid id, CodeService s, CancellationToken ct) => s.ListAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapPost("/projects/{id:guid}/repositories", (Guid id, CreateRepositoryRequest r, CodeService s, CancellationToken ct) => s.CreateAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPut("/repositories/{id:guid}", (Guid id, UpdateRepositoryRequest r, CodeService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapGet("/repositories/{id:guid}/branches", (Guid id, CodeService s, CancellationToken ct) => s.BranchesAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/repositories/{id:guid}/files", (Guid id, string? branch, CodeService s, CancellationToken ct) => s.FilesAsync(id, branch, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/repositories/{id:guid}/file", async (Guid id, string? branch, string path, CodeService s, CancellationToken ct) =>
+            Results.Text(await s.FileAsync(id, branch, path, ct), "text/plain; charset=utf-8")).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/repositories/{id:guid}/test-runs", (Guid id, Guid? taskId, CodeService s, CancellationToken ct) => s.TestRunsAsync(id, taskId, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/projects/{id:guid}/merge-requests", (Guid id, CodeService s, CancellationToken ct) => s.MergeRequestsAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/merge-requests/{id:guid}", (Guid id, CodeService s, CancellationToken ct) => s.MergeRequestAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
     }
 
     private static void MapSecurity(RouteGroupBuilder api)

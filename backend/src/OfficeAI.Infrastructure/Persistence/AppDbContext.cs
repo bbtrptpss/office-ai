@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using OfficeAI.Application.Abstractions;
 using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Audit;
+using OfficeAI.Domain.Code;
 using OfficeAI.Domain.Delivery;
 using OfficeAI.Domain.Common;
 using OfficeAI.Domain.Organization;
@@ -47,6 +48,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<RoleRate> RoleRates => Set<RoleRate>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
     public DbSet<ProjectEstimate> Estimates => Set<ProjectEstimate>();
+    public DbSet<CodeRepository> CodeRepositories => Set<CodeRepository>();
+    public DbSet<TestRun> TestRuns => Set<TestRun>();
+    public DbSet<MergeRequest> MergeRequests => Set<MergeRequest>();
     public DbSet<SeedMarker> SeedMarkers => Set<SeedMarker>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
