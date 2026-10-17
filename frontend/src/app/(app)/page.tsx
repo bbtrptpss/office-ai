@@ -84,7 +84,7 @@ export default function DashboardPage() {
                 </Stack>
               </Grid>
               <Grid size={{ xs: 12, md: 7 }}>
-                <Box sx={{ bgcolor: "rgba(255,255,255,.14)", borderRadius: 5, p: 1.5 }}>
+                <Box sx={{ bgcolor: "rgba(255,255,255,.14)", borderRadius: "22px", p: 1.5 }}>
                   <OfficeScene working={data.aiWorking} total={data.aiEmployees} />
                 </Box>
               </Grid>

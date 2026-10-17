@@ -67,8 +67,19 @@ public enum AgentRunStatus
     LimitReached = 6,
 }
 
+public enum RunPurpose
+{
+    Work = 1,
+    Review = 2,
+    Plan = 3,
+}
+
 public class AgentRun : Entity
 {
+    public RunPurpose Purpose { get; set; } = RunPurpose.Work;
+
+    /// <summary>1 for the first run of this purpose on the task, then 2, 3… for retries and continuations.</summary>
+    public int Attempt { get; set; } = 1;
     public Guid TaskId { get; set; }
     public Guid ProjectId { get; set; }
     public Guid EmployeeId { get; set; }

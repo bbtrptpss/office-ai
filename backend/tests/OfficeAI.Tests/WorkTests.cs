@@ -25,7 +25,7 @@ public class WorkTests(ApiFixture fx)
         c.PostAsync<TaskDto>($"/api/projects/{projectId}/tasks", new { title, priority = "High" });
 
     private static async Task<EmployeeDto> AiEmployeeAsync(HttpClient c, string jobTitle) =>
-        (await c.GetAsync<List<EmployeeDto>>("/api/employees")).First(e => e.JobTitle == jobTitle);
+        (await c.GetAsync<List<EmployeeDto>>("/api/employees")).First(e => e.JobTitle == jobTitle && e.DisplayName == jobTitle.Replace(" Agent", "") + " AI");
 
     [Fact]
     public async Task Create_project_milestone_task_and_assign_moves_task_to_Assigned()

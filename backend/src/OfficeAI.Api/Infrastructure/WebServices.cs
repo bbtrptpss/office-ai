@@ -120,4 +120,7 @@ public class SignalRNotifier(IHubContext<EventsHub> hub) : IRealtimeNotifier
 
     public Task AgentRunChangedAsync(Guid runId, Guid taskId, Guid projectId, string status, CancellationToken ct = default) =>
         hub.Clients.All.SendAsync("agentRunChanged", new { runId, taskId, projectId, status }, ct);
+
+    public Task ApprovalsChangedAsync(CancellationToken ct = default) =>
+        hub.Clients.All.SendAsync("approvalsChanged", ct);
 }

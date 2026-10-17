@@ -58,6 +58,7 @@ internal class AgentRunConfig : IEntityTypeConfiguration<AgentRun>
         // The executor is the only writer of a run's progress; a cancel flag set meanwhile must not make its saves fail.
         b.Ignore(r => r.Version);
         b.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(r => r.Purpose).HasConversion<string>().HasMaxLength(20);
         b.Property(r => r.Provider).HasMaxLength(50);
         b.Property(r => r.ModelId).HasMaxLength(100);
         b.Property(r => r.StopReason).HasMaxLength(50);

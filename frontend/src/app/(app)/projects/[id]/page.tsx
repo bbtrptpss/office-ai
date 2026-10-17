@@ -8,12 +8,13 @@ import {
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react";
 import AddIcon from "@mui/icons-material/Add";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
-import { AgentRun, api, Deliverable, Employee, Milestone, Project, Task, TaskPriority, TaskStatus } from "@/lib/api";
+import { AgentRun, api, Deliverable, Employee, Milestone, Project, Review, Task, TaskPriority, TaskStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
 import { KindIcon, Loading, PageHeader, StatusChip, useErrorMessage, useLoad } from "@/components/common";
 import { DeliverableList, RunList } from "@/components/agents";
+import { ObjectivesPanel } from "@/components/objectives";
 
 const COLUMNS: TaskStatus[] = ["Todo", "Assigned", "InProgress", "Blocked", "InReview", "WaitingApproval", "Done", "Failed"];
 const PRIORITIES: TaskPriority[] = ["Low", "Medium", "High", "Critical"];
@@ -127,6 +128,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
           {data.milestones.map((m) => <Chip key={m.id} size="small" label={`${m.name}${m.dueDate ? ` · ${m.dueDate}` : ""}`} />)}
         </Stack>
       )}
+      <ObjectivesPanel projectId={id} employees={data.employees} />
       <FormControlLabel control={<Switch size="small" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />} label={t.showCancelled} sx={{ mb: 1 }} />
       {message && !openTaskId && <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
 
@@ -138,7 +140,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
             <Box
               key={status}
               sx={{
-                minWidth: 256, width: 256, flexShrink: 0, p: 1.25, borderRadius: 5, minHeight: 160,
+                minWidth: 256, width: 256, flexShrink: 0, p: 1.25, borderRadius: "22px", minHeight: 160,
                 bgcolor: (th) => `rgba(${th.vars?.palette.primary.mainChannel} / 0.06)`,
                 borderTop: `4px solid ${COLUMN_COLORS[status]}`,
               }}
@@ -343,7 +345,8 @@ function TaskAiPanel({ task, onError }: { task: Task; onError: (m: string) => vo
       api.get<AgentRun[]>(`/api/agent-runs?taskId=${task.id}&take=20`),
       api.get<Deliverable[]>(`/api/tasks/${task.id}/deliverables`),
     ]);
-    return { runs, deliverables };
+    const reviews = await api.get<Review[]>(`/api/tasks/${task.id}/reviews`);
+    return { runs, deliverables, reviews };
   }, task.id);
   useRealtime<{ taskId: string }>("agentRunChanged", (e) => {
     if (e.taskId === task.id) void reload();
@@ -354,7 +357,7 @@ function TaskAiPanel({ task, onError }: { task: Task; onError: (m: string) => vo
   const canStart = can("agent.run") && !!aiAssignee && ["Assigned", "InProgress"].includes(task.status) && !active;
 
   return (
-    <Box sx={{ p: 2, borderRadius: 4, bgcolor: (th) => `rgba(${th.vars?.palette.secondary.mainChannel} / 0.06)` }}>
+    <Box sx={{ p: 2, borderRadius: "18px", bgcolor: (th) => `rgba(${th.vars?.palette.secondary.mainChannel} / 0.06)` }}>
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1.5 }}>
         <Typography variant="h6" sx={{ flex: 1 }}>🤖 {t.runs}</Typography>
         {can("agent.run") && (
@@ -381,6 +384,22 @@ function TaskAiPanel({ task, onError }: { task: Task; onError: (m: string) => vo
       {!data ? <Loading /> : <RunList runs={data.runs} showTask={false} />}
       <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2, mb: 1 }}>{t.deliverables}</Typography>
       {data && <DeliverableList items={data.deliverables} />}
+      {data && data.reviews.length > 0 && (
+        <>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2, mb: 1 }}>{t.reviews}</Typography>
+          <Stack spacing={1}>
+            {data.reviews.map((r) => (
+              <Box key={r.id} sx={{ p: 1.25, borderRadius: "14px", border: 1, borderColor: "divider" }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 0.5 }}>
+                  <StatusChip value={r.outcome} />
+                  <Typography variant="caption" color="text.secondary">{r.reviewerName} · {new Date(r.createdAt).toLocaleString()}</Typography>
+                </Stack>
+                <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{r.comments}</Typography>
+              </Box>
+            ))}
+          </Stack>
+        </>
+      )}
     </Box>
   );
 }

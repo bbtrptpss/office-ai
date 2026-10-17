@@ -31,10 +31,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchMe]);
 
   useEffect(() => {
-    fetchMe()
-      .then(setMe)
-      .catch(() => setMe(null))
-      .finally(() => setLoading(false));
+    // Only a 401 means "signed out". Network errors (e.g. the API restarting) are retried instead of logging the user out.
+    let cancelled = false;
+    let attempt = 0;
+    const load = () =>
+      fetchMe()
+        .then((m) => {
+          if (cancelled) return;
+          setMe(m);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          attempt++;
+          if (attempt < 10) setTimeout(load, Math.min(5000, 500 * attempt));
+          else {
+            setMe(null);
+            setLoading(false);
+          }
+        });
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [fetchMe]);
 
   const login = useCallback(

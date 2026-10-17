@@ -3,6 +3,7 @@ using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Audit;
 using OfficeAI.Domain.Organization;
 using OfficeAI.Domain.Work;
+using OfficeAI.Domain.Workflows;
 
 namespace OfficeAI.Application.Abstractions;
 
@@ -26,6 +27,11 @@ public interface IAppDbContext
     DbSet<UsageRecord> UsageRecords { get; }
     DbSet<CostRecord> CostRecords { get; }
     DbSet<Deliverable> Deliverables { get; }
+    DbSet<WorkflowDefinition> WorkflowDefinitions { get; }
+    DbSet<WorkflowExecution> WorkflowExecutions { get; }
+    DbSet<WorkflowEvent> WorkflowEvents { get; }
+    DbSet<ApprovalRequest> ApprovalRequests { get; }
+    DbSet<Review> Reviews { get; }
 
     /// <summary>Sets the concurrency token the client last saw, so a stale update fails with <see cref="Domain.Common.ConcurrencyException"/>.</summary>
     void ExpectVersion<T>(T entity, uint version) where T : Domain.Common.Entity;
@@ -34,6 +40,10 @@ public interface IAppDbContext
 
     /// <summary>Drops every tracked entity, then re-tracks <paramref name="keep"/> as modified. Used by long-running work to avoid stale data.</summary>
     void ResetTracking(params object[] keep);
+
+    /// <summary>Cluster-wide lock so only one workflow engine tick runs at a time (PostgreSQL advisory lock).</summary>
+    Task<bool> TryAcquireEngineLockAsync(CancellationToken ct);
+    Task ReleaseEngineLockAsync();
 }
 
 public interface ICurrentUser
@@ -52,6 +62,7 @@ public interface IRealtimeNotifier
     Task TaskChangedAsync(Guid projectId, Guid taskId, CancellationToken ct = default);
     Task OrganizationChangedAsync(CancellationToken ct = default);
     Task AgentRunChangedAsync(Guid runId, Guid taskId, Guid projectId, string status, CancellationToken ct = default);
+    Task ApprovalsChangedAsync(CancellationToken ct = default);
 }
 
 /// <summary>Who is acting outside an HTTP request, e.g. an AI employee inside a background run.</summary>

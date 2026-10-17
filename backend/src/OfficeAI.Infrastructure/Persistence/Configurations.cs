@@ -101,6 +101,9 @@ internal class WorkTaskConfig : IEntityTypeConfiguration<WorkTask>
         b.Property(t => t.Status).HasConversion<string>().HasMaxLength(30);
         b.Property(t => t.Priority).HasConversion<string>().HasMaxLength(20);
         b.HasIndex(t => new { t.ProjectId, t.Status });
+        b.HasIndex(t => new { t.WorkflowExecutionId, t.Status });
+        b.Property(t => t.PlanKey).HasMaxLength(40);
+        b.HasOne<WorkTask>().WithMany().HasForeignKey(t => t.ParentTaskId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(t => t.Project).WithMany().HasForeignKey(t => t.ProjectId).OnDelete(DeleteBehavior.Cascade);
         b.HasOne<Milestone>().WithMany().HasForeignKey(t => t.MilestoneId).OnDelete(DeleteBehavior.SetNull);
         b.HasMany(t => t.Assignments).WithOne().HasForeignKey(a => a.TaskId).OnDelete(DeleteBehavior.Cascade);

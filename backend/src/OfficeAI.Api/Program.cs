@@ -20,6 +20,7 @@ builder.Services.AddScoped<IRealtimeNotifier, SignalRNotifier>();
 builder.Services.AddSingleton<AgentRunQueue>();
 builder.Services.AddSingleton<IAgentRunQueue>(sp => sp.GetRequiredService<AgentRunQueue>());
 builder.Services.AddHostedService<AgentRunWorker>();
+builder.Services.AddHostedService<WorkflowEngineWorker>();
 
 // ---------- Identity + cookie auth ----------
 builder.Services

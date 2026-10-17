@@ -63,8 +63,8 @@ public class OrganizationTests(ApiFixture fx)
     {
         var ceo = await fx.CeoAsync();
         var employees = await ceo.GetAsync<List<EmployeeDto>>("/api/employees");
-        var cto = employees.Single(e => e.JobTitle == "CTO");
-        var architect = employees.Single(e => e.JobTitle == "Software Architect Agent");
+        var cto = employees.Single(e => e.DisplayName == "CTO AI");
+        var architect = employees.Single(e => e.DisplayName == "Software Architect AI");
         Assert.Equal(cto.Id, architect.ManagerId);
 
         // Make the CTO report to the architect, who reports to the CTO.

@@ -55,6 +55,16 @@ public class WorkTask : Entity, IAuditable
     public TaskPriority Priority { get; set; } = TaskPriority.Medium;
     public DateOnly? DueDate { get; set; }
     public List<TaskAssignment> Assignments { get; set; } = [];
+
+    // Orchestration (Phase 3)
+    public Guid? WorkflowExecutionId { get; set; }
+
+    /// <summary>Key of the plan item this task came from, unique within its workflow.</summary>
+    public string? PlanKey { get; set; }
+    public Guid? ParentTaskId { get; set; }
+    public int DelegationDepth { get; set; }
+    public List<string> RequiredSkills { get; set; } = [];
+    public Guid? ReviewerEmployeeId { get; set; }
 }
 
 public class TaskDependency : IAuditable

@@ -55,7 +55,7 @@ export default function LoginPage() {
         <Box sx={{ display: "flex", justifyContent: "center", mb: -4, position: "relative", zIndex: 1 }}>
           <Mascot size={120} />
         </Box>
-        <Card sx={{ borderRadius: 8, boxShadow: "0 24px 60px rgba(40,10,80,.35)" }}>
+        <Card sx={{ borderRadius: "28px", boxShadow: "0 24px 60px rgba(40,10,80,.35)" }}>
           <CardContent sx={{ p: 4, pt: 6 }}>
             <Typography variant="h5" align="center" gutterBottom>
               {t.appName}

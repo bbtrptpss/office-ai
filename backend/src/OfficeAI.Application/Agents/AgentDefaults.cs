@@ -31,6 +31,14 @@ public static class AgentDefaults
         ModelId = ModelFor(level),
     };
 
-    public static IEnumerable<AgentToolPermission> GrantsFor(Guid employeeId, DateTimeOffset now) =>
-        ToolRegistry.DefaultGrants.Select(id => new AgentToolPermission { EmployeeId = employeeId, ToolId = id, GrantedAt = now });
+    /// <summary>Default tools by position level: everyone works and reviews; heads and executives plan; heads and seniors may delegate.</summary>
+    public static IEnumerable<string> ToolsFor(OrgLevel level)
+    {
+        foreach (var id in ToolRegistry.DefaultGrants) yield return id;
+        if (level is OrgLevel.Executive or OrgLevel.Head) yield return Workflows.PlanSubmitTool.ToolId;
+        if (level is OrgLevel.Head or OrgLevel.Senior) yield return Workflows.DelegateTaskTool.ToolId;
+    }
+
+    public static IEnumerable<AgentToolPermission> GrantsFor(Guid employeeId, OrgLevel level, DateTimeOffset now) =>
+        ToolsFor(level).Select(id => new AgentToolPermission { EmployeeId = employeeId, ToolId = id, GrantedAt = now });
 }

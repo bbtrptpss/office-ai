@@ -10,6 +10,7 @@ using OfficeAI.Domain.Audit;
 using OfficeAI.Domain.Common;
 using OfficeAI.Domain.Organization;
 using OfficeAI.Domain.Work;
+using OfficeAI.Domain.Workflows;
 using OfficeAI.Infrastructure.Identity;
 
 namespace OfficeAI.Infrastructure.Persistence;
@@ -35,6 +36,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<UsageRecord> UsageRecords => Set<UsageRecord>();
     public DbSet<CostRecord> CostRecords => Set<CostRecord>();
     public DbSet<Deliverable> Deliverables => Set<Deliverable>();
+    public DbSet<WorkflowDefinition> WorkflowDefinitions => Set<WorkflowDefinition>();
+    public DbSet<WorkflowExecution> WorkflowExecutions => Set<WorkflowExecution>();
+    public DbSet<WorkflowEvent> WorkflowEvents => Set<WorkflowEvent>();
+    public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
+    public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<SeedMarker> SeedMarkers => Set<SeedMarker>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
@@ -48,6 +55,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         b.Entity<IdentityUserLogin<Guid>>().ToTable("UserLogins");
         b.Entity<IdentityUserToken<Guid>>().ToTable("UserTokens");
         b.Entity<IdentityRoleClaim<Guid>>().ToTable("RoleClaims");
+    }
+
+    private const long EngineLockKey = 0x0FF1CEA1;
+
+    public async Task<bool> TryAcquireEngineLockAsync(CancellationToken ct)
+    {
+        await Database.OpenConnectionAsync(ct); // session lock: keep the connection until released
+        var got = await Database.SqlQuery<bool>($"SELECT pg_try_advisory_lock({EngineLockKey}) AS \"Value\"").SingleAsync(ct);
+        if (!got) await Database.CloseConnectionAsync();
+        return got;
+    }
+
+    public async Task ReleaseEngineLockAsync()
+    {
+        await Database.SqlQuery<bool>($"SELECT pg_advisory_unlock({EngineLockKey}) AS \"Value\"").SingleAsync();
+        await Database.CloseConnectionAsync();
     }
 
     public void ResetTracking(params object[] keep)

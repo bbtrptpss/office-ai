@@ -5,6 +5,8 @@ using OfficeAI.Application.Abstractions;
 using OfficeAI.Application.Agents;
 using OfficeAI.Application.Organization;
 using OfficeAI.Application.Work;
+using OfficeAI.Application.Workflows;
+using OfficeAI.Domain.Workflows;
 using OfficeAI.Domain.Audit;
 using OfficeAI.Domain.Security;
 using OfficeAI.Infrastructure.Identity;
@@ -26,6 +28,7 @@ public static class Endpoints
         MapWork(api);
         MapSecurity(api);
         MapAgents(api);
+        MapWorkflows(api);
         app.MapHub<EventsHub>("/hubs/events");
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
     }
@@ -137,6 +140,23 @@ public static class Endpoints
         api.MapGet("/agent-runs/{id:guid}", (Guid id, AgentRunService s, CancellationToken ct) => s.GetRunDetailAsync(id, ct)).RequirePermission(Permissions.AgentRead);
         api.MapPost("/agent-runs/{id:guid}/cancel", (Guid id, AgentRunService s, CancellationToken ct) => s.CancelAsync(id, ct)).RequirePermission(Permissions.AgentRun);
         api.MapGet("/ai/usage", (AgentRunService s, CancellationToken ct) => s.GetUsageSummaryAsync(ct)).RequirePermission(Permissions.AgentRead);
+    }
+
+    private static void MapWorkflows(RouteGroupBuilder api)
+    {
+        api.MapPost("/projects/{id:guid}/objectives", (Guid id, StartObjectiveRequest r, ObjectiveService s, CancellationToken ct) => s.StartAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapGet("/workflows", (Guid? projectId, ObjectiveService s, CancellationToken ct) => s.ListAsync(projectId, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/workflows/{id:guid}", (Guid id, ObjectiveService s, CancellationToken ct) => s.GetAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/workflows/{id:guid}/events", (Guid id, ObjectiveService s, CancellationToken ct) => s.ListEventsAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapPost("/workflows/{id:guid}/cancel", (Guid id, ObjectiveService s, CancellationToken ct) => s.CancelAsync(id, ct)).RequirePermission(Permissions.ProjectManage);
+
+        api.MapGet("/approvals", (ApprovalStatus? status, Guid? workflowId, Guid? taskId, ApprovalService s, CancellationToken ct) =>
+            s.ListAsync(status, workflowId, taskId, ct)).RequirePermission(Permissions.TaskRead);
+        api.MapGet("/approvals/{id:guid}", (Guid id, ApprovalService s, CancellationToken ct) => s.GetAsync(id, ct)).RequirePermission(Permissions.TaskRead);
+        // Which permission a decision needs depends on the kind of request; the service checks it against the caller's real permissions.
+        api.MapPost("/approvals/{id:guid}/decision", async (Guid id, DecideApprovalRequest r, ApprovalService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+            await s.DecideAsync(id, r, await perms.GetPermissionsAsync(me.UserId!.Value, ct), ct)).RequirePermission(Permissions.TaskRead);
+        api.MapGet("/tasks/{id:guid}/reviews", (Guid id, ApprovalService s, CancellationToken ct) => s.ListReviewsAsync(id, ct)).RequirePermission(Permissions.TaskRead);
     }
 
     private static void MapSecurity(RouteGroupBuilder api)

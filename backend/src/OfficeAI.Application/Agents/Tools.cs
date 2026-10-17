@@ -8,7 +8,7 @@ using OfficeAI.Domain.Work;
 namespace OfficeAI.Application.Agents;
 
 /// <summary>Everything a tool may know about the call: who is running, on which task, in which run.</summary>
-public sealed record ToolContext(Guid RunId, Guid TaskId, Guid ProjectId, Guid EmployeeId, bool IsSimulated, IAppDbContext Db, TimeProvider Clock);
+public sealed record ToolContext(Guid RunId, Guid TaskId, Guid ProjectId, Guid EmployeeId, bool IsSimulated, IAppDbContext Db, TimeProvider Clock, RunPurpose Purpose = RunPurpose.Work);
 
 public sealed record ToolResult(bool Success, string Output)
 {
@@ -25,7 +25,12 @@ public sealed record ToolDescriptor(
     TimeSpan Timeout,
     int MaxOutputChars,
     bool RequiresApproval,
-    bool HasSideEffects);
+    bool HasSideEffects,
+    RunPurpose[]? Purposes = null)
+{
+    /// <summary>Kinds of run that may use this tool. Default: work runs only.</summary>
+    public bool AllowedFor(RunPurpose purpose) => (Purposes ?? [RunPurpose.Work]).Contains(purpose);
+}
 
 public interface IAgentTool
 {
@@ -42,7 +47,7 @@ public sealed class ToolRegistry(IEnumerable<IAgentTool> tools)
 
     /// <summary>Default grants for every new AI employee: read their own work context and hand in results.</summary>
     public static readonly string[] DefaultGrants =
-        [TaskContextTool.ToolId, ProjectTasksTool.ToolId, FindEmployeesTool.ToolId, SubmitDeliverableTool.ToolId, RequestReviewTool.ToolId, ReportBlockedTool.ToolId];
+        [TaskContextTool.ToolId, ProjectTasksTool.ToolId, FindEmployeesTool.ToolId, SubmitDeliverableTool.ToolId, RequestReviewTool.ToolId, ReportBlockedTool.ToolId, Workflows.ReviewSubmitTool.ToolId];
 }
 
 internal static class ToolJson
@@ -100,7 +105,7 @@ public sealed class TaskContextTool : IAgentTool
 
     public ToolDescriptor Descriptor { get; } = new(ToolId, "1.0",
         "Read the task you are assigned: title, description, acceptance criteria, priority, due date, dependencies and earlier deliverables.",
-        ToolJson.NoInput, TimeSpan.FromSeconds(10), 20_000, RequiresApproval: false, HasSideEffects: false);
+        ToolJson.NoInput, TimeSpan.FromSeconds(10), 40_000, RequiresApproval: false, HasSideEffects: false, Purposes: [RunPurpose.Work, RunPurpose.Review, RunPurpose.Plan]);
 
     public async Task<ToolResult> ExecuteAsync(ToolContext ctx, JsonElement input, CancellationToken ct)
     {
@@ -110,12 +115,20 @@ public sealed class TaskContextTool : IAgentTool
             .Join(ctx.Db.Tasks, d => d.DependsOnTaskId, t => t.Id, (d, t) => new { t.Title, Status = t.Status.ToString() }).ToListAsync(ct);
         var deliverables = await ctx.Db.Deliverables.AsNoTracking().Where(d => d.TaskId == task.Id)
             .OrderBy(d => d.CreatedAt).Select(d => new { d.Title, Status = d.Status.ToString(), d.Content }).ToListAsync(ct);
+        var reviews = await ctx.Db.Reviews.AsNoTracking().Where(r => r.TaskId == task.Id)
+            .OrderBy(r => r.CreatedAt).Select(r => new { Outcome = r.Outcome.ToString(), r.Comments }).ToListAsync(ct);
+        // Work handed in by the tasks this one waits for (e.g. delegated sub-tasks).
+        var upstream = await ctx.Db.TaskDependencies.AsNoTracking().Where(d => d.TaskId == task.Id)
+            .Join(ctx.Db.Deliverables, d => d.DependsOnTaskId, x => x.TaskId, (d, x) => new { x.TaskId, x.Title, x.Content, x.CreatedAt })
+            .OrderBy(x => x.CreatedAt).Select(x => new { x.Title, x.Content }).ToListAsync(ct);
         return ToolResult.Ok(new
         {
             project,
-            task = new { task.Title, task.Description, task.AcceptanceCriteria, Priority = task.Priority.ToString(), task.DueDate, Status = task.Status.ToString() },
+            task = new { task.Title, task.Description, task.AcceptanceCriteria, Priority = task.Priority.ToString(), task.DueDate, Status = task.Status.ToString(), task.RequiredSkills },
             dependsOn = deps,
             previousDeliverables = deliverables,
+            reviewFeedback = reviews,
+            upstreamDeliverables = upstream,
         });
     }
 }
@@ -126,7 +139,7 @@ public sealed class ProjectTasksTool : IAgentTool
 
     public ToolDescriptor Descriptor { get; } = new(ToolId, "1.0",
         "List the other tasks in your project with their status and assignee, to understand the surrounding work.",
-        ToolJson.NoInput, TimeSpan.FromSeconds(10), 20_000, RequiresApproval: false, HasSideEffects: false);
+        ToolJson.NoInput, TimeSpan.FromSeconds(10), 20_000, RequiresApproval: false, HasSideEffects: false, Purposes: [RunPurpose.Work, RunPurpose.Review, RunPurpose.Plan]);
 
     public async Task<ToolResult> ExecuteAsync(ToolContext ctx, JsonElement input, CancellationToken ct)
     {
@@ -158,7 +171,7 @@ public sealed class FindEmployeesTool : IAgentTool
             required = new[] { "query" },
             additionalProperties = false,
         }),
-        TimeSpan.FromSeconds(10), 10_000, RequiresApproval: false, HasSideEffects: false);
+        TimeSpan.FromSeconds(10), 10_000, RequiresApproval: false, HasSideEffects: false, Purposes: [RunPurpose.Work, RunPurpose.Plan]);
 
     public async Task<ToolResult> ExecuteAsync(ToolContext ctx, JsonElement input, CancellationToken ct)
     {
