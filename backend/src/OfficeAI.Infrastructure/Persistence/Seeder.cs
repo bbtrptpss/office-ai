@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OfficeAI.Application.Agents;
 using OfficeAI.Domain.Organization;
 using OfficeAI.Domain.Security;
 using OfficeAI.Infrastructure.Identity;
@@ -24,23 +25,55 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
         var ceoUser = await SeedCeoAsync();
         if (ceoUser is not null && !await db.Departments.AnyAsync(ct))
             await SeedOrganizationAsync(ceoUser, ct);
+        await SeedAiAsync(ct);
     }
 
     private async Task SeedPermissionsAsync(CancellationToken ct)
     {
+        var introduced = new List<string>();
         foreach (var (code, description) in Permissions.All)
             if (!await db.Permissions.AnyAsync(p => p.Code == code, ct))
+            {
                 db.Permissions.Add(new Permission { Code = code, Description = description });
+                introduced.Add(code);
+            }
         await db.SaveChangesAsync(ct);
 
         var permIds = await db.Permissions.ToDictionaryAsync(p => p.Code, p => p.Id, ct);
         foreach (var (roleName, perms) in SystemRoles.DefaultPermissions)
         {
             var role = await roles.FindByNameAsync(roleName);
-            if (role is not null) continue; // never overwrite permissions an admin has changed
-            role = new AppRole { Name = roleName };
-            Check(await roles.CreateAsync(role));
-            foreach (var p in perms) db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permIds[p] });
+            if (role is null)
+            {
+                role = new AppRole { Name = roleName };
+                Check(await roles.CreateAsync(role));
+                foreach (var p in perms) db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permIds[p] });
+            }
+            else
+            {
+                // Existing roles keep the admin's choices; only permissions new in this release get their default grants.
+                foreach (var p in perms.Intersect(introduced))
+                    db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permIds[p] });
+            }
+        }
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task SeedAiAsync(CancellationToken ct)
+    {
+        foreach (var model in AgentDefaults.Models())
+            if (!await db.AiModels.AnyAsync(m => m.Provider == model.Provider && m.ModelId == model.ModelId, ct))
+                db.AiModels.Add(model);
+
+        var unconfigured = await db.Employees
+            .Where(e => e.Kind == EmployeeKind.AI && !db.AgentConfigurations.Any(c => c.EmployeeId == e.Id))
+            .Select(e => new { Employee = e, e.RoleDefinition!.Level })
+            .ToListAsync(ct);
+        var now = DateTimeOffset.UtcNow;
+        foreach (var x in unconfigured)
+        {
+            db.AgentConfigurations.Add(AgentDefaults.ConfigFor(x.Employee, x.Level));
+            db.AgentToolPermissions.AddRange(AgentDefaults.GrantsFor(x.Employee.Id, now));
         }
         await db.SaveChangesAsync(ct);
     }

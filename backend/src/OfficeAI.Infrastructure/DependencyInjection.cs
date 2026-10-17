@@ -3,8 +3,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Application.Abstractions;
+using OfficeAI.Application.Agents;
 using OfficeAI.Application.Organization;
 using OfficeAI.Application.Work;
+using OfficeAI.Infrastructure.Ai;
 using OfficeAI.Infrastructure.Persistence;
 using OfficeAI.Infrastructure.Security;
 
@@ -30,6 +32,25 @@ public static class DependencyInjection
         services.AddScoped<PermissionService>();
         services.AddScoped<SecurityAdminService>();
         services.AddScoped<SecurityAuditWriter>();
+
+        // AI providers: keys come from configuration/environment only, never from the database.
+        services.Configure<AnthropicOptions>(config.GetSection("AiProviders:Anthropic"));
+        services.Configure<SimulatedOptions>(config.GetSection("AiProviders:Simulated"));
+        services.AddSingleton<IAiProvider, AnthropicProvider>();
+        services.AddSingleton<IAiProvider, SimulatedProvider>();
+        services.AddSingleton<AiProviderRegistry>();
+
+        services.AddSingleton<IAgentTool, TaskContextTool>();
+        services.AddSingleton<IAgentTool, ProjectTasksTool>();
+        services.AddSingleton<IAgentTool, FindEmployeesTool>();
+        services.AddSingleton<IAgentTool, SubmitDeliverableTool>();
+        services.AddSingleton<IAgentTool, RequestReviewTool>();
+        services.AddSingleton<IAgentTool, ReportBlockedTool>();
+        services.AddSingleton<ToolRegistry>();
+
+        services.AddScoped<AgentAdminService>();
+        services.AddScoped<AgentRunService>();
+        services.AddScoped<AgentExecutor>();
         return services;
     }
 }

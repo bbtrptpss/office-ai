@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Api.Infrastructure;
 using OfficeAI.Application.Abstractions;
+using OfficeAI.Application.Agents;
 using OfficeAI.Application.Organization;
 using OfficeAI.Application.Work;
 using OfficeAI.Domain.Audit;
@@ -24,6 +25,7 @@ public static class Endpoints
         MapOrganization(api);
         MapWork(api);
         MapSecurity(api);
+        MapAgents(api);
         app.MapHub<EventsHub>("/hubs/events");
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
     }
@@ -114,6 +116,27 @@ public static class Endpoints
         api.MapPost("/tasks/{id:guid}/assign", (Guid id, AssignRequest r, WorkService s, CancellationToken ct) => s.AssignAsync(id, r, ct)).RequirePermission(Permissions.TaskAssign);
         api.MapPost("/tasks/{id:guid}/dependencies", (Guid id, AddDependencyRequest r, WorkService s, CancellationToken ct) => s.AddDependencyAsync(id, r, ct)).RequirePermission(Permissions.TaskManage);
         api.MapDelete("/tasks/{id:guid}/dependencies/{dependsOn:guid}", (Guid id, Guid dependsOn, WorkService s, CancellationToken ct) => s.RemoveDependencyAsync(id, dependsOn, ct)).RequirePermission(Permissions.TaskManage);
+    }
+
+    private static void MapAgents(RouteGroupBuilder api)
+    {
+        // Configuration (human only: agent.manage is never usable by AI identities)
+        api.MapGet("/ai/providers", (AgentAdminService s) => s.ListProviders()).RequirePermission(Permissions.AgentRead);
+        api.MapGet("/ai/models", (AgentAdminService s, CancellationToken ct) => s.ListModelsAsync(ct)).RequirePermission(Permissions.AgentRead);
+        api.MapPut("/ai/models/{id:guid}", (Guid id, UpdateAiModelRequest r, AgentAdminService s, CancellationToken ct) => s.UpdateModelAsync(id, r, ct)).RequirePermission(Permissions.AgentManage);
+        api.MapGet("/ai/tools", (AgentAdminService s) => s.ListTools()).RequirePermission(Permissions.AgentRead);
+        api.MapGet("/agents/{employeeId:guid}/config", (Guid employeeId, AgentAdminService s, CancellationToken ct) => s.GetConfigAsync(employeeId, ct)).RequirePermission(Permissions.AgentRead);
+        api.MapPut("/agents/{employeeId:guid}/config", (Guid employeeId, UpdateAgentConfigRequest r, AgentAdminService s, CancellationToken ct) => s.UpdateConfigAsync(employeeId, r, ct)).RequirePermission(Permissions.AgentManage);
+        api.MapPut("/agents/{employeeId:guid}/tools", (Guid employeeId, SetAgentToolsRequest r, AgentAdminService s, ICurrentUser me, CancellationToken ct) => s.SetToolsAsync(employeeId, r, me.UserId, ct)).RequirePermission(Permissions.AgentManage);
+
+        // Runs
+        api.MapPost("/tasks/{id:guid}/runs", (Guid id, StartRunRequest? r, AgentRunService s, CancellationToken ct) => s.StartAsync(id, r ?? new StartRunRequest(), ct)).RequirePermission(Permissions.AgentRun);
+        api.MapGet("/tasks/{id:guid}/deliverables", (Guid id, AgentRunService s, CancellationToken ct) => s.ListDeliverablesAsync(id, ct)).RequirePermission(Permissions.TaskRead);
+        api.MapGet("/agent-runs", (Guid? taskId, Guid? employeeId, Guid? projectId, int? take, AgentRunService s, CancellationToken ct) =>
+            s.ListRunsAsync(taskId, employeeId, projectId, take ?? 50, ct)).RequirePermission(Permissions.AgentRead);
+        api.MapGet("/agent-runs/{id:guid}", (Guid id, AgentRunService s, CancellationToken ct) => s.GetRunDetailAsync(id, ct)).RequirePermission(Permissions.AgentRead);
+        api.MapPost("/agent-runs/{id:guid}/cancel", (Guid id, AgentRunService s, CancellationToken ct) => s.CancelAsync(id, ct)).RequirePermission(Permissions.AgentRun);
+        api.MapGet("/ai/usage", (AgentRunService s, CancellationToken ct) => s.GetUsageSummaryAsync(ct)).RequirePermission(Permissions.AgentRead);
     }
 
     private static void MapSecurity(RouteGroupBuilder api)

@@ -34,12 +34,13 @@ public class HttpCurrentUser(IHttpContextAccessor accessor) : ICurrentUser
 {
     private ClaimsPrincipal? User => accessor.HttpContext?.User;
 
-    public Guid? UserId =>
-        Guid.TryParse(User?.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+    // A background flow acting as someone (e.g. an AI run) takes precedence over the HTTP user.
+    public Guid? UserId => ActingAs.Identity is { } a ? a.UserId
+        : Guid.TryParse(User?.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 
-    public string? Name => User?.FindFirstValue(AppClaims.DisplayName) ?? User?.Identity?.Name;
-    public bool IsAgent => User?.FindFirstValue(AppClaims.IsAgent) == "true";
-    public string? CorrelationId => accessor.HttpContext?.Items[CorrelationIdMiddleware.ItemKey] as string;
+    public string? Name => ActingAs.Identity?.Name ?? User?.FindFirstValue(AppClaims.DisplayName) ?? User?.Identity?.Name;
+    public bool IsAgent => ActingAs.Identity?.IsAgent ?? User?.FindFirstValue(AppClaims.IsAgent) == "true";
+    public string? CorrelationId => ActingAs.Identity?.CorrelationId ?? accessor.HttpContext?.Items[CorrelationIdMiddleware.ItemKey] as string;
 }
 
 public class CorrelationIdMiddleware(RequestDelegate next)
@@ -116,4 +117,7 @@ public class SignalRNotifier(IHubContext<EventsHub> hub) : IRealtimeNotifier
 
     public Task OrganizationChangedAsync(CancellationToken ct = default) =>
         hub.Clients.All.SendAsync("organizationChanged", ct);
+
+    public Task AgentRunChangedAsync(Guid runId, Guid taskId, Guid projectId, string status, CancellationToken ct = default) =>
+        hub.Clients.All.SendAsync("agentRunChanged", new { runId, taskId, projectId, status }, ct);
 }

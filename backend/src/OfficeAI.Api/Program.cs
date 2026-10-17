@@ -17,6 +17,9 @@ builder.Services.AddInfrastructure(config);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddScoped<IRealtimeNotifier, SignalRNotifier>();
+builder.Services.AddSingleton<AgentRunQueue>();
+builder.Services.AddSingleton<IAgentRunQueue>(sp => sp.GetRequiredService<AgentRunQueue>());
+builder.Services.AddHostedService<AgentRunWorker>();
 
 // ---------- Identity + cookie auth ----------
 builder.Services

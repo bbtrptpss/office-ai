@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react";
 import {
-  Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Paper, Stack, Table, TableBody,
+  Alert, Button, Dialog, IconButton, DialogActions, DialogContent, DialogTitle, MenuItem, Paper, Stack, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, TextField, ToggleButton, ToggleButtonGroup,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import EditIcon from "@mui/icons-material/EditOutlined";
+import { useRouter } from "next/navigation";
 import { api, Department, Employee, EmployeeKind, EmployeeStatus, RoleDefinition } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -30,6 +32,7 @@ export default function EmployeesPage() {
   const { t, label } = useI18n();
   const { can } = useAuth();
   const errorMessage = useErrorMessage();
+  const router = useRouter();
   const { data, error, reload } = useLoad(async () => {
     const [employees, departments, roles] = await Promise.all([
       api.get<Employee[]>("/api/employees"),
@@ -96,11 +99,12 @@ export default function EmployeesPage() {
               <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{t.department}</TableCell>
               <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{t.manager}</TableCell>
               <TableCell>{t.status}</TableCell>
+              <TableCell padding="checkbox" />
             </TableRow>
           </TableHead>
           <TableBody>
             {rows.map((e) => (
-              <TableRow key={e.id} hover onClick={() => can("org.manage") && openEdit(e)} sx={{ cursor: can("org.manage") ? "pointer" : "default" }}>
+              <TableRow key={e.id} hover onClick={() => router.push(`/employees/${e.id}`)} sx={{ cursor: "pointer" }}>
                 <TableCell>
                   <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                     <KindIcon kind={e.kind} seed={e.displayName} size={32} />
@@ -111,6 +115,13 @@ export default function EmployeesPage() {
                 <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{e.departmentName}</TableCell>
                 <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{e.managerId ? names.get(e.managerId) : "—"}</TableCell>
                 <TableCell><StatusChip value={e.status} /></TableCell>
+                <TableCell padding="checkbox">
+                  {can("org.manage") && (
+                    <IconButton size="small" aria-label={t.edit} onClick={(ev) => { ev.stopPropagation(); openEdit(e); }}>
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

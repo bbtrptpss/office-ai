@@ -4,6 +4,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using OfficeAI.Application.Agents;
 using Testcontainers.PostgreSql;
 
 namespace OfficeAI.Tests;
@@ -18,6 +21,7 @@ public sealed class ApiFixture : IAsyncLifetime
 
     private readonly PostgreSqlContainer _db = new PostgreSqlBuilder("postgres:17-alpine").Build();
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
+    public ScriptedProvider Scripted { get; } = new();
     public string ConnectionString => _db.GetConnectionString();
 
     public async Task InitializeAsync()
@@ -32,6 +36,13 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("Seed:CeoPassword", CeoPassword);
             b.UseSetting("Seed:CeoName", "Test CEO");
             b.UseSetting("RateLimits:LoginPerMinute", "1000");
+            b.UseSetting("AiProviders:Simulated:Enabled", "true");
+            b.UseSetting("AiProviders:Anthropic:ApiKey", "");
+            b.ConfigureTestServices(s =>
+            {
+                s.AddSingleton<IAiProvider>(Scripted);
+                s.AddSingleton<IAgentTool, ApprovalRequiredTool>();
+            });
         });
         _ = Factory.Server; // start host: runs migrations + seed
     }

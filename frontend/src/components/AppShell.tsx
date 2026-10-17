@@ -23,6 +23,7 @@ import VerifiedUserIcon from "@mui/icons-material/VerifiedUserOutlined";
 import ExtensionIcon from "@mui/icons-material/ExtensionOutlined";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import HistoryIcon from "@mui/icons-material/HistoryOutlined";
+import SmartToyIcon from "@mui/icons-material/SmartToyOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import DarkModeIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeIcon from "@mui/icons-material/LightModeOutlined";
@@ -37,7 +38,7 @@ const DRAWER_WIDTH = 264;
 type NavKey =
   | "navDashboard" | "navOrganization" | "navEmployees" | "navDepartments" | "navProjects" | "navActivity"
   | "navApprovals" | "navChat" | "navKnowledge" | "navFinance" | "navQuality" | "navIntegrations"
-  | "navSecurity" | "navAudit";
+  | "navSecurity" | "navAudit" | "aiSettings";
 
 interface NavItem {
   key: NavKey;
@@ -54,13 +55,14 @@ const NAV: NavItem[] = [
   { key: "navEmployees", href: "/employees", icon: <PeopleIcon />, permission: "org.read" },
   { key: "navDepartments", href: "/departments", icon: <ApartmentIcon />, permission: "org.read" },
   { key: "navProjects", href: "/projects", icon: <ViewKanbanIcon />, permission: "project.read" },
-  { key: "navActivity", icon: <TimelineIcon />, phase: 2 },
+  { key: "navActivity", href: "/agents", icon: <TimelineIcon />, permission: "agent.read" },
   { key: "navApprovals", icon: <TaskAltIcon />, phase: 3 },
   { key: "navChat", icon: <ForumIcon />, phase: 5 },
   { key: "navKnowledge", icon: <MenuBookIcon />, phase: 5 },
   { key: "navFinance", icon: <PaymentsIcon />, phase: 5 },
   { key: "navQuality", icon: <VerifiedUserIcon />, phase: 4 },
   { key: "navIntegrations", icon: <ExtensionIcon />, phase: 5 },
+  { key: "aiSettings", href: "/ai-settings", icon: <SmartToyIcon />, permission: "agent.read" },
   { key: "navSecurity", href: "/security", icon: <AdminPanelSettingsIcon />, permission: "security.manage" },
   { key: "navAudit", href: "/audit", icon: <HistoryIcon />, permission: "audit.read" },
 ];

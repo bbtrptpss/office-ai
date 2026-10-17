@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { animate, useReducedMotion } from "motion/react";
 import { Box, Card, CardContent, Grid, LinearProgress, List, ListItem, ListItemIcon, ListItemText, Stack, Typography } from "@mui/material";
-import { api, Dashboard } from "@/lib/api";
+import { api, Dashboard, UsageSummary, usd } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -44,7 +44,7 @@ function Stat({ label, value, suffix, emoji, tone, index }: {
 
 export default function DashboardPage() {
   const { t } = useI18n();
-  const { me } = useAuth();
+  const { me, can } = useAuth();
   const { data, error, reload } = useLoad(() => api.get<Dashboard>("/api/dashboard"));
   useRealtime("taskChanged", () => void reload());
   useRealtime("organizationChanged", () => void reload());
@@ -143,12 +143,49 @@ export default function DashboardPage() {
             </Card>
           </Rise>
         </Grid>
+        {can("agent.read") && <AiCostCard />}
         <Grid size={12}>
           <Typography variant="body2" color="text.secondary">
-            AI usage &amp; cost, quality gates, profitability — {t.notYet} (Phase 2–5)
+            Quality gates, profitability — {t.notYet} (Phase 4–5)
           </Typography>
         </Grid>
       </Grid>
     </>
+  );
+}
+
+function AiCostCard() {
+  const { t } = useI18n();
+  const { data, reload } = useLoad(() => api.get<UsageSummary>("/api/ai/usage"));
+  useRealtime("agentRunChanged", () => void reload());
+  if (!data) return null;
+  return (
+    <Grid size={12}>
+      <Rise index={11}>
+        <Card>
+          <CardContent>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={3} sx={{ alignItems: { sm: "center" } }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="h6">💸 {t.aiCostMonth}</Typography>
+                <Typography variant="caption" color="text.secondary">{t.realOnly}</Typography>
+                <Typography variant="h4">{usd(data.thisMonthUsd)}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="body2" color="text.secondary">{t.tokens}</Typography>
+                <Typography variant="h6">{data.thisMonthTokens.toLocaleString()}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="body2" color="text.secondary">{t.runs}</Typography>
+                <Typography variant="h6">{data.runsThisMonth}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="body2" color="text.secondary">{t.activeRuns}</Typography>
+                <Typography variant="h6">{data.activeRuns}</Typography>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Rise>
+    </Grid>
   );
 }
