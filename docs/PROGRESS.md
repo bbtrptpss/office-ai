@@ -4,7 +4,7 @@ Resume here. Each phase is built on its own branch and committed per milestone.
 
 ## Phase 1 — Company foundation ✅ (master, 1fbcb9f)
 
-## Phase 2 — AI employee execution (branch `phase-2`)
+## Phase 2 — AI employee execution ✅ (merged to master)
 
 Goal: an AI employee can be configured (provider, model, tools, budget) and run an assigned task for real,
 using only authorized tools, with every call, tool execution, token and cost recorded.
@@ -16,7 +16,7 @@ using only authorized tools, with every call, tool execution, token and cost rec
 | M3 | Tool registry: declared id/version/schema/permission/timeout/limits/approval; Phase 2 tools are internal-data tools only | done |
 | M4 | Agent runner: queued background execution, limits (turns, tool calls, tokens, time, monthly budget), cancellation, restart recovery | done |
 | M5 | API + SignalR + tests | done (65 tests) |
-| M6 | UI: Agent Activity, employee profile (model/tools/budget), run a task with AI, AI settings (models + pricing) | todo |
+| M6 | UI: Agent Activity, employee profile (model/tools/budget), run a task with AI, AI settings (models + pricing) | done (verified in browser with the simulated provider) |
 
 ### Decisions taken without the CEO (change any time)
 
@@ -36,6 +36,16 @@ using only authorized tools, with every call, tool execution, token and cost rec
 2. Monthly AI budget for the trial period (company-wide cap).
 3. Deployment target after Phase 5.
 
+### Known gaps carried forward
+
+- The Anthropic adapter has not been run against the real API (no key on this machine). First real run: set `ANTHROPIC_API_KEY` in `.env`, switch one AI employee to `anthropic` and run a small task.
+- OpenAI / Gemini adapters not built (waiting on which accounts exist).
+- Runs interrupted by a restart are marked Failed, not resumed; durable resume belongs to Phase 3 orchestration.
+
+## Phase 3 — Orchestration (next, branch `phase-3`)
+
+Delegation, dependencies and parallel execution, review workflows, retries/timeouts/cancellation/recovery, human approval inbox.
+
 ## Later phases
 
-3 Orchestration · 4 Software house operations · 5 Company management · 6 Production readiness
+4 Software house operations · 5 Company management · 6 Production readiness

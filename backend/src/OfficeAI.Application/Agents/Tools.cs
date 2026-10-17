@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Application.Abstractions;
@@ -46,7 +47,8 @@ public sealed class ToolRegistry(IEnumerable<IAgentTool> tools)
 
 internal static class ToolJson
 {
-    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+    // Tool output goes to the model and is shown as plain text, never as HTML: keep Thai and other scripts readable.
+    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web) { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     public static JsonElement Schema(object schema) => JsonSerializer.SerializeToElement(schema, Options);
 

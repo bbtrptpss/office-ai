@@ -192,3 +192,122 @@ export interface User {
   isActive: boolean;
   roles: string[];
 }
+
+// ---------- Phase 2: AI employees ----------
+
+export type Effort = "Low" | "Medium" | "High" | "XHigh" | "Max";
+export type AgentRunStatus = "Queued" | "Running" | "Succeeded" | "Failed" | "Cancelled" | "LimitReached";
+export type RunStepKind = "Instructions" | "Input" | "AssistantText" | "ToolCall" | "ToolResult" | "Notice";
+export type ToolExecutionStatus = "Succeeded" | "Failed" | "Denied" | "TimedOut" | "InvalidInput";
+
+export interface AiProvider {
+  name: string;
+  isAvailable: boolean;
+  isSimulated: boolean;
+}
+
+export interface AiModel {
+  id: string;
+  provider: string;
+  modelId: string;
+  displayName: string;
+  tier: "Routine" | "Standard" | "Advanced";
+  inputUsdPerMTok: number;
+  outputUsdPerMTok: number;
+  cacheReadUsdPerMTok: number;
+  cacheWriteUsdPerMTok: number;
+  isEnabled: boolean;
+  version: number;
+}
+
+export interface AgentTool {
+  id: string;
+  version: string;
+  description: string;
+  requiresApproval: boolean;
+  hasSideEffects: boolean;
+  timeoutSeconds: number;
+}
+
+export interface AgentConfig {
+  employeeId: string;
+  provider: string;
+  modelId: string;
+  effort: Effort;
+  maxTokensPerCall: number;
+  maxTurnsPerRun: number;
+  maxToolCallsPerRun: number;
+  maxTokensPerRun: number;
+  timeoutSeconds: number;
+  monthlyBudgetUsd: number;
+  isEnabled: boolean;
+  tools: string[];
+  spentThisMonthUsd: number;
+  version: number;
+}
+
+export interface AgentRun {
+  id: string;
+  taskId: string;
+  taskTitle: string;
+  projectId: string;
+  employeeId: string;
+  employeeName: string;
+  status: AgentRunStatus;
+  provider: string;
+  modelId: string;
+  isSimulated: boolean;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  turns: number;
+  toolCalls: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  stopReason: string | null;
+  error: string | null;
+}
+
+export interface AgentRunDetail {
+  run: AgentRun;
+  steps: { sequence: number; kind: RunStepKind; content: string; toolCallId: string | null; createdAt: string }[];
+  toolExecutions: {
+    id: string;
+    toolId: string;
+    toolVersion: string;
+    toolCallId: string;
+    status: ToolExecutionStatus;
+    inputJson: string;
+    output: string | null;
+    error: string | null;
+    durationMs: number;
+    startedAt: string;
+  }[];
+}
+
+export interface Deliverable {
+  id: string;
+  taskId: string;
+  employeeId: string;
+  employeeName: string;
+  runId: string | null;
+  title: string;
+  format: string;
+  content: string;
+  status: "Submitted" | "Accepted" | "Rejected";
+  isSimulated: boolean;
+  createdAt: string;
+}
+
+export interface UsageSummary {
+  thisMonthUsd: number;
+  thisMonthSimulatedUsd: number;
+  thisMonthTokens: number;
+  runsThisMonth: number;
+  activeRuns: number;
+  byEmployee: { employeeId: string; displayName: string; costUsd: number; tokens: number; runs: number; budgetUsd: number }[];
+}
+
+export const usd = (n: number) =>
+  `$${n.toLocaleString("en-US", { minimumFractionDigits: n > 0 && n < 0.01 ? 4 : 2, maximumFractionDigits: n > 0 && n < 0.01 ? 6 : 2 })}`;

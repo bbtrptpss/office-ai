@@ -8,11 +8,12 @@ import {
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react";
 import AddIcon from "@mui/icons-material/Add";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
-import { api, Employee, Milestone, Project, Task, TaskPriority, TaskStatus } from "@/lib/api";
+import { AgentRun, api, Deliverable, Employee, Milestone, Project, Task, TaskPriority, TaskStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
 import { KindIcon, Loading, PageHeader, StatusChip, useErrorMessage, useLoad } from "@/components/common";
+import { DeliverableList, RunList } from "@/components/agents";
 
 const COLUMNS: TaskStatus[] = ["Todo", "Assigned", "InProgress", "Blocked", "InReview", "WaitingApproval", "Done", "Failed"];
 const PRIORITIES: TaskPriority[] = ["Low", "Medium", "High", "Critical"];
@@ -250,6 +251,8 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
                     </TextField>
                   )}
                 </Box>
+
+                {can("agent.read") && <TaskAiPanel task={current} onError={setMessage} />}
               </Stack>
             </DialogContent>
             <DialogActions>
@@ -326,5 +329,58 @@ function TaskFields({ form, setForm, milestones, disabled }: {
         </TextField>
       </Stack>
     </>
+  );
+}
+
+/** AI section of the task dialog: start a run, follow runs live, read deliverables. */
+function TaskAiPanel({ task, onError }: { task: Task; onError: (m: string) => void }) {
+  const { t } = useI18n();
+  const { can } = useAuth();
+  const errorMessage = useErrorMessage();
+  const [starting, setStarting] = useState(false);
+  const { data, reload } = useLoad(async () => {
+    const [runs, deliverables] = await Promise.all([
+      api.get<AgentRun[]>(`/api/agent-runs?taskId=${task.id}&take=20`),
+      api.get<Deliverable[]>(`/api/tasks/${task.id}/deliverables`),
+    ]);
+    return { runs, deliverables };
+  }, task.id);
+  useRealtime<{ taskId: string }>("agentRunChanged", (e) => {
+    if (e.taskId === task.id) void reload();
+  });
+
+  const aiAssignee = task.assignees.find((a) => a.kind === "AI");
+  const active = data?.runs.some((r) => r.status === "Queued" || r.status === "Running");
+  const canStart = can("agent.run") && !!aiAssignee && ["Assigned", "InProgress"].includes(task.status) && !active;
+
+  return (
+    <Box sx={{ p: 2, borderRadius: 4, bgcolor: (th) => `rgba(${th.vars?.palette.secondary.mainChannel} / 0.06)` }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1.5 }}>
+        <Typography variant="h6" sx={{ flex: 1 }}>🤖 {t.runs}</Typography>
+        {can("agent.run") && (
+          <Button
+            variant="contained"
+            size="small"
+            disabled={!canStart || starting}
+            onClick={async () => {
+              setStarting(true);
+              try {
+                await api.post(`/api/tasks/${task.id}/runs`, {});
+                await reload();
+              } catch (e) {
+                onError(errorMessage(e));
+              } finally {
+                setStarting(false);
+              }
+            }}
+          >
+            {t.runWithAi}
+          </Button>
+        )}
+      </Stack>
+      {!data ? <Loading /> : <RunList runs={data.runs} showTask={false} />}
+      <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2, mb: 1 }}>{t.deliverables}</Typography>
+      {data && <DeliverableList items={data.deliverables} />}
+    </Box>
   );
 }

@@ -59,6 +59,7 @@ public sealed class AgentRunWorker(AgentRunQueue queue, IServiceScopeFactory sco
                 catch (Exception ex)
                 {
                     log.LogError(ex, "Run {RunId} crashed", runId);
+                    await MarkCrashedAsync(runId);
                 }
                 finally
                 {
@@ -66,6 +67,26 @@ public sealed class AgentRunWorker(AgentRunQueue queue, IServiceScopeFactory sco
                     slots.Release();
                 }
             }, CancellationToken.None);
+        }
+    }
+
+    /// <summary>Safety net: a run must never stay Queued/Running after its executor died.</summary>
+    private async Task MarkCrashedAsync(Guid runId)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.AgentRuns.Where(r => r.Id == runId && (r.Status == AgentRunStatus.Queued || r.Status == AgentRunStatus.Running))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.Status, AgentRunStatus.Failed)
+                    .SetProperty(r => r.StopReason, "crashed")
+                    .SetProperty(r => r.Error, "The run stopped unexpectedly.")
+                    .SetProperty(r => r.FinishedAt, DateTimeOffset.UtcNow));
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Could not mark run {RunId} as failed", runId);
         }
     }
 

@@ -28,23 +28,24 @@ public sealed class AgentExecutor(
 
     public async Task ExecuteAsync(Guid runId, CancellationToken cancel)
     {
-        var run = await db.AgentRuns.FirstOrDefaultAsync(r => r.Id == runId, cancel);
+        // Setup reads ignore the cancel token: cancellation is honoured just below, never as an unhandled exception.
+        var run = await db.AgentRuns.FirstOrDefaultAsync(r => r.Id == runId, CancellationToken.None);
         if (run is null || run.Status != AgentRunStatus.Queued) return; // already handled (idempotent)
 
         // Employee and task are read untracked: people may edit them while the run is going.
-        var employee = await db.Employees.AsNoTracking().Include(e => e.RoleDefinition).FirstAsync(e => e.Id == run.EmployeeId, cancel);
+        var employee = await db.Employees.AsNoTracking().Include(e => e.RoleDefinition).FirstAsync(e => e.Id == run.EmployeeId, CancellationToken.None);
         using var acting = ActingAs.Use(new ActingIdentity(employee.UserId, employee.DisplayName, IsAgent: true, run.Id.ToString("N")));
 
-        if (run.CancelRequested)
+        if (run.CancelRequested || cancel.IsCancellationRequested)
         {
             await FinishAsync(run, employee, AgentRunStatus.Cancelled, "cancelled", null);
             return;
         }
 
-        var config = await db.AgentConfigurations.AsNoTracking().FirstOrDefaultAsync(c => c.EmployeeId == employee.Id, cancel);
-        var price = await db.AiModels.AsNoTracking().FirstOrDefaultAsync(m => m.Provider == run.Provider && m.ModelId == run.ModelId, cancel);
+        var config = await db.AgentConfigurations.AsNoTracking().FirstOrDefaultAsync(c => c.EmployeeId == employee.Id, CancellationToken.None);
+        var price = await db.AiModels.AsNoTracking().FirstOrDefaultAsync(m => m.Provider == run.Provider && m.ModelId == run.ModelId, CancellationToken.None);
         var provider = providers.Find(run.Provider);
-        var task = await db.Tasks.AsNoTracking().FirstAsync(t => t.Id == run.TaskId, cancel);
+        var task = await db.Tasks.AsNoTracking().FirstAsync(t => t.Id == run.TaskId, CancellationToken.None);
 
         var problem = config is null ? "No agent configuration."
             : price is null ? $"No price configured for {run.Provider}/{run.ModelId}."
@@ -60,7 +61,7 @@ public sealed class AgentExecutor(
         run.StartedAt = clock.GetUtcNow();
         try
         {
-            var tracked = await db.Tasks.FirstAsync(t => t.Id == run.TaskId, cancel);
+            var tracked = await db.Tasks.FirstAsync(t => t.Id == run.TaskId, CancellationToken.None);
             if (tracked.Status == WorkTaskStatus.Assigned) tracked.Status = WorkTaskStatus.InProgress;
             await db.SaveChangesAsync(CancellationToken.None);
         }

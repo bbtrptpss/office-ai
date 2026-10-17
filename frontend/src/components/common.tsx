@@ -75,6 +75,8 @@ const STATUS_COLORS: Record<string, ChipProps["color"]> = {
   InReview: "secondary", WaitingApproval: "warning", WaitingForApproval: "warning",
   Blocked: "error", Failed: "error",
   Critical: "error", High: "warning",
+  Succeeded: "success", Running: "primary", Queued: "info", LimitReached: "warning", Cancelled: "default",
+  Denied: "error", TimedOut: "warning", InvalidInput: "warning", Submitted: "info", Accepted: "success", Rejected: "error",
 };
 
 export function StatusChip({ value }: { value: string }) {
