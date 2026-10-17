@@ -214,9 +214,9 @@ public class OrganizationService(IAppDbContext db, IRealtimeNotifier notifier, T
     private async Task EnsureAgentDefaultsAsync(EmployeeProfile emp, CancellationToken ct)
     {
         if (emp.Kind != EmployeeKind.AI || await db.AgentConfigurations.AnyAsync(c => c.EmployeeId == emp.Id, ct)) return;
-        var level = await db.RoleDefinitions.Where(r => r.Id == emp.RoleDefinitionId).Select(r => r.Level).FirstAsync(ct);
-        db.AgentConfigurations.Add(AgentDefaults.ConfigFor(emp, level));
-        db.AgentToolPermissions.AddRange(AgentDefaults.GrantsFor(emp.Id, level, clock.GetUtcNow()));
+        var role = await db.RoleDefinitions.Where(r => r.Id == emp.RoleDefinitionId).Select(r => new { r.Level, r.Code }).FirstAsync(ct);
+        db.AgentConfigurations.Add(AgentDefaults.ConfigFor(emp, role.Level));
+        db.AgentToolPermissions.AddRange(AgentDefaults.GrantsFor(emp.Id, role.Level, clock.GetUtcNow(), role.Code));
     }
 
     public async Task<List<OrgChartNode>> GetOrgChartAsync(CancellationToken ct)

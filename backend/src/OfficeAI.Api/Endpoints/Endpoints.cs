@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OfficeAI.Api.Infrastructure;
 using OfficeAI.Application.Abstractions;
 using OfficeAI.Application.Agents;
+using OfficeAI.Application.Delivery;
 using OfficeAI.Application.Organization;
 using OfficeAI.Application.Work;
 using OfficeAI.Application.Workflows;
@@ -29,6 +30,7 @@ public static class Endpoints
         MapSecurity(api);
         MapAgents(api);
         MapWorkflows(api);
+        MapDelivery(api);
         app.MapHub<EventsHub>("/hubs/events");
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
     }
@@ -157,6 +159,21 @@ public static class Endpoints
         api.MapPost("/approvals/{id:guid}/decision", async (Guid id, DecideApprovalRequest r, ApprovalService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
             await s.DecideAsync(id, r, await perms.GetPermissionsAsync(me.UserId!.Value, ct), ct)).RequirePermission(Permissions.TaskRead);
         api.MapGet("/tasks/{id:guid}/reviews", (Guid id, ApprovalService s, CancellationToken ct) => s.ListReviewsAsync(id, ct)).RequirePermission(Permissions.TaskRead);
+    }
+
+    private static void MapDelivery(RouteGroupBuilder api)
+    {
+        api.MapGet("/projects/{id:guid}/requirements", (Guid id, DeliveryService s, CancellationToken ct) => s.ListRequirementsAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapPost("/projects/{id:guid}/requirements", (Guid id, SaveRequirementRequest r, DeliveryService s, CancellationToken ct) => s.CreateRequirementAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPut("/requirements/{id:guid}", (Guid id, SaveRequirementRequest r, DeliveryService s, CancellationToken ct) => s.UpdateRequirementAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/requirements/{id:guid}/status", (Guid id, SetReviewStateRequest r, DeliveryService s, CancellationToken ct) => s.SetRequirementStatusAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapGet("/projects/{id:guid}/decisions", (Guid id, DeliveryService s, CancellationToken ct) => s.ListDecisionsAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapPost("/decisions/{id:guid}/status", (Guid id, SetDecisionStatusRequest r, DeliveryService s, CancellationToken ct) => s.SetDecisionStatusAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapGet("/projects/{id:guid}/estimates", (Guid id, DeliveryService s, CancellationToken ct) => s.ListEstimatesAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/rate-card", (DeliveryService s, CancellationToken ct) => s.ListRatesAsync(ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapPut("/rate-card/{roleDefinitionId:guid}", (Guid roleDefinitionId, SetRoleRateRequest r, DeliveryService s, CancellationToken ct) => s.SetRateAsync(roleDefinitionId, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapGet("/company-settings", (DeliveryService s, CancellationToken ct) => s.GetSettingsAsync(ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapPut("/company-settings", (SaveSettingsRequest r, DeliveryService s, CancellationToken ct) => s.SaveSettingsAsync(r, ct)).RequirePermission(Permissions.ProjectManage);
     }
 
     private static void MapSecurity(RouteGroupBuilder api)

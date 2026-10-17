@@ -86,7 +86,7 @@ public class AgentTests(ApiFixture fx)
         Assert.Equal("anthropic", config.Provider);
         Assert.Equal("claude-sonnet-5-5", config.ModelId); // Staff level
         Assert.Equal(5m, config.MonthlyBudgetUsd);
-        Assert.Equal(ToolRegistry.DefaultGrants.Order(), config.Tools.Order());
+        Assert.Equal(AgentDefaults.ToolsFor(Domain.Organization.OrgLevel.Staff, "BACKEND").Distinct().Order(), config.Tools.Order());
 
         var employees = await ceo.GetAsync<List<EmployeeDto>>("/api/employees");
         var cto = employees.Single(e => e.DisplayName == "CTO AI");

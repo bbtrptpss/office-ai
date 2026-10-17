@@ -31,6 +31,7 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
         ApprovalKind.Plan => Permissions.ProjectManage,
         ApprovalKind.TaskCompletion => Permissions.TaskApprove,
         ApprovalKind.ToolAction => Permissions.AgentManage,
+        ApprovalKind.Estimate => Permissions.ProjectManage,
         _ => Permissions.TaskManage,
     };
 
@@ -90,6 +91,9 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
                 break;
             case ApprovalKind.Escalation:
                 await ApplyEscalationDecisionAsync(approval, req.Approve, now, ct);
+                break;
+            case ApprovalKind.Estimate:
+                await ApplyEstimateDecisionAsync(approval, req.Approve, ct);
                 break;
             case ApprovalKind.ToolAction:
                 // Executed by the workflow engine (exactly once) on its next tick.
@@ -172,6 +176,22 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
         }
         if (task.WorkflowExecutionId is { } wf)
             Approvals.Event(db, wf, task.Id, approve ? "escalation_retry" : "escalation_cancel", approve ? $"'{task.Title}' will be retried." : $"'{task.Title}' was cancelled.", now);
+    }
+
+    private async Task ApplyEstimateDecisionAsync(ApprovalRequest approval, bool approve, CancellationToken ct)
+    {
+        var estimateId = System.Text.Json.JsonDocument.Parse(approval.PayloadJson).RootElement.GetProperty("estimateId").GetGuid();
+        var estimate = await db.Estimates.FirstAsync(e => e.Id == estimateId, ct);
+        estimate.Status = approve ? Domain.Delivery.EstimateStatus.Approved : Domain.Delivery.EstimateStatus.Rejected;
+        if (approve)
+        {
+            var project = await db.Projects.FirstAsync(p => p.Id == estimate.ProjectId, ct);
+            project.EstimatedBudget = estimate.TotalCost; // the planned cost; the quoted price stays on the estimate
+        }
+        else if (approval.TaskId is { } taskId && approval.DecisionNote is { } note)
+        {
+            AddHumanReview(taskId, note);
+        }
     }
 
     private void AddHumanReview(Guid taskId, string comments) =>

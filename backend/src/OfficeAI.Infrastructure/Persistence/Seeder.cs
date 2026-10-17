@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OfficeAI.Application.Agents;
+using OfficeAI.Application.Delivery;
 using OfficeAI.Application.Workflows;
+using OfficeAI.Domain.Delivery;
 using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Workflows;
 using OfficeAI.Domain.Organization;
@@ -70,13 +72,13 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
 
         var unconfigured = await db.Employees
             .Where(e => e.Kind == EmployeeKind.AI && !db.AgentConfigurations.Any(c => c.EmployeeId == e.Id))
-            .Select(e => new { Employee = e, e.RoleDefinition!.Level })
+            .Select(e => new { Employee = e, e.RoleDefinition!.Level, e.RoleDefinition.Code })
             .ToListAsync(ct);
         var now = DateTimeOffset.UtcNow;
         foreach (var x in unconfigured)
         {
             db.AgentConfigurations.Add(AgentDefaults.ConfigFor(x.Employee, x.Level));
-            db.AgentToolPermissions.AddRange(AgentDefaults.GrantsFor(x.Employee.Id, x.Level, now));
+            db.AgentToolPermissions.AddRange(AgentDefaults.GrantsFor(x.Employee.Id, x.Level, now, x.Code));
         }
         await db.SaveChangesAsync(ct);
 
@@ -98,6 +100,33 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
                     if (!existing.Contains(new { EmployeeId = e.Id, ToolId = tool }))
                         db.AgentToolPermissions.Add(new AgentToolPermission { EmployeeId = e.Id, ToolId = tool, GrantedAt = now });
             db.SeedMarkers.Add(new SeedMarker { Key = marker, AppliedAt = now });
+        }
+        await db.SaveChangesAsync(ct);
+        await SeedDeliveryAsync(now, ct);
+    }
+
+    /// <summary>Phase 4: company settings, a starting rate card and the specialist tools (each applied once).</summary>
+    private async Task SeedDeliveryAsync(DateTimeOffset now, CancellationToken ct)
+    {
+        if (!await db.CompanySettings.AnyAsync(ct)) db.CompanySettings.Add(new CompanySettings());
+        const string rates = "phase4-rate-card";
+        if (!await db.SeedMarkers.AnyAsync(m => m.Key == rates, ct))
+        {
+            foreach (var role in await db.RoleDefinitions.Where(r => !db.RoleRates.Any(x => x.RoleDefinitionId == r.Id)).ToListAsync(ct))
+                db.RoleRates.Add(new RoleRate { RoleDefinitionId = role.Id, HourlyRateThb = AgentDefaults.DefaultRateThb(role.Level) });
+            db.SeedMarkers.Add(new SeedMarker { Key = rates, AppliedAt = now });
+        }
+        const string tools = "phase4-tool-grants";
+        if (!await db.SeedMarkers.AnyAsync(m => m.Key == tools, ct))
+        {
+            var employees = await db.AgentConfigurations.Join(db.Employees, c => c.EmployeeId, e => e.Id, (c, e) => new { e.Id, e.RoleDefinition!.Level, e.RoleDefinition.Code }).ToListAsync(ct);
+            var existing = (await db.AgentToolPermissions.Select(p => new { p.EmployeeId, p.ToolId }).ToListAsync(ct)).ToHashSet();
+            var phase4 = new[] { ReadRequirementsTool.ToolId, AddRequirementTool.ToolId, ProposeDecisionTool.ToolId, SubmitEstimateTool.ToolId };
+            foreach (var e in employees)
+                foreach (var tool in phase4.Intersect(AgentDefaults.ToolsFor(e.Level, e.Code)))
+                    if (!existing.Contains(new { EmployeeId = e.Id, ToolId = tool }))
+                        db.AgentToolPermissions.Add(new AgentToolPermission { EmployeeId = e.Id, ToolId = tool, GrantedAt = now });
+            db.SeedMarkers.Add(new SeedMarker { Key = tools, AppliedAt = now });
         }
         await db.SaveChangesAsync(ct);
     }

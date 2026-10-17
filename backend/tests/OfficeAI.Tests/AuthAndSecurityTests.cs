@@ -86,6 +86,14 @@ public class AuthAndSecurityTests(ApiFixture fx)
         { "PUT", $"/api/agents/{Guid.Empty}/tools" },
         { "POST", $"/api/tasks/{Guid.Empty}/runs" },
         { "POST", $"/api/agent-runs/{Guid.Empty}/cancel" },
+        { "POST", $"/api/projects/{Guid.Empty}/objectives" },
+        { "POST", $"/api/workflows/{Guid.Empty}/cancel" },
+        { "POST", $"/api/projects/{Guid.Empty}/requirements" },
+        { "PUT", $"/api/requirements/{Guid.Empty}" },
+        { "POST", $"/api/requirements/{Guid.Empty}/status" },
+        { "POST", $"/api/decisions/{Guid.Empty}/status" },
+        { "PUT", $"/api/rate-card/{Guid.Empty}" },
+        { "PUT", "/api/company-settings" },
     };
 
     [Theory]

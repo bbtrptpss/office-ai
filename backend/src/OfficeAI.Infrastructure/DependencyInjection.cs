@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Application.Abstractions;
 using OfficeAI.Application.Agents;
+using OfficeAI.Application.Delivery;
 using OfficeAI.Application.Organization;
 using OfficeAI.Application.Work;
 using OfficeAI.Application.Workflows;
@@ -50,6 +51,10 @@ public static class DependencyInjection
         services.AddSingleton<IAgentTool, PlanSubmitTool>();
         services.AddSingleton<IAgentTool, ReviewSubmitTool>();
         services.AddSingleton<IAgentTool, DelegateTaskTool>();
+        services.AddSingleton<IAgentTool, ReadRequirementsTool>();
+        services.AddSingleton<IAgentTool, AddRequirementTool>();
+        services.AddSingleton<IAgentTool, ProposeDecisionTool>();
+        services.AddSingleton<IAgentTool, SubmitEstimateTool>();
         services.AddSingleton<ToolRegistry>();
 
         services.AddScoped<AgentAdminService>();
@@ -60,6 +65,7 @@ public static class DependencyInjection
         services.AddScoped<ApprovalService>();
         services.AddScoped<ObjectiveService>();
         services.AddScoped<WorkflowEngine>();
+        services.AddScoped<DeliveryService>();
         return services;
     }
 }
