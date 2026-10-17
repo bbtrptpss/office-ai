@@ -121,3 +121,21 @@ public class ReportsTests(ApiFixture fx)
         Assert.Equal(HttpStatusCode.NotFound, (await ceo.PutAsJsonAsync("/api/budgets", new { scope = "Project", scopeId = Guid.NewGuid(), month = ThisMonth, amountUsd = 1 })).StatusCode);
     }
 }
+
+[Collection(ApiCollection.Name)]
+public class QualitySecurityTests(ApiFixture fx)
+{
+    [Fact]
+    public async Task Overview_counts_security_events_and_needs_audit_permission()
+    {
+        await fx.Anonymous().PostAsJsonAsync("/api/auth/login", new { email = ApiFixture.CeoEmail, password = "definitely-wrong" });
+        var ceo = await fx.CeoAsync();
+        var report = await ceo.GetAsync<OfficeAI.Application.Reports.QualitySecurityDto>("/api/reports/quality-security?days=7");
+        Assert.Equal(7, report.Days);
+        Assert.Contains(report.SecurityEventCounts, c => c.Key == "LoginFailed" && c.Count >= 1);
+        Assert.Contains(report.RecentSecurityEvents, e => e.Action == "LoginFailed");
+
+        var manager = await fx.UserWithRolesAsync("Manager");
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, (await manager.GetAsync("/api/reports/quality-security")).StatusCode);
+    }
+}

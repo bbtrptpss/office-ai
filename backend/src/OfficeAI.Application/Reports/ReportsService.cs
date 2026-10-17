@@ -25,6 +25,13 @@ public record PerformanceRowDto(Guid EmployeeId, string Name, string JobTitle, s
     int ChangesRequested, decimal FirstPassApprovalRate);
 public record PerformanceReportDto(DateOnly Month, List<PerformanceRowDto> Rows);
 
+public record CountDto(string Key, int Count);
+public record SecurityEventDto(DateTimeOffset OccurredAt, string Action, string? ActorName, string? EntityId);
+public record FailedTestDto(Guid Id, Guid RepositoryId, string Branch, string Status, DateTimeOffset StartedAt);
+public record QualitySecurityDto(int Days, int TestRuns, int TestsPassed, decimal TestPassRate, List<FailedTestDto> RecentTestFailures,
+    int OpenMergeRequests, int ConflictedMergeRequests, int MergedMergeRequests, int FailedRuns, int LimitReachedRuns, int ToolDenials,
+    List<CountDto> PendingApprovals, List<CountDto> SecurityEventCounts, List<SecurityEventDto> RecentSecurityEvents);
+
 /// <summary>Deterministic finance and performance figures. Estimates and actuals are always reported separately.</summary>
 public class ReportsService(IAppDbContext db, TimeProvider clock)
 {
@@ -145,6 +152,37 @@ public class ReportsService(IAppDbContext db, TimeProvider clock)
         return new FinanceReportDto(m, settings.UsdToThb, total, Math.Round(total * settings.UsdToThb, 2),
             monthCosts.Where(c => c.RunId is { } r && simulatedRuns.Contains(r)).Sum(c => c.AmountUsd),
             projectRows, byDept, byEmployee.Take(50).ToList(), await ListBudgetsAsync(m, ct));
+    }
+
+    // ---------------- quality & security ----------------
+
+    private static readonly string[] SecurityActions =
+        [Domain.Audit.AuditActions.LoginFailed, Domain.Audit.AuditActions.LockedOut, Domain.Audit.AuditActions.AccessDenied, Domain.Audit.AuditActions.PermissionChangeDenied];
+
+    public async Task<QualitySecurityDto> QualitySecurityAsync(int days, CancellationToken ct)
+    {
+        days = Math.Clamp(days, 1, 365);
+        var since = clock.GetUtcNow().AddDays(-days);
+        var tests = await db.TestRuns.AsNoTracking().Where(t => t.StartedAt >= since)
+            .Select(t => new { t.Id, t.RepositoryId, t.Branch, t.Status, t.StartedAt }).ToListAsync(ct);
+        var passed = tests.Count(t => t.Status == Domain.Code.TestRunStatus.Passed);
+        var mrs = await db.MergeRequests.AsNoTracking().GroupBy(m => m.Status).Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct);
+        var runs = await db.AgentRuns.AsNoTracking().Where(r => r.CreatedAt >= since).GroupBy(r => r.Status).Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct);
+        var denials = await db.ToolExecutions.AsNoTracking().CountAsync(x => x.StartedAt >= since && x.Status == ToolExecutionStatus.Denied, ct);
+        var approvals = await db.ApprovalRequests.AsNoTracking().Where(a => a.Status == ApprovalStatus.Pending)
+            .GroupBy(a => a.Kind).Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct);
+        var events = db.AuditLogs.AsNoTracking().Where(a => a.OccurredAt >= since && SecurityActions.Contains(a.Action));
+        var eventCounts = await events.GroupBy(a => a.Action).Select(g => new CountDto(g.Key, g.Count())).ToListAsync(ct);
+        var recent = await events.OrderByDescending(a => a.Id).Take(25)
+            .Select(a => new SecurityEventDto(a.OccurredAt, a.Action, a.ActorName, a.EntityId)).ToListAsync(ct);
+        int Mr(Domain.Code.MergeRequestStatus s) => mrs.FirstOrDefault(m => m.Key == s)?.Count ?? 0;
+        int Run(AgentRunStatus s) => runs.FirstOrDefault(r => r.Key == s)?.Count ?? 0;
+        return new QualitySecurityDto(days, tests.Count, passed, tests.Count == 0 ? 0 : Math.Round(100m * passed / tests.Count, 1),
+            tests.Where(t => t.Status != Domain.Code.TestRunStatus.Passed).OrderByDescending(t => t.StartedAt).Take(10)
+                .Select(t => new FailedTestDto(t.Id, t.RepositoryId, t.Branch, t.Status.ToString(), t.StartedAt)).ToList(),
+            Mr(Domain.Code.MergeRequestStatus.Open), Mr(Domain.Code.MergeRequestStatus.Conflict), Mr(Domain.Code.MergeRequestStatus.Merged),
+            Run(AgentRunStatus.Failed), Run(AgentRunStatus.LimitReached), denials,
+            approvals.Select(a => new CountDto(a.Key.ToString(), a.Count)).ToList(), eventCounts, recent);
     }
 
     // ---------------- performance ----------------

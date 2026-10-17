@@ -1,0 +1,53 @@
+# Production overrides:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Every ${VAR:?} below must be set in .env — the stack refuses to start otherwise.
+services:
+  db:
+    ports: !reset []            # never expose PostgreSQL
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+
+  api:
+    ports: !reset []            # only reachable through the proxy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: Host=db;Port=5432;Database=officeai;Username=officeai;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      Cors__Origins__0: https://${APP_DOMAIN:?set APP_DOMAIN}
+      Seed__CeoEmail: ${CEO_EMAIL:?set CEO_EMAIL}
+      Seed__CeoPassword: ${CEO_PASSWORD:?set CEO_PASSWORD}
+      AiProviders__Simulated__Enabled: "false"
+      Sandbox__RunnerToken: ${SANDBOX_RUNNER_TOKEN:?set SANDBOX_RUNNER_TOKEN}
+      Security__SecureCookies: "true"
+      Security__Hsts: "true"
+      Logging__Json: "true"
+      Integrations__AppBaseUrl: https://${APP_DOMAIN}
+      Integrations__AllowHttp: "false"
+    restart: unless-stopped
+
+  sandbox-runner:
+    environment:
+      Sandbox__RunnerToken: ${SANDBOX_RUNNER_TOKEN:?set SANDBOX_RUNNER_TOKEN}
+    restart: unless-stopped
+
+  web:
+    ports: !reset []
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: https://${API_DOMAIN:?set API_DOMAIN}
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2.8.4-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [web, api]
+    restart: unless-stopped
+
+volumes:
+  caddy-data:

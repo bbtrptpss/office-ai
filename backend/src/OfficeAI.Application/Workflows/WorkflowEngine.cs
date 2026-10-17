@@ -38,7 +38,13 @@ public sealed class WorkflowEngine(
     /// <summary>One pass over every open workflow. Returns false if another engine instance holds the lock.</summary>
     public async Task<bool> TickAsync(CancellationToken ct)
     {
-        if (!await db.TryAcquireEngineLockAsync(ct)) return false;
+        if (!await db.TryAcquireEngineLockAsync(ct))
+        {
+            Telemetry.EngineTicks.Add(1, new KeyValuePair<string, object?>("outcome", "locked"));
+            return false;
+        }
+        using var activity = Telemetry.Source.StartActivity("workflow.tick");
+        Telemetry.EngineTicks.Add(1, new KeyValuePair<string, object?>("outcome", "ran"));
         try
         {
             using var acting = ActingAs.Use(new ActingIdentity(null, "Workflow engine", IsAgent: false, "engine"));

@@ -104,6 +104,7 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
                 break;
         }
         await db.SaveChangesAsync(ct);
+        Telemetry.ApprovalsDecided.Add(1, new("kind", approval.Kind.ToString()), new("approved", req.Approve));
         if (approval.ProjectId is { } p && approval.TaskId is { } t) await notifier.TaskChangedAsync(p, t, ct);
         await notifier.ApprovalsChangedAsync(ct);
         return await GetAsync(id, ct);
