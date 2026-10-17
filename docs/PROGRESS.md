@@ -76,8 +76,8 @@ locked-down sandbox, code review and merge — and nothing merges without a pers
 | # | Milestone | Status |
 | --- | --- | --- |
 | M1 | Requirements, architecture decisions (ADRs), estimates with deterministic pricing (rate card, contingency, margin, evidence flags); agent tools to record them | done (backend + tests; UI in M5) |
-| M2 | Git repositories per project (local, git CLI, no shell), one branch + worktree per task; agent tools: list/read/search/write files, diff, commit — confined to the task workspace | todo |
-| M3 | Sandbox: tests run in a throwaway container — no network, read-only image, CPU/memory/pids/time limits, non-root; a separate runner service owns the Docker socket, the API never does | todo |
+| M2 | Git repositories per project (local, git CLI, no shell), one branch + worktree per task; agent tools: list/read/search/write files, diff, commit — confined to the task workspace | done |
+| M3 | Sandbox: tests run in a throwaway container — no network, read-only image, CPU/memory/pids/time limits, non-root; a separate runner service owns the Docker socket, the API never does | in progress — DockerSandbox done and tested; HttpSandbox + OfficeAI.SandboxRunner project written and building. NEXT: person-triggered branch test endpoint (CheckoutBranchAsync), Dockerfile targets (api with git, runner with docker CLI from docker:27-cli), compose service + shared named volume officeai-repos (/data/repos owned by app user), verify in compose |
 | M4 | Merge requests: diff + test evidence, AI code review, merge only after human approval | todo |
 | M5 | Tests + UI: project workspace (requirements, ADRs, estimates, repository, merge requests, test runs) | todo |
 

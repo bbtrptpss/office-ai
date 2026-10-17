@@ -64,7 +64,11 @@ public static class DependencyInjection
         services.AddSingleton<GitStore>();
         services.AddSingleton<ICodeRepositoryStore>(sp => sp.GetRequiredService<GitStore>());
         services.AddSingleton<IRepositoryLayout>(sp => sp.GetRequiredService<GitStore>());
-        services.AddSingleton<ISandbox, DockerSandbox>();
+        // In containers the API asks the sandbox runner; only a developer machine (or tests) drives Docker directly.
+        if (!string.IsNullOrWhiteSpace(config["Sandbox:RunnerUrl"]))
+            services.AddHttpClient<ISandbox, HttpSandbox>(c => c.Timeout = TimeSpan.FromMinutes(15));
+        else
+            services.AddSingleton<ISandbox, DockerSandbox>();
         services.AddSingleton<CodeWorkspace>();
         services.AddSingleton<IAgentTool, ListFilesTool>();
         services.AddSingleton<IAgentTool, ReadFileTool>();
