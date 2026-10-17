@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using OfficeAI.Application.Abstractions;
+using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Audit;
 using OfficeAI.Domain.Common;
 using OfficeAI.Domain.Organization;
@@ -25,6 +26,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<TaskDependency> TaskDependencies => Set<TaskDependency>();
     public DbSet<TaskAssignment> TaskAssignments => Set<TaskAssignment>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<AiModel> AiModels => Set<AiModel>();
+    public DbSet<AgentConfiguration> AgentConfigurations => Set<AgentConfiguration>();
+    public DbSet<AgentToolPermission> AgentToolPermissions => Set<AgentToolPermission>();
+    public DbSet<AgentRun> AgentRuns => Set<AgentRun>();
+    public DbSet<AgentRunStep> AgentRunSteps => Set<AgentRunStep>();
+    public DbSet<ToolExecution> ToolExecutions => Set<ToolExecution>();
+    public DbSet<UsageRecord> UsageRecords => Set<UsageRecord>();
+    public DbSet<CostRecord> CostRecords => Set<CostRecord>();
+    public DbSet<Deliverable> Deliverables => Set<Deliverable>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
@@ -38,6 +48,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         b.Entity<IdentityUserLogin<Guid>>().ToTable("UserLogins");
         b.Entity<IdentityUserToken<Guid>>().ToTable("UserTokens");
         b.Entity<IdentityRoleClaim<Guid>>().ToTable("RoleClaims");
+    }
+
+    public void ResetTracking(params object[] keep)
+    {
+        ChangeTracker.Clear();
+        foreach (var entity in keep) Update(entity);
     }
 
     public void ExpectVersion<T>(T entity, uint version) where T : Entity =>

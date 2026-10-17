@@ -81,6 +81,11 @@ public class AuthAndSecurityTests(ApiFixture fx)
         { "POST", "/api/security/users" },
         { "PUT", $"/api/security/users/{Guid.Empty}/roles" },
         { "PUT", $"/api/security/roles/{Guid.Empty}/permissions" },
+        { "PUT", $"/api/ai/models/{Guid.Empty}" },
+        { "PUT", $"/api/agents/{Guid.Empty}/config" },
+        { "PUT", $"/api/agents/{Guid.Empty}/tools" },
+        { "POST", $"/api/tasks/{Guid.Empty}/runs" },
+        { "POST", $"/api/agent-runs/{Guid.Empty}/cancel" },
     };
 
     [Theory]
@@ -120,6 +125,7 @@ public class AuthAndSecurityTests(ApiFixture fx)
         var perms = await sp.GetRequiredService<PermissionService>().GetPermissionsAsync(agent.Id, default);
         Assert.DoesNotContain(Permissions.SecurityManage, perms);
         Assert.DoesNotContain(Permissions.TaskApprove, perms);
+        Assert.DoesNotContain(Permissions.AgentManage, perms);
         Assert.Contains(Permissions.ProjectManage, perms);
 
         // The real authorization pipeline denies it and writes an audit record.

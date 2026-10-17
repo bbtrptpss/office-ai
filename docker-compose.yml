@@ -26,6 +26,9 @@ services:
       Seed__CeoEmail: ${CEO_EMAIL:-ceo@officeai.local}
       Seed__CeoPassword: ${CEO_PASSWORD:-ChangeMe-Dev-2026}
       Seed__CeoName: ${CEO_NAME:-CEO}
+      # Claude is used only when a key is supplied. The simulated provider is for this local dev stack only.
+      AiProviders__Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}
+      AiProviders__Simulated__Enabled: ${SIMULATED_AI:-true}
     ports:
       - "5000:8080"
     depends_on:

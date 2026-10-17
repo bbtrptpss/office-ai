@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Application.Abstractions;
+using OfficeAI.Application.Agents;
 using OfficeAI.Domain.Common;
 using OfficeAI.Domain.Organization;
 
@@ -26,7 +27,7 @@ public record SaveEmployeeRequest(
 
 public record OrgChartNode(Guid Id, string DisplayName, EmployeeKind Kind, string JobTitle, string DepartmentName, EmployeeStatus Status, List<OrgChartNode> Reports);
 
-public class OrganizationService(IAppDbContext db, IRealtimeNotifier notifier)
+public class OrganizationService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvider clock)
 {
     // ---------- Departments ----------
 
@@ -158,6 +159,7 @@ public class OrganizationService(IAppDbContext db, IRealtimeNotifier notifier)
         var emp = new EmployeeProfile { DisplayName = "" };
         await ApplyAsync(emp, req, isNew: true, ct);
         db.Employees.Add(emp);
+        await EnsureAgentDefaultsAsync(emp, ct);
         await db.SaveChangesAsync(ct);
         await notifier.OrganizationChangedAsync(ct);
         return await GetEmployeeAsync(emp.Id, ct);
@@ -168,6 +170,7 @@ public class OrganizationService(IAppDbContext db, IRealtimeNotifier notifier)
         var emp = await db.Employees.FirstOrDefaultAsync(e => e.Id == id, ct) ?? throw new NotFoundException("Employee", id);
         if (req.Version is { } v) db.ExpectVersion(emp, v);
         await ApplyAsync(emp, req, isNew: false, ct);
+        await EnsureAgentDefaultsAsync(emp, ct);
         await db.SaveChangesAsync(ct);
         await notifier.OrganizationChangedAsync(ct);
         return await GetEmployeeAsync(emp.Id, ct);
@@ -205,6 +208,15 @@ public class OrganizationService(IAppDbContext db, IRealtimeNotifier notifier)
         emp.RoleDefinitionId = req.RoleDefinitionId;
         emp.ManagerId = req.ManagerId;
         emp.Status = req.Status;
+    }
+
+    /// <summary>Every AI employee gets a model configuration and the default tool grants.</summary>
+    private async Task EnsureAgentDefaultsAsync(EmployeeProfile emp, CancellationToken ct)
+    {
+        if (emp.Kind != EmployeeKind.AI || await db.AgentConfigurations.AnyAsync(c => c.EmployeeId == emp.Id, ct)) return;
+        var level = await db.RoleDefinitions.Where(r => r.Id == emp.RoleDefinitionId).Select(r => r.Level).FirstAsync(ct);
+        db.AgentConfigurations.Add(AgentDefaults.ConfigFor(emp, level));
+        db.AgentToolPermissions.AddRange(AgentDefaults.GrantsFor(emp.Id, clock.GetUtcNow()));
     }
 
     public async Task<List<OrgChartNode>> GetOrgChartAsync(CancellationToken ct)
