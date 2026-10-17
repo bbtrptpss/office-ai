@@ -96,6 +96,10 @@ public static class DependencyInjection
         services.AddScoped<CodeService>();
         services.AddScoped<OfficeAI.Application.Reports.ReportsService>();
         services.AddScoped<OfficeAI.Application.Knowledge.KnowledgeService>();
+        services.Configure<OfficeAI.Application.Integrations.IntegrationSettings>(config.GetSection("Integrations"));
+        services.AddHttpClient("integrations", c => c.Timeout = TimeSpan.FromSeconds(10));
+        services.AddScoped<OfficeAI.Application.Integrations.IntegrationService>();
+        services.AddScoped<OfficeAI.Application.Integrations.IntegrationDispatcher>();
         return services;
     }
 }

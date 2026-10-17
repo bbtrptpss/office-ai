@@ -95,7 +95,7 @@ Finance and usage reporting (planned vs actual), internal knowledge with validat
 | M2 | Performance report per AI employee: runs, success rate, cost per run, review approvals vs changes requested, tasks done, tool denials | done (backend + tests) |
 | M3 | Knowledge base: agents propose, people validate before it becomes authoritative; permission/project-scoped search with source references | done (backend + tests) |
 | M4 | Documents: agents write versioned project documents (proposal, SOW, release notes, completion report) from templates | done (backend + tests; markdown download) |
-| M5 | Integrations: outbound webhook notifications configured by people (secrets from environment only) | todo |
+| M5 | Integrations: outbound webhook notifications configured by people (secrets from environment only) | done (backend + tests) |
 | M6 | UI for all of the above | todo |
 
 ## Later phases

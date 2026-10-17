@@ -21,6 +21,7 @@ builder.Services.AddSingleton<AgentRunQueue>();
 builder.Services.AddSingleton<IAgentRunQueue>(sp => sp.GetRequiredService<AgentRunQueue>());
 builder.Services.AddHostedService<AgentRunWorker>();
 builder.Services.AddHostedService<WorkflowEngineWorker>();
+builder.Services.AddHostedService<IntegrationWorker>();
 
 // ---------- Identity + cookie auth ----------
 builder.Services

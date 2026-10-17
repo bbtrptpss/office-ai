@@ -43,6 +43,8 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("Repositories:Root", RepoRoot);
             b.UseSetting("Sandbox:UseLocalDocker", "true");
             b.UseSetting("Sandbox:TestTimeoutSeconds", "8");
+            b.UseSetting("Integrations:AutoDispatch", "false");
+            b.UseSetting("Integrations:AllowHttp", "true");
             b.ConfigureTestServices(s =>
             {
                 s.AddSingleton<IAiProvider>(Scripted);

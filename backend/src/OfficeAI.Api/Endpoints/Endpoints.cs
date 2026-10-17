@@ -37,6 +37,7 @@ public static class Endpoints
         MapCode(api);
         MapReports(api);
         MapKnowledge(api);
+        MapIntegrations(api);
         app.MapHub<EventsHub>("/hubs/events");
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
     }
@@ -225,6 +226,14 @@ public static class Endpoints
             return Results.File(System.Text.Encoding.UTF8.GetBytes(d.Content ?? ""), "text/markdown; charset=utf-8", name);
         }).RequirePermission(Permissions.ProjectRead);
         api.MapPost("/documents/{id:guid}/finalize", (Guid id, KnowledgeService s, CancellationToken ct) => s.FinalizeDocumentAsync(id, ct)).RequirePermission(Permissions.KnowledgeManage);
+    }
+
+    private static void MapIntegrations(RouteGroupBuilder api)
+    {
+        api.MapGet("/integrations", (OfficeAI.Application.Integrations.IntegrationService s, CancellationToken ct) => s.ListAsync(ct)).RequirePermission(Permissions.SecurityManage);
+        api.MapPost("/integrations", (OfficeAI.Application.Integrations.SaveIntegrationRequest r, OfficeAI.Application.Integrations.IntegrationService s, CancellationToken ct) => s.CreateAsync(r, ct)).RequirePermission(Permissions.SecurityManage);
+        api.MapPut("/integrations/{id:guid}", (Guid id, OfficeAI.Application.Integrations.SaveIntegrationRequest r, OfficeAI.Application.Integrations.IntegrationService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(Permissions.SecurityManage);
+        api.MapGet("/integrations/{id:guid}/deliveries", (Guid id, OfficeAI.Application.Integrations.IntegrationService s, CancellationToken ct) => s.DeliveriesAsync(id, ct)).RequirePermission(Permissions.SecurityManage);
     }
 
     private static void MapSecurity(RouteGroupBuilder api)

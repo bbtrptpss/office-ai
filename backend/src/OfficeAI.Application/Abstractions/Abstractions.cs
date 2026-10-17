@@ -3,6 +3,7 @@ using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Audit;
 using OfficeAI.Domain.Code;
 using OfficeAI.Domain.Finance;
+using OfficeAI.Domain.Integrations;
 using OfficeAI.Domain.Knowledge;
 using OfficeAI.Domain.Delivery;
 using OfficeAI.Domain.Organization;
@@ -47,6 +48,8 @@ public interface IAppDbContext
     DbSet<BudgetAllocation> BudgetAllocations { get; }
     DbSet<KnowledgeEntry> KnowledgeEntries { get; }
     DbSet<ProjectDocument> Documents { get; }
+    DbSet<IntegrationConfiguration> Integrations { get; }
+    DbSet<IntegrationDelivery> IntegrationDeliveries { get; }
 
     /// <summary>Sets the concurrency token the client last saw, so a stale update fails with <see cref="Domain.Common.ConcurrencyException"/>.</summary>
     void ExpectVersion<T>(T entity, uint version) where T : Domain.Common.Entity;
