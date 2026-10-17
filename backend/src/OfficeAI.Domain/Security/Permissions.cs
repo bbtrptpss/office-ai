@@ -19,6 +19,7 @@ public static class Permissions
     public const string AgentManage = "agent.manage";
     public const string FinanceRead = "finance.read";
     public const string FinanceManage = "finance.manage";
+    public const string KnowledgeManage = "knowledge.manage";
 
     public static readonly IReadOnlyDictionary<string, string> All = new Dictionary<string, string>
     {
@@ -38,10 +39,11 @@ public static class Permissions
         [AgentManage] = "Configure AI models, tools, budgets and prices",
         [FinanceRead] = "View finance and performance reports",
         [FinanceManage] = "Set company, department and project budgets",
+        [KnowledgeManage] = "Validate, write and archive company knowledge; finalize documents",
     };
 
     /// <summary>Permissions an AI identity can never use, whatever roles it holds.</summary>
-    public static readonly IReadOnlySet<string> HumanOnly = new HashSet<string> { SecurityManage, TaskApprove, AgentManage, FinanceManage };
+    public static readonly IReadOnlySet<string> HumanOnly = new HashSet<string> { SecurityManage, TaskApprove, AgentManage, FinanceManage, KnowledgeManage };
 }
 
 public static class SystemRoles
@@ -59,7 +61,7 @@ public static class SystemRoles
         [
             Permissions.OrgRead, Permissions.ProjectRead, Permissions.ProjectManage, Permissions.TaskRead,
             Permissions.TaskManage, Permissions.TaskAssign, Permissions.TaskUpdateStatus, Permissions.TaskApprove,
-            Permissions.AgentRead, Permissions.AgentRun, Permissions.FinanceRead,
+            Permissions.AgentRead, Permissions.AgentRun, Permissions.FinanceRead, Permissions.KnowledgeManage,
         ],
         [Member] = [Permissions.OrgRead, Permissions.ProjectRead, Permissions.TaskRead, Permissions.TaskUpdateStatus, Permissions.AgentRead],
         [Auditor] = [Permissions.OrgRead, Permissions.ProjectRead, Permissions.TaskRead, Permissions.AuditRead, Permissions.AgentRead, Permissions.FinanceRead],

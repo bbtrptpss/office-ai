@@ -93,8 +93,8 @@ Finance and usage reporting (planned vs actual), internal knowledge with validat
 | --- | --- | --- |
 | M1 | Budgets (company / department / project, per month, USD) enforced at run start with 80% / 100% alerts; finance report: planned (approved estimate) vs actual AI cost per project, spend by department and employee | done (backend + tests) |
 | M2 | Performance report per AI employee: runs, success rate, cost per run, review approvals vs changes requested, tasks done, tool denials | done (backend + tests) |
-| M3 | Knowledge base: agents propose, people validate before it becomes authoritative; permission/project-scoped search with source references | todo |
-| M4 | Documents: agents write versioned project documents (proposal, SOW, release notes, completion report) from templates | todo |
+| M3 | Knowledge base: agents propose, people validate before it becomes authoritative; permission/project-scoped search with source references | done (backend + tests) |
+| M4 | Documents: agents write versioned project documents (proposal, SOW, release notes, completion report) from templates | done (backend + tests; markdown download) |
 | M5 | Integrations: outbound webhook notifications configured by people (secrets from environment only) | todo |
 | M6 | UI for all of the above | todo |
 

@@ -4,6 +4,8 @@ using OfficeAI.Api.Infrastructure;
 using OfficeAI.Application.Abstractions;
 using OfficeAI.Application.Agents;
 using OfficeAI.Application.Code;
+using OfficeAI.Application.Knowledge;
+using OfficeAI.Domain.Knowledge;
 using OfficeAI.Application.Delivery;
 using OfficeAI.Application.Organization;
 using OfficeAI.Application.Work;
@@ -34,6 +36,7 @@ public static class Endpoints
         MapDelivery(api);
         MapCode(api);
         MapReports(api);
+        MapKnowledge(api);
         app.MapHub<EventsHub>("/hubs/events");
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
     }
@@ -206,6 +209,22 @@ public static class Endpoints
             await s.DeleteBudgetAsync(id, ct);
             return Results.NoContent();
         }).RequirePermission(Permissions.FinanceManage);
+    }
+
+    private static void MapKnowledge(RouteGroupBuilder api)
+    {
+        api.MapGet("/knowledge", (string? q, KnowledgeStatus? status, Guid? projectId, KnowledgeService s, CancellationToken ct) => s.ListAsync(q, status, projectId, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapPost("/knowledge", (SaveKnowledgeRequest r, KnowledgeService s, CancellationToken ct) => s.CreateAsync(r, ct)).RequirePermission(Permissions.KnowledgeManage);
+        api.MapPost("/knowledge/{id:guid}/status", (Guid id, SetKnowledgeStatusRequest r, KnowledgeService s, CancellationToken ct) => s.SetStatusAsync(id, r, ct)).RequirePermission(Permissions.KnowledgeManage);
+        api.MapGet("/projects/{id:guid}/documents", (Guid id, KnowledgeService s, CancellationToken ct) => s.ListDocumentsAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/documents/{id:guid}", (Guid id, KnowledgeService s, CancellationToken ct) => s.GetDocumentAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/documents/{id:guid}/download", async (Guid id, KnowledgeService s, CancellationToken ct) =>
+        {
+            var d = await s.GetDocumentAsync(id, ct);
+            var name = string.Concat(d.Title.Select(c => char.IsLetterOrDigit(c) ? c : '-')) + $"-v{d.Version}.md";
+            return Results.File(System.Text.Encoding.UTF8.GetBytes(d.Content ?? ""), "text/markdown; charset=utf-8", name);
+        }).RequirePermission(Permissions.ProjectRead);
+        api.MapPost("/documents/{id:guid}/finalize", (Guid id, KnowledgeService s, CancellationToken ct) => s.FinalizeDocumentAsync(id, ct)).RequirePermission(Permissions.KnowledgeManage);
     }
 
     private static void MapSecurity(RouteGroupBuilder api)

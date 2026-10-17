@@ -9,6 +9,7 @@ using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Audit;
 using OfficeAI.Domain.Code;
 using OfficeAI.Domain.Finance;
+using OfficeAI.Domain.Knowledge;
 using OfficeAI.Domain.Delivery;
 using OfficeAI.Domain.Common;
 using OfficeAI.Domain.Organization;
@@ -53,6 +54,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<TestRun> TestRuns => Set<TestRun>();
     public DbSet<MergeRequest> MergeRequests => Set<MergeRequest>();
     public DbSet<BudgetAllocation> BudgetAllocations => Set<BudgetAllocation>();
+    public DbSet<KnowledgeEntry> KnowledgeEntries => Set<KnowledgeEntry>();
+    public DbSet<ProjectDocument> Documents => Set<ProjectDocument>();
     public DbSet<SeedMarker> SeedMarkers => Set<SeedMarker>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();

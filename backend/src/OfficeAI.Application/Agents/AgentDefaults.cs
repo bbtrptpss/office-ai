@@ -36,6 +36,9 @@ public static class AgentDefaults
     {
         foreach (var id in ToolRegistry.DefaultGrants) yield return id;
         yield return Delivery.ReadRequirementsTool.ToolId;
+        yield return Knowledge.SearchKnowledgeTool.ToolId;
+        if (level is OrgLevel.Executive or OrgLevel.Head or OrgLevel.Senior || Writers.Contains(roleCode ?? "")) yield return Knowledge.ProposeKnowledgeTool.ToolId;
+        if (Writers.Contains(roleCode ?? "")) yield return Knowledge.WriteDocumentTool.ToolId;
         if (level is OrgLevel.Executive or OrgLevel.Head) yield return Workflows.PlanSubmitTool.ToolId;
         if (level is OrgLevel.Head or OrgLevel.Senior) yield return Workflows.DelegateTaskTool.ToolId;
         foreach (var id in RoleTools.GetValueOrDefault(roleCode ?? "", [])) yield return id;
@@ -57,6 +60,7 @@ public static class AgentDefaults
     };
 
     private static readonly HashSet<string> Engineers = new(StringComparer.OrdinalIgnoreCase) { "ARCH", "BACKEND", "FRONTEND", "MOBILE", "DBENG", "DEVOPS", "INTEG" };
+    private static readonly HashSet<string> Writers = new(StringComparer.OrdinalIgnoreCase) { "DOCS", "PM", "PROPOSAL", "SOLCON", "RELEASE", "BA", "BREQ", "ACCMGR" };
     private static readonly HashSet<string> Quality = new(StringComparer.OrdinalIgnoreCase) { "QAENG", "AUTOTEST", "REVIEWER", "SECENG", "RELEASE" };
 
     public static readonly string[] CodeReadTools =

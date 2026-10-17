@@ -79,6 +79,9 @@ public static class DependencyInjection
         services.AddSingleton<IAgentTool, CommitTool>();
         services.AddSingleton<IAgentTool, RunTestsTool>();
         services.AddSingleton<IAgentTool, OpenMergeRequestTool>();
+        services.AddSingleton<IAgentTool, OfficeAI.Application.Knowledge.SearchKnowledgeTool>();
+        services.AddSingleton<IAgentTool, OfficeAI.Application.Knowledge.ProposeKnowledgeTool>();
+        services.AddSingleton<IAgentTool, OfficeAI.Application.Knowledge.WriteDocumentTool>();
         services.AddSingleton<ToolRegistry>();
 
         services.AddScoped<AgentAdminService>();
@@ -92,6 +95,7 @@ public static class DependencyInjection
         services.AddScoped<DeliveryService>();
         services.AddScoped<CodeService>();
         services.AddScoped<OfficeAI.Application.Reports.ReportsService>();
+        services.AddScoped<OfficeAI.Application.Knowledge.KnowledgeService>();
         return services;
     }
 }
