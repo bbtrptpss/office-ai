@@ -98,7 +98,7 @@ Finance and usage reporting (planned vs actual), internal knowledge with validat
 | M5 | Integrations: outbound webhook notifications configured by people (secrets from environment only) | done (backend + tests) |
 | M6 | UI for all of the above | done (finance/performance, knowledge, integrations pages; documents tab; verified in browser) |
 
-## Phase 6 — Production readiness (next, branch `phase-6`)
+## Phase 6 — Production readiness ✅ (merged to master)
 
 Security testing, reliability/concurrency testing, observability, backup/restore, deployment docs; Quality & Security overview page; company chat/announcements still open.
 
@@ -109,4 +109,13 @@ Security testing, reliability/concurrency testing, observability, backup/restore
 | M3 | Observability: OpenTelemetry traces/metrics (OTLP when configured), JSON logs in production, readiness check, domain metrics (runs, tool calls, cost) | done (133 tests) |
 | M4 | Backup & restore scripts for PostgreSQL + repositories, with a real restore drill | done (drill 2026-10-18: restored copy matched live counts — 5 tasks, 593 audit rows, 4 runs, 9 migrations, 53 repo files; append-only trigger intact) |
 | M5 | Deployment guide + production compose override (HTTPS proxy, no simulated AI, secrets) | done (docs/DEPLOYMENT.md, docker-compose.prod.yml + Caddy; config validated; change-password endpoint + UI added) |
-| M6 | Quality & Security overview page (tests, merge requests, failed runs, security events) | todo |
+| M6 | Quality & Security overview page (tests, merge requests, failed runs, security events) | done (135 tests; verified in browser) |
+
+## Open items (not built yet)
+
+- Company chat, announcements, meeting agendas/minutes UI (nav shows "Phase 7").
+- OpenAI / Gemini adapters (waiting on which accounts exist); first real Claude run needs ANTHROPIC_API_KEY.
+- Remote Git hosting (GitHub/GitLab) behind the repository interface.
+- Encrypting DataProtection keys at rest (certificate).
+- A budget escalation does not raise a workflow budget by itself.
+- Durable mid-call resume of AI runs (interrupted runs are failed and retried by the engine).
