@@ -31,6 +31,11 @@ public sealed class AgentExecutor(
         // Setup reads ignore the cancel token: cancellation is honoured just below, never as an unhandled exception.
         var run = await db.AgentRuns.FirstOrDefaultAsync(r => r.Id == runId, CancellationToken.None);
         if (run is null || run.Status != AgentRunStatus.Queued) return; // already handled (idempotent)
+        using var activity = Telemetry.Source.StartActivity("agent.run");
+        activity?.SetTag("officeai.run_id", run.Id);
+        activity?.SetTag("officeai.task_id", run.TaskId);
+        activity?.SetTag("officeai.purpose", run.Purpose.ToString());
+        activity?.SetTag("officeai.model", $"{run.Provider}/{run.ModelId}");
 
         // Employee and task are read untracked: people may edit them while the run is going.
         var employee = await db.Employees.AsNoTracking().Include(e => e.RoleDefinition).FirstAsync(e => e.Id == run.EmployeeId, CancellationToken.None);
@@ -250,6 +255,7 @@ public sealed class AgentExecutor(
         if (queuedApproval is not null) db.ApprovalRequests.Add(queuedApproval);
         db.ToolExecutions.Add(exec);
         await db.SaveChangesAsync(CancellationToken.None);
+        Telemetry.ToolExecutions.Add(1, new("tool", exec.ToolId), new("status", exec.Status.ToString()));
         if (queuedApproval is not null) await notifier.ApprovalsChangedAsync(CancellationToken.None);
         return (content, isError, limit);
     }
@@ -290,6 +296,10 @@ public sealed class AgentExecutor(
         run.OutputTokens += usage.OutputTokens;
         run.CostUsd += cost;
         await db.SaveChangesAsync(CancellationToken.None);
+        var model = new KeyValuePair<string, object?>("model", $"{provider.Name}/{run.ModelId}");
+        Telemetry.AiCostUsd.Add((double)cost, model);
+        Telemetry.AiTokens.Add(usage.InputTokens + usage.CacheReadTokens + usage.CacheWriteTokens, model, new("direction", "input"));
+        Telemetry.AiTokens.Add(usage.OutputTokens, model, new("direction", "output"));
     }
 
     private async Task FinishAsync(AgentRun run, EmployeeProfile employee, AgentRunStatus status, string reason, string? error)
@@ -302,6 +312,7 @@ public sealed class AgentExecutor(
         if (error is not null) await StepAsync(run, RunStepKind.Notice, error);
         await db.SaveChangesAsync(CancellationToken.None);
         await SetEmployeeStatusAsync(employee.Id, status == AgentRunStatus.Failed ? EmployeeStatus.Failed : EmployeeStatus.Available);
+        Telemetry.RunsFinished.Add(1, new("status", status.ToString()), new("purpose", run.Purpose.ToString()), new("simulated", run.IsSimulated));
         await notifier.AgentRunChangedAsync(run.Id, run.TaskId, run.ProjectId, status.ToString(), CancellationToken.None);
         await notifier.TaskChangedAsync(run.ProjectId, run.TaskId, CancellationToken.None);
         await notifier.OrganizationChangedAsync(CancellationToken.None);

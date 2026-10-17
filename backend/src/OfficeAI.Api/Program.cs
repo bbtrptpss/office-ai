@@ -5,13 +5,40 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Api.Endpoints;
 using OfficeAI.Api.Infrastructure;
+using OfficeAI.Application;
 using OfficeAI.Application.Abstractions;
+using Npgsql;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using OfficeAI.Infrastructure;
 using OfficeAI.Infrastructure.Identity;
 using OfficeAI.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
+
+// ---------- Observability ----------
+if (config.GetValue("Logging:Json", false))
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddJsonConsole(o => o.IncludeScopes = true); // scopes carry the correlation id
+}
+var otlp = config["OTEL_EXPORTER_OTLP_ENDPOINT"];
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService(config["OTEL_SERVICE_NAME"] ?? "officeai-api"))
+    .WithTracing(t =>
+    {
+        t.AddAspNetCoreInstrumentation(o => o.Filter = ctx => !ctx.Request.Path.StartsWithSegments("/health"))
+            .AddHttpClientInstrumentation().AddNpgsql().AddSource(Telemetry.Name);
+        if (!string.IsNullOrEmpty(otlp)) t.AddOtlpExporter();
+    })
+    .WithMetrics(m =>
+    {
+        m.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddMeter(Telemetry.Name);
+        if (!string.IsNullOrEmpty(otlp)) m.AddOtlpExporter();
+    });
+builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database");
 
 builder.Services.AddInfrastructure(config);
 builder.Services.AddHttpContextAccessor();
@@ -88,6 +115,7 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapAppEndpoints();
+app.MapHealthChecks("/health/ready"); // liveness stays at /health
 
 if (config.GetValue("Database:MigrateOnStartup", false))
 {
