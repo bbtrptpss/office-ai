@@ -24,6 +24,7 @@ import ExtensionIcon from "@mui/icons-material/ExtensionOutlined";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import HistoryIcon from "@mui/icons-material/HistoryOutlined";
 import SmartToyIcon from "@mui/icons-material/SmartToyOutlined";
+import BusinessIcon from "@mui/icons-material/BusinessCenterOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import DarkModeIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeIcon from "@mui/icons-material/LightModeOutlined";
@@ -40,7 +41,7 @@ const DRAWER_WIDTH = 264;
 type NavKey =
   | "navDashboard" | "navOrganization" | "navEmployees" | "navDepartments" | "navProjects" | "navActivity"
   | "navApprovals" | "navChat" | "navKnowledge" | "navFinance" | "navQuality" | "navIntegrations"
-  | "navSecurity" | "navAudit" | "aiSettings";
+  | "navSecurity" | "navAudit" | "aiSettings" | "companySettings";
 
 interface NavItem {
   key: NavKey;
@@ -64,6 +65,7 @@ const NAV: NavItem[] = [
   { key: "navFinance", icon: <PaymentsIcon />, phase: 5 },
   { key: "navQuality", icon: <VerifiedUserIcon />, phase: 4 },
   { key: "navIntegrations", icon: <ExtensionIcon />, phase: 5 },
+  { key: "companySettings", href: "/company", icon: <BusinessIcon />, permission: "project.read" },
   { key: "aiSettings", href: "/ai-settings", icon: <SmartToyIcon />, permission: "agent.read" },
   { key: "navSecurity", href: "/security", icon: <AdminPanelSettingsIcon />, permission: "security.manage" },
   { key: "navAudit", href: "/audit", icon: <HistoryIcon />, permission: "audit.read" },

@@ -6,7 +6,7 @@ import {
   Alert, Box, Button, Card, CardContent, Chip, Collapse, Paper, Stack, Tab, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Tabs, TextField, Typography,
 } from "@mui/material";
-import { api, Approval, Deliverable, PlanItem } from "@/lib/api";
+import { api, Approval, Deliverable, PlanItem, thb } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -14,7 +14,7 @@ import { Loading, PageHeader, StatusChip, useErrorMessage, useLoad } from "@/com
 import { Avatar, Mascot } from "@/components/cute";
 import { DeliverableList, SimulatedBadge } from "@/components/agents";
 
-const KIND_EMOJI: Record<string, string> = { Plan: "🗺️", TaskCompletion: "🎀", ToolAction: "🔧", Escalation: "🚨" };
+const KIND_EMOJI: Record<string, string> = { Plan: "🗺️", TaskCompletion: "🎀", ToolAction: "🔧", Escalation: "🚨", Estimate: "💰", Merge: "🔀" };
 
 export default function ApprovalsPage() {
   const { t } = useI18n();
@@ -64,7 +64,7 @@ function ApprovalCard({ approval: a, onDone }: { approval: Approval; onDone: () 
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const kindLabel = { Plan: t.kindPlan, TaskCompletion: t.kindTaskCompletion, ToolAction: t.kindToolAction, Escalation: t.kindEscalation }[a.kind];
+  const kindLabel = { Plan: t.kindPlan, TaskCompletion: t.kindTaskCompletion, ToolAction: t.kindToolAction, Escalation: t.kindEscalation, Estimate: t.kindEstimate, Merge: t.kindMerge }[a.kind];
   const allowed = can(a.requiredPermission);
 
   async function decide(approve: boolean) {
@@ -170,6 +170,15 @@ function Payload({ approval: a }: { approval: Approval }) {
     );
   }
   if (a.kind === "TaskCompletion" && a.taskId) return <TaskDeliverables taskId={a.taskId} />;
+  if (a.kind === "Estimate") {
+    const rows: [string, string][] = [[t.hours, String(payload.totalHours)], [t.totalCost, thb(payload.totalCost)], [t.price, thb(payload.price)], [t.grossMargin, `${thb(payload.grossMargin)} (${payload.grossMarginPercent}%)`]];
+    return (
+      <Stack direction="row" spacing={3} sx={{ flexWrap: "wrap", rowGap: 1 }}>
+        {rows.map(([k, v]) => <Box key={k}><Typography variant="caption" color="text.secondary">{k}</Typography><Typography fontWeight={600}>{v}</Typography></Box>)}
+      </Stack>
+    );
+  }
+  if (a.kind === "Merge") return <MergeDiff id={payload.mergeRequestId} branch={`${payload.sourceBranch} → ${payload.targetBranch} @ ${String(payload.headSha).slice(0, 8)}`} />;
   if (a.kind === "ToolAction") {
     return (
       <Box>
@@ -181,6 +190,18 @@ function Payload({ approval: a }: { approval: Approval }) {
     );
   }
   return null;
+}
+
+function MergeDiff({ id, branch }: { id: string; branch: string }) {
+  const { data } = useLoad(async () => (await api.get<{ diff: string }>(`/api/merge-requests/${id}`)).diff, id);
+  return (
+    <Box>
+      <Typography variant="caption" sx={{ fontFamily: "monospace" }}>{branch}</Typography>
+      <Typography component="pre" variant="body2" sx={{ m: 0, mt: 1, p: 1.5, borderRadius: "10px", bgcolor: "action.hover", whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: 13, maxHeight: 400, overflow: "auto" }}>
+        {data ?? "…"}
+      </Typography>
+    </Box>
+  );
 }
 
 function TaskDeliverables({ taskId }: { taskId: string }) {
