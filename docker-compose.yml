@@ -18,7 +18,9 @@ services:
       retries: 20
 
   api:
-    build: ./backend
+    build:
+      context: ./backend
+      target: api
     environment:
       ConnectionStrings__Default: Host=db;Port=5432;Database=officeai;Username=officeai;Password=${POSTGRES_PASSWORD:-officeai_dev}
       Database__MigrateOnStartup: "true"
@@ -29,11 +31,32 @@ services:
       # Claude is used only when a key is supplied. The simulated provider is for this local dev stack only.
       AiProviders__Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}
       AiProviders__Simulated__Enabled: ${SIMULATED_AI:-true}
+      Repositories__Root: /data/repos
+      Sandbox__RunnerUrl: http://sandbox-runner:8080
+      Sandbox__RunnerToken: ${SANDBOX_RUNNER_TOKEN:-dev-runner-token}
+    volumes:
+      - repos:/data/repos
     ports:
       - "5000:8080"
     depends_on:
       db:
         condition: service_healthy
+      sandbox-runner:
+        condition: service_started
+
+  # Owns the Docker socket so the API never does. Not published to the host.
+  sandbox-runner:
+    build:
+      context: ./backend
+      target: runner
+    environment:
+      Repositories__Root: /data/repos
+      Sandbox__UseLocalDocker: "true"
+      Sandbox__RunnerToken: ${SANDBOX_RUNNER_TOKEN:-dev-runner-token}
+      Sandbox__WorkspaceMount: "volume:officeai-repos:"
+    volumes:
+      - repos:/data/repos:ro
+      - /var/run/docker.sock:/var/run/docker.sock
 
   web:
     build:
@@ -48,3 +71,5 @@ services:
 
 volumes:
   pgdata:
+  repos:
+    name: officeai-repos

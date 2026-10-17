@@ -25,6 +25,9 @@ public interface ICodeRepositoryStore
 
     Task<IReadOnlyList<string>> BranchesAsync(CodeRepository repo, CancellationToken ct);
 
+    /// <summary>A clean, up-to-date checkout of any branch for people to test (reset on every call).</summary>
+    Task<string> CheckoutBranchAsync(CodeRepository repo, string branch, CancellationToken ct);
+
     /// <summary>Read-only listing / file read straight from a branch of the bare repository.</summary>
     Task<IReadOnlyList<string>> ListFilesAsync(CodeRepository repo, string branch, CancellationToken ct);
     Task<string?> ReadFileAsync(CodeRepository repo, string branch, string path, CancellationToken ct);

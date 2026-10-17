@@ -94,6 +94,9 @@ public class AuthAndSecurityTests(ApiFixture fx)
         { "POST", $"/api/decisions/{Guid.Empty}/status" },
         { "PUT", $"/api/rate-card/{Guid.Empty}" },
         { "PUT", "/api/company-settings" },
+        { "POST", $"/api/projects/{Guid.Empty}/repositories" },
+        { "PUT", $"/api/repositories/{Guid.Empty}" },
+        { "POST", $"/api/repositories/{Guid.Empty}/test-runs" },
     };
 
     [Theory]

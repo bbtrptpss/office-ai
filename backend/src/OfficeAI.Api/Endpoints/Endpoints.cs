@@ -189,6 +189,7 @@ public static class Endpoints
         api.MapGet("/repositories/{id:guid}/file", async (Guid id, string? branch, string path, CodeService s, CancellationToken ct) =>
             Results.Text(await s.FileAsync(id, branch, path, ct), "text/plain; charset=utf-8")).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/repositories/{id:guid}/test-runs", (Guid id, Guid? taskId, CodeService s, CancellationToken ct) => s.TestRunsAsync(id, taskId, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapPost("/repositories/{id:guid}/test-runs", (Guid id, RunBranchTestsRequest? r, CodeService s, TimeProvider clock, CancellationToken ct) => s.RunTestsAsync(id, r?.Branch, clock, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapGet("/projects/{id:guid}/merge-requests", (Guid id, CodeService s, CancellationToken ct) => s.MergeRequestsAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/merge-requests/{id:guid}", (Guid id, CodeService s, CancellationToken ct) => s.MergeRequestAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
     }

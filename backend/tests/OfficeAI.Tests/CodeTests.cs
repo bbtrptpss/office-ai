@@ -195,6 +195,18 @@ public class CodeTests(ApiFixture fx)
     }
 
     [Fact]
+    public async Task A_person_can_run_the_tests_on_a_branch()
+    {
+        var (ceo, _, _, _, repo) = await SetupAsync("BACKEND", [], testCommand: "test -f README.md && echo HAS_README");
+        var run = await ceo.PostAsync<TestRunDto>($"/api/repositories/{repo.Id}/test-runs", new { branch = "main" });
+        Assert.Equal(TestRunStatus.Passed, run.Status);
+        Assert.Contains("HAS_README", run.Output);
+        Assert.NotNull(run.CommitSha);
+        var res = await ceo.PostAsJsonAsync($"/api/repositories/{repo.Id}/test-runs", new { branch = "nope" });
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+    }
+
+    [Fact]
     public async Task Reviewers_can_read_code_but_not_write_it_and_images_are_allow_listed()
     {
         var (ceo, qa, _, project, _) = await SetupAsync("QAENG", []);

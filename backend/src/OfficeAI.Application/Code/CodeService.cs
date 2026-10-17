@@ -15,6 +15,7 @@ public record MergeRequestDto(Guid Id, Guid ProjectId, Guid RepositoryId, Guid? 
     string TargetBranch, string HeadSha, MergeRequestStatus Status, Guid? LatestTestRunId, TestRunStatus? LatestTestStatus, string? AuthorName,
     string? MergedSha, DateTimeOffset? MergedAt, DateTimeOffset CreatedAt);
 public record MergeRequestDetailDto(MergeRequestDto MergeRequest, string Diff);
+public record RunBranchTestsRequest(string? Branch);
 public record SandboxInfoDto(bool IsAvailable, IReadOnlyCollection<string> AllowedImages);
 
 public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, ISandbox sandbox)
@@ -92,6 +93,28 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
         return await q.OrderByDescending(t => t.StartedAt).Take(100)
             .Select(t => new TestRunDto(t.Id, t.RepositoryId, t.TaskId, t.RunId, t.Branch, t.CommitSha, t.Image, t.Command, t.Status, t.ExitCode, t.Output, t.DurationMs, t.StartedAt))
             .ToListAsync(ct);
+    }
+
+    /// <summary>A person runs the tests on a branch (e.g. before approving a merge). Kept like any other test run.</summary>
+    public async Task<TestRunDto> RunTestsAsync(Guid repositoryId, string? branch, TimeProvider clock, CancellationToken ct)
+    {
+        var repo = await RepoAsync(repositoryId, ct);
+        if (!sandbox.IsAvailable) throw new DomainException("code.sandbox_disabled", "The test sandbox is not enabled on this server.");
+        branch = string.IsNullOrWhiteSpace(branch) ? repo.DefaultBranch : branch.Trim();
+        if (!(await store.BranchesAsync(repo, ct)).Contains(branch)) throw new DomainException("code.not_found", $"No branch '{branch}'.");
+        var path = await store.CheckoutBranchAsync(repo, branch, ct);
+        var sha = (await store.GitAsync(path, ["rev-parse", "HEAD"], ct)).Output.Trim();
+        var started = clock.GetUtcNow();
+        var result = await sandbox.RunAsync(new SandboxRequest(repo.SandboxImage, path, repo.TestCommand, sandbox.TestTimeout, 1.0, 2048), ct);
+        var run = new TestRun
+        {
+            RepositoryId = repo.Id, Branch = branch, CommitSha = sha, Image = repo.SandboxImage, Command = repo.TestCommand,
+            Status = result.Error is not null ? TestRunStatus.Error : result.TimedOut ? TestRunStatus.TimedOut : result.ExitCode == 0 ? TestRunStatus.Passed : TestRunStatus.Failed,
+            ExitCode = result.ExitCode, Output = result.Error ?? result.Output, DurationMs = result.DurationMs, StartedAt = started,
+        };
+        db.TestRuns.Add(run);
+        await db.SaveChangesAsync(ct);
+        return (await TestRunsAsync(repositoryId, null, ct)).First(t => t.Id == run.Id);
     }
 
     private IQueryable<MergeRequestDto> MrQuery(IQueryable<MergeRequest> q) =>

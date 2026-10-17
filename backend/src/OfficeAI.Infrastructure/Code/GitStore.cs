@@ -140,6 +140,22 @@ public sealed class GitStore(IOptions<RepositoryOptions> options, ILogger<GitSto
         }
     }
 
+    public async Task<string> CheckoutBranchAsync(CodeRepository repo, string branch, CancellationToken ct)
+    {
+        var safe = string.Concat(branch.Select(c => char.IsLetterOrDigit(c) ? c : '-'));
+        var dir = Path.Combine(RepoDir(repo), "work", "branch-" + safe);
+        if (!Directory.Exists(Path.Combine(dir, ".git")))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(dir)!);
+            await Must(RepoDir(repo), ct, null, "clone", "--no-hardlinks", Origin(repo), dir);
+        }
+        await Must(dir, ct, null, "fetch", "--quiet", "origin");
+        await Must(dir, ct, null, "checkout", "-B", branch, $"origin/{branch}");
+        await Must(dir, ct, null, "reset", "--hard", $"origin/{branch}");
+        await Must(dir, ct, null, "clean", "-fdx");
+        return dir;
+    }
+
     public async Task<IReadOnlyList<string>> BranchesAsync(CodeRepository repo, CancellationToken ct)
     {
         var r = await GitAsync(Origin(repo), ["for-each-ref", "--format=%(refname:short)", "refs/heads"], ct);
