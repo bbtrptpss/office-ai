@@ -314,7 +314,7 @@ export const usd = (n: number) =>
 
 // ---------- Phase 3: orchestration ----------
 
-export type ApprovalKind = "Plan" | "TaskCompletion" | "ToolAction" | "Escalation";
+export type ApprovalKind = "Plan" | "TaskCompletion" | "ToolAction" | "Escalation" | "Estimate" | "Merge";
 export type ApprovalStatus = "Pending" | "Approved" | "Rejected" | "Expired" | "Cancelled";
 export type WorkflowStatus = "Planning" | "AwaitingPlanApproval" | "Executing" | "Completed" | "Failed" | "Cancelled";
 
@@ -387,3 +387,119 @@ export interface PlanItem {
   dependsOn: string[];
   priority: TaskPriority;
 }
+
+// ---------- Phase 4: delivery & code ----------
+
+export interface Requirement {
+  id: string;
+  code: string;
+  kind: "Functional" | "NonFunctional" | "Constraint" | "Assumption" | "Risk";
+  title: string;
+  description: string | null;
+  acceptanceCriteria: string | null;
+  priority: "Must" | "Should" | "Could" | "Wont";
+  status: "Draft" | "Approved" | "Rejected";
+  authorName: string | null;
+  createdAt: string;
+  version: number;
+}
+
+export interface Decision {
+  id: string;
+  number: number;
+  title: string;
+  context: string;
+  decision: string;
+  consequences: string | null;
+  status: "Proposed" | "Accepted" | "Rejected" | "Superseded";
+  authorName: string | null;
+  createdAt: string;
+}
+
+export interface Estimate {
+  id: string;
+  revision: number;
+  status: "Draft" | "Submitted" | "Approved" | "Rejected";
+  currency: string;
+  assumptions: string | null;
+  contingencyPercent: number;
+  targetMarginPercent: number;
+  aiCostUsd: number;
+  usdToThb: number;
+  totalHours: number;
+  laborCost: number;
+  aiCost: number;
+  contingency: number;
+  totalCost: number;
+  price: number;
+  grossMargin: number;
+  grossMarginPercent: number;
+  warnings: string[];
+  authorName: string | null;
+  createdAt: string;
+  items: { description: string; roleTitle: string; hours: number; rateThb: number; amount: number; evidence: string | null }[];
+}
+
+export interface RoleRate {
+  roleDefinitionId: string;
+  code: string;
+  title: string;
+  hourlyRateThb: number;
+}
+
+export interface CompanySettings {
+  usdToThb: number;
+  defaultContingencyPercent: number;
+  targetMarginPercent: number;
+  version: number;
+}
+
+export interface Repository {
+  id: string;
+  projectId: string;
+  name: string;
+  defaultBranch: string;
+  sandboxImage: string;
+  testCommand: string;
+  isDefault: boolean;
+  createdAt: string;
+  version: number;
+}
+
+export interface TestRun {
+  id: string;
+  repositoryId: string;
+  taskId: string | null;
+  runId: string | null;
+  branch: string;
+  commitSha: string | null;
+  image: string;
+  command: string;
+  status: "Passed" | "Failed" | "TimedOut" | "Error";
+  exitCode: number | null;
+  output: string | null;
+  durationMs: number;
+  startedAt: string;
+}
+
+export interface MergeRequest {
+  id: string;
+  projectId: string;
+  repositoryId: string;
+  taskId: string | null;
+  number: number;
+  title: string;
+  description: string | null;
+  sourceBranch: string;
+  targetBranch: string;
+  headSha: string;
+  status: "Open" | "Merged" | "Closed" | "Conflict";
+  latestTestRunId: string | null;
+  latestTestStatus: TestRun["status"] | null;
+  authorName: string | null;
+  mergedSha: string | null;
+  mergedAt: string | null;
+  createdAt: string;
+}
+
+export const thb = (n: number) => `฿${n.toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;

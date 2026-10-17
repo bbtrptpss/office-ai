@@ -69,6 +69,8 @@ public enum ApprovalKind
     TaskCompletion = 2,
     ToolAction = 3,
     Escalation = 4,
+    Estimate = 5,
+    Merge = 6,
 }
 
 public enum ApprovalStatus

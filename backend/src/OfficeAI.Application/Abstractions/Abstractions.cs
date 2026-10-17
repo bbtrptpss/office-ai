@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Audit;
+using OfficeAI.Domain.Code;
+using OfficeAI.Domain.Delivery;
 using OfficeAI.Domain.Organization;
 using OfficeAI.Domain.Work;
 using OfficeAI.Domain.Workflows;
@@ -32,6 +34,14 @@ public interface IAppDbContext
     DbSet<WorkflowEvent> WorkflowEvents { get; }
     DbSet<ApprovalRequest> ApprovalRequests { get; }
     DbSet<Review> Reviews { get; }
+    DbSet<ProjectRequirement> Requirements { get; }
+    DbSet<ArchitectureDecision> ArchitectureDecisions { get; }
+    DbSet<RoleRate> RoleRates { get; }
+    DbSet<CompanySettings> CompanySettings { get; }
+    DbSet<ProjectEstimate> Estimates { get; }
+    DbSet<CodeRepository> CodeRepositories { get; }
+    DbSet<TestRun> TestRuns { get; }
+    DbSet<MergeRequest> MergeRequests { get; }
 
     /// <summary>Sets the concurrency token the client last saw, so a stale update fails with <see cref="Domain.Common.ConcurrencyException"/>.</summary>
     void ExpectVersion<T>(T entity, uint version) where T : Domain.Common.Entity;

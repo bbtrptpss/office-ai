@@ -3,7 +3,7 @@
 import { use, useMemo, useState } from "react";
 import {
   Alert, Box, Button, Card, CardActionArea, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  Divider, FormControlLabel, MenuItem, Stack, Switch, TextField, Typography,
+  Divider, FormControlLabel, MenuItem, Stack, Switch, Tab, Tabs, TextField, Typography,
 } from "@mui/material";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react";
 import AddIcon from "@mui/icons-material/Add";
@@ -15,6 +15,7 @@ import { useRealtime } from "@/lib/realtime";
 import { KindIcon, Loading, PageHeader, StatusChip, useErrorMessage, useLoad } from "@/components/common";
 import { DeliverableList, RunList } from "@/components/agents";
 import { ObjectivesPanel } from "@/components/objectives";
+import { DecisionsPanel, EstimatesPanel, RepositoryPanel, RequirementsPanel } from "@/components/workspace";
 
 const COLUMNS: TaskStatus[] = ["Todo", "Assigned", "InProgress", "Blocked", "InReview", "WaitingApproval", "Done", "Failed"];
 const PRIORITIES: TaskPriority[] = ["Low", "Medium", "High", "Critical"];
@@ -65,6 +66,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   const [milestoneName, setMilestoneName] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showCancelled, setShowCancelled] = useState(false);
+  const [tab, setTab] = useState<"board" | "requirements" | "decisions" | "estimates" | "repository">("board");
 
   const titles = useMemo(() => new Map(data?.tasks.map((x) => [x.id, x.title])), [data]);
   if (!data) return <Loading error={error} />;
@@ -122,6 +124,19 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
         }
       />
 
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile sx={{ mb: 2 }}>
+        <Tab value="board" label={t.board} />
+        <Tab value="requirements" label={t.requirements} />
+        <Tab value="decisions" label={t.decisionsTab} />
+        <Tab value="estimates" label={t.estimates} />
+        <Tab value="repository" label={t.repository} />
+      </Tabs>
+      {tab === "requirements" && <RequirementsPanel projectId={id} />}
+      {tab === "decisions" && <DecisionsPanel projectId={id} />}
+      {tab === "estimates" && <EstimatesPanel projectId={id} />}
+      {tab === "repository" && <RepositoryPanel projectId={id} />}
+
+      {tab === "board" && <>
       {data.milestones.length > 0 && (
         <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap", rowGap: 1 }}>
           <Typography variant="body2" color="text.secondary" sx={{ alignSelf: "center" }}>{t.milestones}:</Typography>
@@ -189,6 +204,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
         })}
       </Box>
       </LayoutGroup>
+      </>}
 
       {/* Task detail */}
       <Dialog open={!!current} onClose={() => setOpenTaskId(null)} fullWidth maxWidth="md">

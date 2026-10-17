@@ -4,6 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Application.Abstractions;
 using OfficeAI.Application.Agents;
+using OfficeAI.Application.Code;
+using OfficeAI.Infrastructure.Code;
+using OfficeAI.Application.Delivery;
 using OfficeAI.Application.Organization;
 using OfficeAI.Application.Work;
 using OfficeAI.Application.Workflows;
@@ -50,6 +53,32 @@ public static class DependencyInjection
         services.AddSingleton<IAgentTool, PlanSubmitTool>();
         services.AddSingleton<IAgentTool, ReviewSubmitTool>();
         services.AddSingleton<IAgentTool, DelegateTaskTool>();
+        services.AddSingleton<IAgentTool, ReadRequirementsTool>();
+        services.AddSingleton<IAgentTool, AddRequirementTool>();
+        services.AddSingleton<IAgentTool, ProposeDecisionTool>();
+        services.AddSingleton<IAgentTool, SubmitEstimateTool>();
+
+        // Code: local Git repositories and the test sandbox.
+        services.Configure<RepositoryOptions>(config.GetSection("Repositories"));
+        services.Configure<SandboxOptions>(config.GetSection("Sandbox"));
+        services.AddSingleton<GitStore>();
+        services.AddSingleton<ICodeRepositoryStore>(sp => sp.GetRequiredService<GitStore>());
+        services.AddSingleton<IRepositoryLayout>(sp => sp.GetRequiredService<GitStore>());
+        // In containers the API asks the sandbox runner; only a developer machine (or tests) drives Docker directly.
+        if (!string.IsNullOrWhiteSpace(config["Sandbox:RunnerUrl"]))
+            services.AddHttpClient<ISandbox, HttpSandbox>(c => c.Timeout = TimeSpan.FromMinutes(15));
+        else
+            services.AddSingleton<ISandbox, DockerSandbox>();
+        services.AddSingleton<CodeWorkspace>();
+        services.AddSingleton<IAgentTool, ListFilesTool>();
+        services.AddSingleton<IAgentTool, ReadFileTool>();
+        services.AddSingleton<IAgentTool, SearchCodeTool>();
+        services.AddSingleton<IAgentTool, WriteFileTool>();
+        services.AddSingleton<IAgentTool, DeleteFileTool>();
+        services.AddSingleton<IAgentTool, DiffTool>();
+        services.AddSingleton<IAgentTool, CommitTool>();
+        services.AddSingleton<IAgentTool, RunTestsTool>();
+        services.AddSingleton<IAgentTool, OpenMergeRequestTool>();
         services.AddSingleton<ToolRegistry>();
 
         services.AddScoped<AgentAdminService>();
@@ -60,6 +89,8 @@ public static class DependencyInjection
         services.AddScoped<ApprovalService>();
         services.AddScoped<ObjectiveService>();
         services.AddScoped<WorkflowEngine>();
+        services.AddScoped<DeliveryService>();
+        services.AddScoped<CodeService>();
         return services;
     }
 }

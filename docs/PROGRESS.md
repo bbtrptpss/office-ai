@@ -68,10 +68,27 @@ approval requests — never free-form chat.
 Defaults: max 3 parallel runs per workflow, 2 retries per task, 5 runs per task, delegation depth 2,
 workflow budget USD 20, approvals expire after 7 days.
 
-## Phase 4 — Software house operations (next, branch `phase-4`)
+## Phase 4 — Software house operations ✅ (merged to master)
 
-Requirements and estimation, project planning, repository integration, controlled coding/testing/code review in a sandbox, deliverable management.
+Goal: AI employees do real software work — requirements, estimates, code in a Git repository, tests in a
+locked-down sandbox, code review and merge — and nothing merges without a person approving it.
+
+| # | Milestone | Status |
+| --- | --- | --- |
+| M1 | Requirements, architecture decisions (ADRs), estimates with deterministic pricing (rate card, contingency, margin, evidence flags); agent tools to record them | done (backend + tests; UI in M5) |
+| M2 | Git repositories per project (local, git CLI, no shell), one branch + worktree per task; agent tools: list/read/search/write files, diff, commit — confined to the task workspace | done |
+| M3 | Sandbox: tests run in a throwaway container — no network, read-only image, CPU/memory/pids/time limits, non-root; a separate runner service owns the Docker socket, the API never does | done (verified in compose: API → runner → container with no network, uid 1000, repo via volume subpath) |
+| M4 | Merge requests: diff + test evidence, AI code review, merge only after human approval | done (backend in M2; AI review via the Phase 3 engine with read/diff/test tools) |
+| M5 | Tests + UI: project workspace (requirements, ADRs, estimates, repository, merge requests, test runs) | done (104 tests; project tabs: requirements, ADRs, estimates, repository/MRs/test runs; approvals for estimates and merges; company settings page) |
+
+Decisions: Git hosting starts local (bare repos in a volume); GitHub/GitLab integration later behind the same
+interface. Customer prices in THB, AI costs in USD converted with a configurable rate. The sandbox image is a
+generic toolchain image (.NET SDK + Node); per-project test commands are configured on the repository.
+
+## Phase 5 — Company management (next, branch `phase-5`)
+
+Finance and usage reporting (planned vs actual), internal knowledge with validation before promotion, document generation, HR/performance reports, external integrations.
 
 ## Later phases
 
-5 Company management · 6 Production readiness
+6 Production readiness
