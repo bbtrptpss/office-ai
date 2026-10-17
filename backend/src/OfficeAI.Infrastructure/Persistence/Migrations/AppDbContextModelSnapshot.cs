@@ -1309,6 +1309,58 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                     b.ToTable("RoleRates", (string)null);
                 });
 
+            modelBuilder.Entity("OfficeAI.Domain.Finance.BudgetAllocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AmountUsd")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("Month")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("ScopeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Scope", "ScopeId", "Month")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("Scope", "ScopeId", "Month"), false);
+
+                    b.ToTable("BudgetAllocations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_BudgetAllocations_Amount", "\"AmountUsd\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("OfficeAI.Domain.Organization.Department", b =>
                 {
                     b.Property<Guid>("Id")

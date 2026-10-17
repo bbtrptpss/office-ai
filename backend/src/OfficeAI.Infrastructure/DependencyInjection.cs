@@ -91,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<WorkflowEngine>();
         services.AddScoped<DeliveryService>();
         services.AddScoped<CodeService>();
+        services.AddScoped<OfficeAI.Application.Reports.ReportsService>();
         return services;
     }
 }

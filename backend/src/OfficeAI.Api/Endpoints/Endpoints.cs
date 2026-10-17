@@ -33,6 +33,7 @@ public static class Endpoints
         MapWorkflows(api);
         MapDelivery(api);
         MapCode(api);
+        MapReports(api);
         app.MapHub<EventsHub>("/hubs/events");
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
     }
@@ -192,6 +193,19 @@ public static class Endpoints
         api.MapPost("/repositories/{id:guid}/test-runs", (Guid id, RunBranchTestsRequest? r, CodeService s, TimeProvider clock, CancellationToken ct) => s.RunTestsAsync(id, r?.Branch, clock, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapGet("/projects/{id:guid}/merge-requests", (Guid id, CodeService s, CancellationToken ct) => s.MergeRequestsAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/merge-requests/{id:guid}", (Guid id, CodeService s, CancellationToken ct) => s.MergeRequestAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+    }
+
+    private static void MapReports(RouteGroupBuilder api)
+    {
+        api.MapGet("/reports/finance", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.FinanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
+        api.MapGet("/reports/performance", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.PerformanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
+        api.MapGet("/budgets", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.ListBudgetsAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
+        api.MapPut("/budgets", (OfficeAI.Application.Reports.SetBudgetRequest r, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.SetBudgetAsync(r, ct)).RequirePermission(Permissions.FinanceManage);
+        api.MapDelete("/budgets/{id:guid}", async (Guid id, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) =>
+        {
+            await s.DeleteBudgetAsync(id, ct);
+            return Results.NoContent();
+        }).RequirePermission(Permissions.FinanceManage);
     }
 
     private static void MapSecurity(RouteGroupBuilder api)
