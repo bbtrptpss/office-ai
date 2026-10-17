@@ -60,7 +60,12 @@ public sealed class ApiFixture : IAsyncLifetime
         await _db.DisposeAsync();
     }
 
-    public HttpClient Anonymous() => Factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+    public HttpClient Anonymous()
+    {
+        var client = Factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+        client.DefaultRequestHeaders.Add("X-Requested-With", "tests");
+        return client;
+    }
 
     public async Task<HttpClient> LoginAsync(string email, string password)
     {

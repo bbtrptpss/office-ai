@@ -101,3 +101,12 @@ Finance and usage reporting (planned vs actual), internal knowledge with validat
 ## Phase 6 — Production readiness (next, branch `phase-6`)
 
 Security testing, reliability/concurrency testing, observability, backup/restore, deployment docs; Quality & Security overview page; company chat/announcements still open.
+
+| # | Milestone | Status |
+| --- | --- | --- |
+| M1 | Security hardening + tests: security headers, CSRF guard on state-changing API calls, secure cookies outside development, cross-project isolation of agent tools, dependency vulnerability scan | done (126 tests; dotnet + npm audits clean on 2026-10-18) |
+| M2 | Reliability: concurrent requests (double start, racing edits, parallel engine ticks) resolve to clean 409s, never 500s or duplicates | todo |
+| M3 | Observability: OpenTelemetry traces/metrics (OTLP when configured), JSON logs in production, readiness check, domain metrics (runs, tool calls, cost) | todo |
+| M4 | Backup & restore scripts for PostgreSQL + repositories, with a real restore drill | todo |
+| M5 | Deployment guide + production compose override (HTTPS proxy, no simulated AI, secrets) | todo |
+| M6 | Quality & Security overview page (tests, merge requests, failed runs, security events) | todo |

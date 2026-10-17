@@ -14,7 +14,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const res = await fetch(`${API_URL}${path}`, {
     method,
     credentials: "include",
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    headers: body === undefined ? { "X-Requested-With": "officeai" } : { "Content-Type": "application/json", "X-Requested-With": "officeai" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {

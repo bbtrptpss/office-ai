@@ -45,7 +45,8 @@ builder.Services.ConfigureApplicationCookie(o =>
     o.Cookie.Name = "officeai.auth";
     o.Cookie.HttpOnly = true;
     o.Cookie.SameSite = SameSiteMode.Lax;
-    o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    // Behind HTTPS in production the cookie must never travel over plain http.
+    o.Cookie.SecurePolicy = config.GetValue("Security:SecureCookies", false) ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
     o.ExpireTimeSpan = TimeSpan.FromHours(8);
     o.SlidingExpiration = true;
     // API: answer with status codes, never redirect to a login page.
@@ -67,7 +68,7 @@ builder.Services.AddRateLimiter(o =>
 
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .WithOrigins(config.GetSection("Cors:Origins").Get<string[]>() ?? [])
-    .AllowAnyHeader().AllowAnyMethod().AllowCredentials()
+    .WithHeaders("Content-Type", SecurityMiddleware.CsrfHeader, CorrelationIdMiddleware.Header, "X-SignalR-User-Agent").AllowAnyMethod().AllowCredentials()
     .WithExposedHeaders(CorrelationIdMiddleware.Header)));
 
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -78,9 +79,11 @@ builder.Services.AddExceptionHandler<AppExceptionHandler>();
 var app = builder.Build();
 
 app.UseMiddleware<CorrelationIdMiddleware>();
+if (!app.Environment.IsDevelopment() && config.GetValue("Security:Hsts", false)) app.UseHsts();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseCors();
+app.UseMiddleware<SecurityMiddleware>();
 app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
