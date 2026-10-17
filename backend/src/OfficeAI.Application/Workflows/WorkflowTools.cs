@@ -12,11 +12,12 @@ namespace OfficeAI.Application.Workflows;
 public static class Approvals
 {
     public static readonly TimeSpan DefaultLifetime = TimeSpan.FromDays(7);
+    private static readonly JsonSerializerOptions PayloadJson = new(JsonSerializerDefaults.Web) { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } };
 
     public static ApprovalRequest Create(ApprovalKind kind, string title, string? details, object payload, DateTimeOffset now,
         Guid? projectId = null, Guid? taskId = null, Guid? workflowId = null, Guid? runId = null, Guid? requestedByEmployee = null, Guid? requestedByUser = null)
     {
-        var json = JsonSerializer.Serialize(payload);
+        var json = JsonSerializer.Serialize(payload, PayloadJson);
         return new ApprovalRequest
         {
             Kind = kind, Title = title.Length > 300 ? title[..300] : title, Details = details, PayloadJson = json, PayloadHash = ApprovalRequest.Hash(json),

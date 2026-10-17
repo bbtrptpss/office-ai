@@ -74,7 +74,7 @@ export default function ProjectsPage() {
                       <StatusChip value={p.status} />
                     </Stack>
                     <Typography variant="h6" gutterBottom noWrap>{p.name}</Typography>
-                    <LinearProgress variant="determinate" value={pct} sx={{ height: 6, borderRadius: 3 }} />
+                    <LinearProgress variant="determinate" value={pct} sx={{ height: 6, borderRadius: "14px" }} />
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                       {p.doneCount}/{p.taskCount} · {pct}%
                       {p.dueDate && ` · ${t.dueDate} ${p.dueDate}`}

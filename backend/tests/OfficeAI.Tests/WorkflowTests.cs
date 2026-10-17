@@ -150,6 +150,8 @@ public class WorkflowTests(ApiFixture fx)
         var plan = Assert.Single(await PendingAsync(ceo, workflow.Id));
         Assert.Equal(ApprovalKind.Plan, plan.Kind);
         Assert.Equal(planner.Id, plan.RequestedByEmployeeId);
+        Assert.Contains("\"requiredSkills\"", plan.PayloadJson); // the UI reads camelCase
+        Assert.Contains("\"priority\":\"", plan.PayloadJson); // enums as names, not numbers
 
         // Wrong hash: the approver must have seen exactly this payload.
         var res = await ceo.PostAsJsonAsync($"/api/approvals/{plan.Id}/decision", new { approve = true, payloadHash = new string('0', 64) });

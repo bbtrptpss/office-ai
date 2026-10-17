@@ -37,7 +37,8 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                 name: "RequiredSkills",
                 table: "Tasks",
                 type: "text[]",
-                nullable: false);
+                nullable: false,
+                defaultValueSql: "'{}'::text[]");
 
             migrationBuilder.AddColumn<Guid>(
                 name: "ReviewerEmployeeId",
@@ -56,7 +57,7 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                 table: "AgentRuns",
                 type: "integer",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 1);
 
             migrationBuilder.AddColumn<string>(
                 name: "Purpose",
@@ -64,7 +65,7 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                 type: "character varying(20)",
                 maxLength: 20,
                 nullable: false,
-                defaultValue: "");
+                defaultValue: "Work");
 
             migrationBuilder.CreateTable(
                 name: "ApprovalRequests",

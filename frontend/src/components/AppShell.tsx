@@ -29,7 +29,9 @@ import DarkModeIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeIcon from "@mui/icons-material/LightModeOutlined";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
-import { stopRealtime } from "@/lib/realtime";
+import { stopRealtime, useRealtime } from "@/lib/realtime";
+import { api, Approval } from "@/lib/api";
+import { useLoad } from "./common";
 import { Avatar, Mascot } from "@/components/cute";
 import { brand } from "@/theme";
 
@@ -56,7 +58,7 @@ const NAV: NavItem[] = [
   { key: "navDepartments", href: "/departments", icon: <ApartmentIcon />, permission: "org.read" },
   { key: "navProjects", href: "/projects", icon: <ViewKanbanIcon />, permission: "project.read" },
   { key: "navActivity", href: "/agents", icon: <TimelineIcon />, permission: "agent.read" },
-  { key: "navApprovals", icon: <TaskAltIcon />, phase: 3 },
+  { key: "navApprovals", href: "/approvals", icon: <TaskAltIcon />, permission: "task.read" },
   { key: "navChat", icon: <ForumIcon />, phase: 5 },
   { key: "navKnowledge", icon: <MenuBookIcon />, phase: 5 },
   { key: "navFinance", icon: <PaymentsIcon />, phase: 5 },
@@ -79,6 +81,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const dark = (mode === "system" ? systemMode : mode) === "dark";
 
   const items = NAV.filter((i) => !i.permission || can(i.permission));
+  const pending = usePendingApprovals(can("task.read"));
 
   const drawer = (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -105,6 +108,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             >
               <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
               <ListItemText primary={t[item.key]} />
+              {item.key === "navApprovals" && pending > 0 && <Chip size="small" color="secondary" label={pending} sx={{ height: 20, fontWeight: 700 }} />}
               {item.phase && <Chip size="small" variant="outlined" label={`${t.comingInPhase} ${item.phase}`} sx={{ height: 20, fontSize: 11 }} />}
             </ListItemButton>
           );
@@ -181,4 +185,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </Box>
     </Box>
   );
+}
+
+/** Number of approvals waiting for a decision, kept live. */
+function usePendingApprovals(enabled: boolean) {
+  const { data, reload } = useLoad(async () => (enabled ? (await api.get<Approval[]>("/api/approvals?status=Pending")).length : 0), String(enabled));
+  useRealtime("approvalsChanged", () => void reload());
+  return data ?? 0;
 }

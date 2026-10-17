@@ -161,7 +161,7 @@ function RunDetailView({ runId, onClose }: { runId: string; onClose: () => void 
           const tone = s.kind === "AssistantText" ? brand.lilac : s.kind === "Notice" ? "#FFF1D6" : "transparent";
           return (
             <motion.div key={s.sequence} initial={reduce ? false : { opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(i, 10) * 0.03 }}>
-              <Box sx={{ p: 1.25, borderRadius: 3, border: 1, borderColor: "divider", bgcolor: tone, color: tone === "transparent" ? undefined : brand.ink }}>
+              <Box sx={{ p: 1.25, borderRadius: "14px", border: 1, borderColor: "divider", bgcolor: tone, color: tone === "transparent" ? undefined : brand.ink }}>
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 0.5 }}>
                   {s.kind === "ToolCall" || s.kind === "ToolResult" ? <BuildIcon fontSize="small" /> : s.kind === "Notice" ? <InfoIcon fontSize="small" /> : <ChatBubbleIcon fontSize="small" />}
                   <Typography variant="caption" fontWeight={600}>{s.kind}</Typography>
@@ -200,7 +200,7 @@ export function DeliverableList({ items }: { items: Deliverable[] }) {
   return (
     <Stack spacing={1}>
       {items.map((d) => (
-        <Box key={d.id} sx={{ p: 1.5, borderRadius: 3, border: 1, borderColor: "divider" }}>
+        <Box key={d.id} sx={{ p: 1.5, borderRadius: "14px", border: 1, borderColor: "divider" }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 0.5 }}>
             <Typography fontWeight={600} sx={{ flex: 1 }}>{d.title}</Typography>
             {d.isSimulated && <SimulatedBadge />}

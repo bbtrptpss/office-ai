@@ -311,3 +311,79 @@ export interface UsageSummary {
 
 export const usd = (n: number) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: n > 0 && n < 0.01 ? 4 : 2, maximumFractionDigits: n > 0 && n < 0.01 ? 6 : 2 })}`;
+
+// ---------- Phase 3: orchestration ----------
+
+export type ApprovalKind = "Plan" | "TaskCompletion" | "ToolAction" | "Escalation";
+export type ApprovalStatus = "Pending" | "Approved" | "Rejected" | "Expired" | "Cancelled";
+export type WorkflowStatus = "Planning" | "AwaitingPlanApproval" | "Executing" | "Completed" | "Failed" | "Cancelled";
+
+export interface Approval {
+  id: string;
+  kind: ApprovalKind;
+  status: ApprovalStatus;
+  title: string;
+  details: string | null;
+  payloadJson: string;
+  payloadHash: string;
+  projectId: string | null;
+  taskId: string | null;
+  workflowExecutionId: string | null;
+  runId: string | null;
+  requestedByEmployeeId: string | null;
+  requestedByName: string | null;
+  createdAt: string;
+  expiresAt: string;
+  decidedByUserId: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  isSimulated: boolean;
+  requiredPermission: string;
+}
+
+export interface Workflow {
+  id: string;
+  projectId: string;
+  objective: string;
+  status: WorkflowStatus;
+  plannerEmployeeId: string;
+  plannerName: string;
+  planningTaskId: string | null;
+  budgetUsd: number;
+  spentUsd: number;
+  maxParallelRuns: number;
+  taskCount: number;
+  doneCount: number;
+  createdAt: string;
+  completedAt: string | null;
+  error: string | null;
+}
+
+export interface WorkflowEvent {
+  id: number;
+  taskId: string | null;
+  kind: string;
+  message: string;
+  createdAt: string;
+}
+
+export interface Review {
+  id: string;
+  taskId: string;
+  deliverableId: string | null;
+  reviewerName: string | null;
+  outcome: "Approved" | "ChangesRequested";
+  comments: string;
+  isSimulated: boolean;
+  createdAt: string;
+}
+
+export interface PlanItem {
+  key: string;
+  title: string;
+  description: string | null;
+  acceptanceCriteria: string | null;
+  requiredSkills: string[];
+  dependsOn: string[];
+  priority: TaskPriority;
+}
