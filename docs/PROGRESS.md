@@ -108,5 +108,5 @@ Security testing, reliability/concurrency testing, observability, backup/restore
 | M2 | Reliability: concurrent requests (double start, racing edits, parallel engine ticks) resolve to clean 409s, never 500s or duplicates | done (5 race tests, stable over repeated runs) |
 | M3 | Observability: OpenTelemetry traces/metrics (OTLP when configured), JSON logs in production, readiness check, domain metrics (runs, tool calls, cost) | done (133 tests) |
 | M4 | Backup & restore scripts for PostgreSQL + repositories, with a real restore drill | done (drill 2026-10-18: restored copy matched live counts — 5 tasks, 593 audit rows, 4 runs, 9 migrations, 53 repo files; append-only trigger intact) |
-| M5 | Deployment guide + production compose override (HTTPS proxy, no simulated AI, secrets) | todo |
+| M5 | Deployment guide + production compose override (HTTPS proxy, no simulated AI, secrets) | done (docs/DEPLOYMENT.md, docker-compose.prod.yml + Caddy; config validated; change-password endpoint + UI added) |
 | M6 | Quality & Security overview page (tests, merge requests, failed runs, security events) | todo |

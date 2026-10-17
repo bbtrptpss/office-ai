@@ -112,3 +112,23 @@ public class SecurityTests(ApiFixture fx)
         Assert.Contains("My task", detail.ToolExecutions[0].Output);
     }
 }
+
+[Collection(ApiCollection.Name)]
+public class PasswordTests(ApiFixture fx)
+{
+    [Fact]
+    public async Task Users_can_change_their_password_with_the_current_one()
+    {
+        var ceo = await fx.CeoAsync();
+        var email = $"pw-{Guid.NewGuid():N}@test.local";
+        (await ceo.PostAsJsonAsync("/api/security/users", new { email, displayName = "Pw", password = "Old-Password-123", isAgent = false, roles = new[] { "Member" } })).EnsureSuccessStatusCode();
+        var user = await fx.LoginAsync(email, "Old-Password-123");
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await user.PostAsJsonAsync("/api/auth/change-password", new { currentPassword = "wrong", newPassword = "New-Password-456" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await user.PostAsJsonAsync("/api/auth/change-password", new { currentPassword = "Old-Password-123", newPassword = "short" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await user.PostAsJsonAsync("/api/auth/change-password", new { currentPassword = "Old-Password-123", newPassword = "New-Password-456" })).StatusCode);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await fx.Anonymous().PostAsJsonAsync("/api/auth/login", new { email, password = "Old-Password-123" })).StatusCode);
+        await fx.LoginAsync(email, "New-Password-456");
+    }
+}

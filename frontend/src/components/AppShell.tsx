@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   AppBar, Box, Chip, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText,
-  Stack, Toolbar, Tooltip, Typography, useMediaQuery, useTheme,
+  Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Toolbar, Tooltip, Typography, useMediaQuery, useTheme,
 } from "@mui/material";
 import { useColorScheme } from "@mui/material/styles";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -80,6 +80,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const muiTheme = useTheme();
   const desktop = useMediaQuery(muiTheme.breakpoints.up("md"));
   const [open, setOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const dark = (mode === "system" ? systemMode : mode) === "dark";
 
   const items = NAV.filter((i) => !i.permission || can(i.permission));
@@ -117,7 +118,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         })}
       </List>
       <Divider />
-      <Stack direction="row" spacing={1.5} sx={{ p: 2, alignItems: "center" }}>
+      <Stack direction="row" spacing={1.5} onClick={() => setPasswordOpen(true)} title={t.changePassword}
+        sx={{ p: 2, alignItems: "center", cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}>
         <Avatar kind="Human" seed={me?.displayName ?? "me"} size={38} />
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="body2" fontWeight={600} noWrap>
@@ -182,6 +184,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </Drawer>
       </Box>
 
+      <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
+
       <Box component="main" sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 3 }, mt: 8, backgroundImage: `radial-gradient(600px 300px at 90% 0%, ${brand.pinkSoft}55, transparent 70%), radial-gradient(500px 280px at 10% 100%, ${brand.lavender}44, transparent 70%)`, backgroundAttachment: "fixed" }}>
         {children}
       </Box>
@@ -194,4 +198,37 @@ function usePendingApprovals(enabled: boolean) {
   const { data, reload } = useLoad(async () => (enabled ? (await api.get<Approval[]>("/api/approvals?status=Pending")).length : 0), String(enabled));
   useRealtime("approvalsChanged", () => void reload());
   return data ?? 0;
+}
+
+function ChangePasswordDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useI18n();
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const close = () => { setCurrent(""); setNext(""); setResult(null); onClose(); };
+  return (
+    <Dialog open={open} onClose={close} fullWidth maxWidth="xs">
+      <DialogTitle>{t.changePassword}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {result && <Alert severity={result.ok ? "success" : "error"}>{result.text}</Alert>}
+          <TextField type="password" label={t.currentPassword} autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          <TextField type="password" label={t.newPassword} autoComplete="new-password" helperText="≥ 10" value={next} onChange={(e) => setNext(e.target.value)} />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={close}>{t.close}</Button>
+        <Button variant="contained" disabled={!current || next.length < 10} onClick={async () => {
+          try {
+            await api.post("/api/auth/change-password", { currentPassword: current, newPassword: next });
+            setResult({ ok: true, text: "✓" });
+            setCurrent("");
+            setNext("");
+          } catch (e) {
+            setResult({ ok: false, text: e instanceof Error ? e.message : String(e) });
+          }
+        }}>{t.save}</Button>
+      </DialogActions>
+    </Dialog>
+  );
 }

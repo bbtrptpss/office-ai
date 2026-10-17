@@ -27,6 +27,10 @@ docker compose up -d --build
 
 ระบบรัน migration และใส่ข้อมูลตั้งต้นอัตโนมัติ: 6 แผนก, 31 ตำแหน่ง, พนักงาน AI 30 ตัว และ CEO 1 คน
 
+## ติดตั้งใช้งานจริง
+
+ดู [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — HTTPS อัตโนมัติ, secrets, สำรอง/กู้คืน, monitoring
+
 ## พัฒนาแบบไม่ใช้ Docker
 
 ```bash

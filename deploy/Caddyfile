@@ -1,0 +1,10 @@
+# Automatic HTTPS (Let's Encrypt) for both hostnames. DNS for both must point at this server.
+{$APP_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:8080
+}

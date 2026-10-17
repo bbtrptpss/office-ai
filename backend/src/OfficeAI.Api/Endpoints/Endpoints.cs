@@ -20,6 +20,7 @@ using OfficeAI.Infrastructure.Security;
 namespace OfficeAI.Api.Endpoints;
 
 public record LoginRequest(string Email, string Password);
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 public record MeDto(Guid UserId, string Email, string DisplayName, bool IsAgent, List<string> Roles, List<string> Permissions, Guid? EmployeeId);
 
 public static class Endpoints
@@ -69,6 +70,19 @@ public static class Endpoints
             await audit.WriteAsync(AuditActions.LoginFailed, "User", user.Id.ToString(), user.Id, user.DisplayName, new { Reason = "bad_password" }, ct);
             return Results.Problem(statusCode: 401, title: "Invalid email or password.");
         }).AllowAnonymous().RequireRateLimiting("login");
+
+        auth.MapPost("/change-password", async (ChangePasswordRequest req, ICurrentUser me, UserManager<AppUser> users, SignInManager<AppUser> signIn,
+            SecurityAuditWriter audit, CancellationToken ct) =>
+        {
+            var user = await users.FindByIdAsync(me.UserId!.Value.ToString());
+            if (user is null) return Results.Unauthorized();
+            var result = await users.ChangePasswordAsync(user, req.CurrentPassword ?? "", req.NewPassword ?? "");
+            if (!result.Succeeded)
+                return Results.Problem(statusCode: 400, title: string.Join(" ", result.Errors.Select(e => e.Description)));
+            await signIn.RefreshSignInAsync(user); // the security stamp changed: other sessions are signed out
+            await audit.WriteAsync(AuditActions.Updated, "UserPassword", user.Id.ToString(), user.Id, user.DisplayName, null, ct);
+            return Results.NoContent();
+        }).RequireAuthorization();
 
         auth.MapPost("/logout", async (SignInManager<AppUser> signIn) =>
         {
