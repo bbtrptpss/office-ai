@@ -89,7 +89,7 @@ public class AgentTests(ApiFixture fx)
         Assert.Equal(ToolRegistry.DefaultGrants.Order(), config.Tools.Order());
 
         var employees = await ceo.GetAsync<List<EmployeeDto>>("/api/employees");
-        var cto = employees.Single(e => e.JobTitle == "CTO");
+        var cto = employees.Single(e => e.DisplayName == "CTO AI");
         Assert.Equal("claude-opus-5-5", (await ceo.GetAsync<AgentConfigDto>($"/api/agents/{cto.Id}/config")).ModelId);
     }
 

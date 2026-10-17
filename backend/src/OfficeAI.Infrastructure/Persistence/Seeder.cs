@@ -3,6 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OfficeAI.Application.Agents;
+using OfficeAI.Application.Workflows;
+using OfficeAI.Domain.Agents;
+using OfficeAI.Domain.Workflows;
 using OfficeAI.Domain.Organization;
 using OfficeAI.Domain.Security;
 using OfficeAI.Infrastructure.Identity;
@@ -73,7 +76,28 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
         foreach (var x in unconfigured)
         {
             db.AgentConfigurations.Add(AgentDefaults.ConfigFor(x.Employee, x.Level));
-            db.AgentToolPermissions.AddRange(AgentDefaults.GrantsFor(x.Employee.Id, now));
+            db.AgentToolPermissions.AddRange(AgentDefaults.GrantsFor(x.Employee.Id, x.Level, now));
+        }
+        await db.SaveChangesAsync(ct);
+
+        if (!await db.WorkflowDefinitions.AnyAsync(d => d.Code == ObjectiveService.DefaultDefinition, ct))
+            db.WorkflowDefinitions.Add(new WorkflowDefinition
+            {
+                Code = ObjectiveService.DefaultDefinition, Name = "Objective delivery",
+                Description = "Plan → CEO approves plan → agents work in parallel → AI review → CEO approves each result.",
+            });
+
+        // Phase 3 tools for AI employees configured before they existed (applied once; later changes by people are kept).
+        const string marker = "phase3-tool-grants";
+        if (!await db.SeedMarkers.AnyAsync(m => m.Key == marker, ct))
+        {
+            var employees = await db.AgentConfigurations.Join(db.Employees, c => c.EmployeeId, e => e.Id, (c, e) => new { e.Id, e.RoleDefinition!.Level }).ToListAsync(ct);
+            var existing = (await db.AgentToolPermissions.Select(p => new { p.EmployeeId, p.ToolId }).ToListAsync(ct)).ToHashSet();
+            foreach (var e in employees)
+                foreach (var tool in new[] { ReviewSubmitTool.ToolId, PlanSubmitTool.ToolId, DelegateTaskTool.ToolId }.Intersect(AgentDefaults.ToolsFor(e.Level)))
+                    if (!existing.Contains(new { EmployeeId = e.Id, ToolId = tool }))
+                        db.AgentToolPermissions.Add(new AgentToolPermission { EmployeeId = e.Id, ToolId = tool, GrantedAt = now });
+            db.SeedMarkers.Add(new SeedMarker { Key = marker, AppliedAt = now });
         }
         await db.SaveChangesAsync(ct);
     }

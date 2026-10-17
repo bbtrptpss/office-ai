@@ -23,7 +23,7 @@ public record SetAgentToolsRequest(List<string> Tools);
 public record StartRunRequest(Guid? EmployeeId = null);
 public record AgentRunDto(Guid Id, Guid TaskId, string TaskTitle, Guid ProjectId, Guid EmployeeId, string EmployeeName, AgentRunStatus Status,
     string Provider, string ModelId, bool IsSimulated, DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? FinishedAt,
-    int Turns, int ToolCalls, long InputTokens, long OutputTokens, decimal CostUsd, string? StopReason, string? Error);
+    int Turns, int ToolCalls, long InputTokens, long OutputTokens, decimal CostUsd, string? StopReason, string? Error, RunPurpose Purpose, int Attempt);
 public record RunStepDto(int Sequence, RunStepKind Kind, string Content, string? ToolCallId, DateTimeOffset CreatedAt);
 public record ToolExecutionDto(Guid Id, string ToolId, string ToolVersion, string ToolCallId, ToolExecutionStatus Status, string InputJson,
     string? Output, string? Error, int DurationMs, DateTimeOffset StartedAt);
@@ -136,17 +136,38 @@ public class AgentAdminService(IAppDbContext db, AiProviderRegistry providers, T
 /// <summary>Starting, cancelling and inspecting AI runs.</summary>
 public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAgentRunQueue queue, IRealtimeNotifier notifier, ICurrentUser current, TimeProvider clock)
 {
+    /// <summary>A person starts a work run on a task assigned to an AI employee.</summary>
     public async Task<AgentRunDto> StartAsync(Guid taskId, StartRunRequest req, CancellationToken ct)
     {
-        var task = await db.Tasks.AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskId, ct) ?? throw new NotFoundException("Task", taskId);
-        if (task.Status is not (WorkTaskStatus.Assigned or WorkTaskStatus.InProgress))
-            throw new DomainException("agent.task_state", $"Only Assigned or InProgress tasks can be run; this one is {task.Status}.");
-
         var assignees = await db.TaskAssignments.AsNoTracking().Where(a => a.TaskId == taskId && a.UnassignedAt == null).Select(a => a.EmployeeId).ToListAsync(ct);
         var employeeId = req.EmployeeId ?? (assignees.Count == 1 ? assignees[0] : throw new DomainException("agent.not_assigned", "Assign the task to an AI employee first."));
-        if (!assignees.Contains(employeeId)) throw new DomainException("agent.not_assigned", "The task is not assigned to this employee.");
+        var run = await CreateRunAsync(taskId, employeeId, RunPurpose.Work, ct);
+        return await GetRunAsync(run.Id, ct);
+    }
 
-        var employee = await db.Employees.AsNoTracking().FirstAsync(e => e.Id == employeeId, ct);
+    /// <summary>
+    /// Validates and queues a run. Work and Plan runs need the employee to be the assignee of an Assigned/InProgress task;
+    /// Review runs need the task in review and the employee to be its (different) reviewer.
+    /// </summary>
+    public async Task<AgentRun> CreateRunAsync(Guid taskId, Guid employeeId, RunPurpose purpose, CancellationToken ct)
+    {
+        var task = await db.Tasks.AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskId, ct) ?? throw new NotFoundException("Task", taskId);
+        var assignees = await db.TaskAssignments.AsNoTracking().Where(a => a.TaskId == taskId && a.UnassignedAt == null).Select(a => a.EmployeeId).ToListAsync(ct);
+        if (purpose == RunPurpose.Review)
+        {
+            if (task.Status != WorkTaskStatus.InReview)
+                throw new DomainException("agent.task_state", $"Only tasks in review can be reviewed; this one is {task.Status}.");
+            if (task.ReviewerEmployeeId != employeeId) throw new DomainException("agent.not_reviewer", "This employee is not the task's reviewer.");
+            if (assignees.Contains(employeeId)) throw new DomainException("agent.self_review", "An employee cannot review its own work.");
+        }
+        else
+        {
+            if (task.Status is not (WorkTaskStatus.Assigned or WorkTaskStatus.InProgress))
+                throw new DomainException("agent.task_state", $"Only Assigned or InProgress tasks can be run; this one is {task.Status}.");
+            if (!assignees.Contains(employeeId)) throw new DomainException("agent.not_assigned", "The task is not assigned to this employee.");
+        }
+
+        var employee = await db.Employees.AsNoTracking().FirstOrDefaultAsync(e => e.Id == employeeId, ct) ?? throw new NotFoundException("Employee", employeeId);
         if (employee.Kind != EmployeeKind.AI) throw new DomainException("agent.not_ai", $"{employee.DisplayName} is not an AI employee.");
         if (employee.Status == EmployeeStatus.Inactive) throw new DomainException("agent.inactive", $"{employee.DisplayName} is inactive.");
 
@@ -166,16 +187,17 @@ public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAg
         if (await db.AgentRuns.AnyAsync(r => r.TaskId == taskId && (r.Status == AgentRunStatus.Queued || r.Status == AgentRunStatus.Running), ct))
             throw new DomainException("agent.already_running", "This task already has a run in progress.");
 
+        var attempt = await db.AgentRuns.CountAsync(r => r.TaskId == taskId && r.Purpose == purpose, ct) + 1;
         var run = new AgentRun
         {
-            TaskId = taskId, ProjectId = task.ProjectId, EmployeeId = employeeId, Provider = provider.Name, ModelId = config.ModelId,
-            IsSimulated = provider.IsSimulated, TriggeredBy = current.UserId, CorrelationId = current.CorrelationId,
+            TaskId = taskId, ProjectId = task.ProjectId, EmployeeId = employeeId, Purpose = purpose, Attempt = attempt, Provider = provider.Name,
+            ModelId = config.ModelId, IsSimulated = provider.IsSimulated, TriggeredBy = current.UserId, CorrelationId = current.CorrelationId,
         };
         db.AgentRuns.Add(run);
         await db.SaveChangesAsync(ct);
         await queue.EnqueueAsync(run.Id, ct);
         await notifier.AgentRunChangedAsync(run.Id, run.TaskId, run.ProjectId, run.Status.ToString(), ct);
-        return await GetRunAsync(run.Id, ct);
+        return run;
     }
 
     public async Task<AgentRunDto> CancelAsync(Guid runId, CancellationToken ct)
@@ -194,7 +216,7 @@ public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAg
             .Join(db.Employees, x => x.r.EmployeeId, e => e.Id, (x, e) => new AgentRunDto(
                 x.r.Id, x.r.TaskId, x.Title, x.r.ProjectId, x.r.EmployeeId, e.DisplayName, x.r.Status, x.r.Provider, x.r.ModelId, x.r.IsSimulated,
                 x.r.CreatedAt, x.r.StartedAt, x.r.FinishedAt, x.r.Turns, x.r.ToolCalls, x.r.InputTokens, x.r.OutputTokens, x.r.CostUsd,
-                x.r.StopReason, x.r.Error));
+                x.r.StopReason, x.r.Error, x.r.Purpose, x.r.Attempt));
 
     public async Task<AgentRunDto> GetRunAsync(Guid runId, CancellationToken ct) =>
         await RunQuery(db.AgentRuns.AsNoTracking().Where(r => r.Id == runId)).FirstOrDefaultAsync(ct) ?? throw new NotFoundException("AgentRun", runId);

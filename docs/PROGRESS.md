@@ -42,9 +42,28 @@ using only authorized tools, with every call, tool execution, token and cost rec
 - OpenAI / Gemini adapters not built (waiting on which accounts exist).
 - Runs interrupted by a restart are marked Failed, not resumed; durable resume belongs to Phase 3 orchestration.
 
-## Phase 3 — Orchestration (next, branch `phase-3`)
+## Phase 3 — Orchestration (branch `phase-3`)
 
-Delegation, dependencies and parallel execution, review workflows, retries/timeouts/cancellation/recovery, human approval inbox.
+Goal: the CEO gives an objective; an AI planner proposes tasks; the CEO approves the plan; a deterministic
+workflow engine assigns agents, runs ready tasks in parallel, routes deliverables to AI reviewers, retries
+recoverable failures, escalates the rest, and asks a human for every final approval.
+
+Design: the engine is ordinary code, not an LLM. Its state lives in the database and is re-derived on every
+tick, so a restart simply continues. Agents coordinate only through tasks, deliverables, reviews and
+approval requests — never free-form chat.
+
+| # | Milestone | Status |
+| --- | --- | --- |
+| M1 | Data: WorkflowDefinitions, WorkflowExecutions, WorkflowEvents, ApprovalRequests, Reviews; task delegation fields; run purpose + attempt | done |
+| M2 | Approval inbox: request/decide/expire, payload hash binding, no self-approval, agents never decide; approval-required tools queue an action that runs once after approval | done |
+| M3 | Planner: plan.submit tool, plan validation (keys, deps, no cycles, size), plan approval creates tasks | done |
+| M4 | Engine: agent selection (skills, workload, budget), ready-task scheduling with parallel limit, retries, escalation, workflow budget cap, completion, cancellation, advisory lock | done |
+| M5 | Review + delegation tools: review.submit, task.delegate with depth limit | done |
+| M6 | Tests incl. the end-to-end objective → plan → work → review → CEO approval | done (79 tests, incl. end-to-end with the simulated provider) |
+| M7 | UI: approvals inbox, objectives/workflows on the project page, reviews in the task dialog | todo |
+
+Defaults: max 3 parallel runs per workflow, 2 retries per task, 5 runs per task, delegation depth 2,
+workflow budget USD 20, approvals expire after 7 days.
 
 ## Later phases
 

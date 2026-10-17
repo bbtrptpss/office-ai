@@ -38,6 +38,7 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("RateLimits:LoginPerMinute", "1000");
             b.UseSetting("AiProviders:Simulated:Enabled", "true");
             b.UseSetting("AiProviders:Anthropic:ApiKey", "");
+            b.UseSetting("Workflow:AutoTick", "false"); // tests drive the engine explicitly
             b.ConfigureTestServices(s =>
             {
                 s.AddSingleton<IAiProvider>(Scripted);

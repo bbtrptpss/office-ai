@@ -33,7 +33,7 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IAiP
         if (lastResults.Any(r => r.IsError))
             return Done($"[SIMULATED] Stopping: a tool reported an error ({lastResults.First(r => r.IsError).Content}).", inputTokens);
 
-        string? Next() => new[] { "task_read_context", "deliverable_submit", "task_request_review" }
+        string? Next() => new[] { "task_read_context", "plan_submit", "review_submit", "deliverable_submit", "task_request_review" }
             .FirstOrDefault(n => toolNames.Contains(n) && !used.Contains(n));
 
         var next = Next();
@@ -47,6 +47,17 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IAiP
                 content = "# Simulated output\n\nThis deliverable was produced by the development stand-in provider. It is **not** real work and must not be accepted.",
             }),
             "task_request_review" => JsonSerializer.SerializeToElement(new { note = "[SIMULATED] Ready for review." }),
+            "review_submit" => JsonSerializer.SerializeToElement(new { outcome = "approve", comments = "[SIMULATED] Review by the development stand-in; a person must check the real work." }),
+            "plan_submit" => JsonSerializer.SerializeToElement(new
+            {
+                summary = "[SIMULATED] Placeholder plan from the development stand-in provider.",
+                tasks = new object[]
+                {
+                    new { key = "requirements", title = "[SIMULATED] Clarify requirements", description = "List the requirements and open questions.", acceptanceCriteria = "Requirements listed", requiredSkills = new[] { "requirements" }, dependsOn = Array.Empty<string>(), priority = "High" },
+                    new { key = "build", title = "[SIMULATED] Build the first version", description = "Implement the core feature.", acceptanceCriteria = "Feature works", requiredSkills = new[] { "csharp", "api" }, dependsOn = new[] { "requirements" }, priority = "High" },
+                    new { key = "test", title = "[SIMULATED] Test the feature", description = "Write and run tests.", acceptanceCriteria = "Tests pass", requiredSkills = new[] { "testing" }, dependsOn = new[] { "build" }, priority = "Medium" },
+                },
+            }),
             _ => JsonSerializer.SerializeToElement(new { }),
         };
         var callId = $"sim_{used.Count + 1}";
