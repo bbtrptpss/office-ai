@@ -105,7 +105,7 @@ Security testing, reliability/concurrency testing, observability, backup/restore
 | # | Milestone | Status |
 | --- | --- | --- |
 | M1 | Security hardening + tests: security headers, CSRF guard on state-changing API calls, secure cookies outside development, cross-project isolation of agent tools, dependency vulnerability scan | done (126 tests; dotnet + npm audits clean on 2026-10-18) |
-| M2 | Reliability: concurrent requests (double start, racing edits, parallel engine ticks) resolve to clean 409s, never 500s or duplicates | todo |
+| M2 | Reliability: concurrent requests (double start, racing edits, parallel engine ticks) resolve to clean 409s, never 500s or duplicates | done (5 race tests, stable over repeated runs) |
 | M3 | Observability: OpenTelemetry traces/metrics (OTLP when configured), JSON logs in production, readiness check, domain metrics (runs, tool calls, cost) | todo |
 | M4 | Backup & restore scripts for PostgreSQL + repositories, with a real restore drill | todo |
 | M5 | Deployment guide + production compose override (HTTPS proxy, no simulated AI, secrets) | todo |
