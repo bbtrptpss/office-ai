@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OfficeAI.Api/OfficeAI.Api.csproj" />
+    <Project Path="src/OfficeAI.Application/OfficeAI.Application.csproj" />
+    <Project Path="src/OfficeAI.Domain/OfficeAI.Domain.csproj" />
+    <Project Path="src/OfficeAI.Infrastructure/OfficeAI.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OfficeAI.Tests/OfficeAI.Tests.csproj" />
+  </Folder>
+</Solution>

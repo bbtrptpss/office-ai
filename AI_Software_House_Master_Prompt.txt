@@ -1,0 +1,530 @@
+# MASTER PROJECT PROMPT
+# AI SOFTWARE HOUSE — Autonomous AI Company Operating System
+
+## 1. YOUR ROLE
+
+Act as a Principal Software Architect, AI Systems Engineer, Multi-Agent Systems Engineer, Senior Full-Stack Developer, DevOps Engineer, and Security Engineer.
+
+Build a real, extensible AI Company Operating System for an IT Solutions and Software House business.
+
+This is NOT merely a chatbot, AI dashboard, or collection of independent AI agents.
+
+The goal is to simulate and operate a software company in which AI employees have organizational positions, responsibilities, specialized skills, access permissions, persistent workspaces, assigned tasks, measurable deliverables, and collaboration workflows.
+
+The human owner acts as CEO and retains authority over company strategy, budgets, high-risk decisions, and external commitments.
+
+AI employees should perform actual work through authorized tools, not simply describe what they would do.
+
+## 2. BUSINESS VISION
+
+Build a virtual Software House that can:
+
+- Receive software project requests from the CEO or customers.
+- Analyze business requirements.
+- Prepare proposals and project estimates.
+- Evaluate feasibility, cost, risks, and expected profitability.
+- Create project plans, milestones, and tasks.
+- Assign tasks to suitable AI employees.
+- Develop software through authorized coding tools.
+- Review code and execute tests.
+- Track progress, costs, blockers, and quality.
+- Produce documentation and delivery packages.
+- Manage internal operations, company knowledge, and performance.
+- Improve workflows based on measurable results and human-approved feedback.
+
+The architecture must support adding new departments, job positions, AI models, tools, and external integrations without rewriting the core platform.
+
+## 3. ORGANIZATIONAL STRUCTURE
+
+Implement a configurable organizational hierarchy.
+
+### Executive Office
+- CEO: Human owner and final decision-maker.
+- COO Agent: Operational coordination and task prioritization.
+- CTO Agent: Technical strategy, architecture, and engineering standards.
+- CFO Agent: Cost tracking, budgets, estimates, and profitability analysis.
+- HR Agent: Employee configuration, role assignments, evaluations, and staffing recommendations.
+
+### Sales and Business
+- Sales Agent
+- Business Analyst Agent
+- Solution Consultant Agent
+- Account Manager Agent
+- Proposal and Estimation Agent
+
+### Project Management
+- Project Manager Agent
+- Scrum Master Agent
+- Business Requirements Agent
+- Documentation Agent
+
+### Software Engineering
+- Software Architect Agent
+- Backend Developer Agent
+- Frontend Developer Agent
+- Mobile Developer Agent
+- Database Engineer Agent
+- DevOps and Platform Engineer Agent
+- Integration Engineer Agent
+
+### Quality and Security
+- QA Engineer Agent
+- Automation Test Engineer Agent
+- Code Reviewer Agent
+- Security Engineer Agent
+- Release Manager Agent
+
+### Corporate Operations
+- Finance Agent
+- Procurement Agent
+- Operations Agent
+- Legal and Compliance Assistant Agent
+- Customer Support Agent
+
+Positions must be configurable in the database.
+
+Do not require one independent model instance for every employee. Support multiple employees sharing a model provider, reusable role definitions, different system instructions, and separate execution contexts.
+
+## 4. AI EMPLOYEE MODEL
+
+Each AI employee must have:
+
+- Unique employee ID and display name.
+- Job title, department, manager, and organizational level.
+- Job description and responsibilities.
+- Skills and supported task types.
+- System instructions and behavioral constraints.
+- Configurable AI model and provider.
+- Authorized tools and permission scopes.
+- Input and output schemas.
+- Task queue and current assignments.
+- Working memory and approved long-term knowledge.
+- Work history and execution logs.
+- Performance metrics and quality evaluation.
+- Token usage, execution time, and cost records.
+- Status: Available, Working, Waiting for Approval, Blocked, Failed, or Inactive.
+
+Each employee must produce structured deliverables and report task status.
+
+AI employees must not be able to grant themselves new permissions, rewrite their own security policies, or bypass approval requirements.
+
+## 5. MULTI-AGENT ORCHESTRATION
+
+Build a central Agent Orchestrator.
+
+Responsibilities:
+
+- Receive objectives from the CEO.
+- Classify the request and identify the required departments.
+- Create a structured execution plan.
+- Break objectives into tasks and subtasks.
+- Select agents according to skills, availability, permissions, cost, and workload.
+- Track task dependencies.
+- Dispatch tasks to authorized execution workers.
+- Validate outputs against acceptance criteria.
+- Route deliverables to reviewers or managers.
+- Retry recoverable failures with configurable limits.
+- Escalate blockers and ambiguous decisions.
+- Request human approval when required.
+- Track execution costs, timeouts, and resource limits.
+- Persist state so interrupted workflows can resume safely.
+
+Use explicit workflow states and durable task records.
+
+Support sequential workflows, parallel tasks, approval gates, retries, cancellation, and recovery.
+
+Prevent infinite delegation, circular task dependencies, uncontrolled agent-to-agent conversations, duplicate external actions, and runaway spending.
+
+Agents may communicate through structured task assignments, messages, and deliverables. Do not rely exclusively on free-form conversations to coordinate work.
+
+## 6. REAL WORK EXECUTION
+
+Implement a controlled tool system.
+
+Potential tools include:
+
+- Read and search authorized project files.
+- Create and edit files within approved workspaces.
+- Run unit and integration tests.
+- Run linting, formatting, and static analysis.
+- Read Git status and diffs.
+- Create branches and pull requests through authorized integrations.
+- Query approved databases using restricted access.
+- Generate documents and spreadsheets.
+- Search approved internal knowledge.
+- Access approved project management tools.
+- Use email and calendar integrations when connected.
+- Run containerized development and testing environments.
+
+Every tool must declare:
+- Tool identifier and version.
+- Input and output schema.
+- Required permissions.
+- Execution timeout.
+- Resource limits.
+- Whether human approval is required.
+- Audit and error-handling behavior.
+
+Run untrusted code in isolated execution environments with restricted filesystem access, network access, credentials, CPU, memory, and execution time.
+
+Never expose unrestricted host shell access or production credentials to AI agents by default.
+
+An AI response alone must never be treated as proof that an action succeeded. Verify actual tool results.
+
+## 7. SOFTWARE PROJECT DELIVERY WORKFLOW
+
+Implement a reusable end-to-end software delivery workflow.
+
+Stage 1: Lead Intake
+- Record customer request, business objective, budget, deadlines, and constraints.
+- Identify missing information.
+- Ask for clarification when necessary.
+
+Stage 2: Discovery and Analysis
+- Generate business requirements.
+- Produce user stories and acceptance criteria.
+- Identify functional and non-functional requirements.
+- Record assumptions, dependencies, and risks.
+
+Stage 3: Proposal and Estimation
+- Propose solution options.
+- Estimate effort and operational cost.
+- Calculate estimated gross margin and contingency.
+- Produce proposal and statement of work drafts.
+- Flag estimates that lack sufficient evidence.
+
+Stage 4: Architecture and Planning
+- Produce architecture diagrams and technical specifications.
+- Design database schemas and API contracts.
+- Define security requirements.
+- Create milestones and dependency-aware tasks.
+
+Stage 5: Development
+- Create isolated work branches.
+- Assign coding tasks to specialized agents.
+- Implement features and tests.
+- Require peer review for relevant changes.
+- Track files changed and commits created.
+
+Stage 6: Quality Assurance
+- Run automated tests and applicable security checks.
+- Validate acceptance criteria.
+- Record reproducible defects.
+- Send failed tasks back to the appropriate developer.
+- Prevent failed quality gates from being marked as passed.
+
+Stage 7: Release Preparation
+- Prepare release notes, deployment instructions, and rollback plans.
+- Verify build artifacts and test evidence.
+- Identify unresolved issues and operational risks.
+- Require human approval for production deployment.
+
+Stage 8: Delivery and Retrospective
+- Prepare a customer delivery package.
+- Generate a project completion report.
+- Compare planned and actual effort and costs.
+- Record lessons learned after review.
+- Update approved company knowledge.
+
+Each stage must have explicit entry criteria, exit criteria, deliverables, and approval requirements.
+
+## 8. COMPANY OPERATIONS
+
+Implement internal company management features:
+
+- Organizational chart.
+- Employee directory and job descriptions.
+- Department management.
+- Task and workload management.
+- Project portfolio.
+- Internal announcements and messages.
+- Meeting agendas and minutes.
+- Company documents and templates.
+- Policies and standard operating procedures.
+- Budget allocation and AI usage budgets.
+- Vendor and AI provider configuration.
+- Performance and quality reports.
+- Audit logs and approval history.
+
+Support human employees and AI employees in the same organizational model, while distinguishing their identity types, permissions, and accountability.
+
+Do not fabricate real employees, customers, payments, signed contracts, or business transactions.
+
+## 9. BUSINESS AND FINANCIAL MANAGEMENT
+
+Support:
+- Project budgets and estimates.
+- Planned versus actual AI and infrastructure costs.
+- Estimated project revenue and gross margin.
+- Tool and model usage by employee, project, and department.
+- Configurable budgets, quotas, and alerts.
+- Cost allocation across projects.
+- Scenario planning and profitability reports.
+
+Use deterministic calculations for financial figures.
+
+Clearly distinguish estimates from actual recorded amounts.
+
+Do not send invoices, transfer funds, make purchases, or commit the company to contractual terms without explicit authorization.
+
+## 10. COMPANY MEMORY AND KNOWLEDGE
+
+Build a permission-aware company knowledge system.
+
+Knowledge sources:
+- Approved company policies.
+- Technical standards.
+- Architecture decisions.
+- Project documentation.
+- Reviewed code patterns.
+- Completed project retrospectives.
+- Employee role instructions.
+- Approved reusable templates.
+
+Support search and retrieval with source references.
+
+Keep project-specific information isolated when required.
+
+Do not automatically convert every AI-generated response into trusted company knowledge.
+
+Require validation before promoting lessons, decisions, or generated documents into authoritative company records.
+
+## 11. USER INTERFACE
+
+Create a professional, responsive company dashboard.
+
+Main navigation:
+- Executive Dashboard
+- Organization
+- AI Employees
+- Departments
+- Projects
+- Task Board
+- Agent Activity
+- Approvals
+- Company Chat
+- Documents and Knowledge
+- Finance and Cost Control
+- Quality and Security
+- Integrations
+- Settings and Audit Logs
+
+Executive Dashboard:
+- Active projects.
+- Tasks completed, blocked, and overdue.
+- Agent workload and availability.
+- Pending approvals.
+- Quality gate status.
+- AI usage and cost.
+- Estimated project profitability.
+- Recent errors and important events.
+
+AI Employee Profile:
+- Role and manager.
+- Skills and authorized tools.
+- Current assignments.
+- Work history.
+- Deliverables.
+- Quality metrics.
+- Model configuration and usage.
+
+Project Workspace:
+- Requirements.
+- Architecture and decisions.
+- Milestones and task dependencies.
+- Code repositories.
+- Test reports.
+- Documents and approvals.
+- Budget and progress.
+
+Provide real-time or near-real-time status updates where technically supported.
+
+## 12. TECHNICAL ARCHITECTURE
+
+Preferred initial stack:
+- Frontend: Next.js, React, TypeScript.
+- UI: Material UI.
+- Backend: ASP.NET Core Web API on .NET 10.
+- Architecture: Domain, Application, Infrastructure, API.
+- Database: PostgreSQL.
+- ORM: Entity Framework Core.
+- Background execution: Durable job or workflow orchestration infrastructure.
+- Cache: Redis where appropriate.
+- AI integrations: Provider-agnostic adapters.
+- File storage: S3-compatible object storage for production.
+- Local development: Docker Compose.
+- Observability: Structured logs, metrics, traces, and execution correlation IDs.
+- Testing: Unit, integration, and end-to-end tests.
+
+Evaluate existing workflow and agent frameworks before implementing custom orchestration. Choose a framework only if it meets durability, observability, security, and extensibility requirements.
+
+Keep business logic independent of specific AI providers.
+
+## 13. DATA MODEL
+
+Design and implement appropriate relational entities, including:
+
+- Users
+- Roles
+- Permissions
+- Departments
+- EmployeeProfiles
+- EmployeeRoleDefinitions
+- AgentConfigurations
+- AgentToolPermissions
+- Conversations
+- Messages
+- Projects
+- ProjectRequirements
+- ArchitectureDecisions
+- Milestones
+- Tasks
+- TaskDependencies
+- TaskAssignments
+- AgentRuns
+- ToolExecutions
+- Deliverables
+- Reviews
+- ApprovalRequests
+- WorkflowDefinitions
+- WorkflowExecutions
+- Documents
+- KnowledgeEntries
+- BudgetAllocations
+- UsageRecords
+- CostRecords
+- AuditLogs
+- IntegrationConfigurations
+
+Define relationships, constraints, indexes, transactions, and retention policies.
+
+Use migrations and test realistic workflows against a real database.
+
+## 14. SECURITY AND GOVERNANCE
+
+Implement:
+- Authentication and server-side authorization.
+- Least-privilege permissions.
+- Department, project, and resource-level access control.
+- Secret management.
+- Protection against prompt injection and malicious documents.
+- Sandboxed code execution.
+- Rate limits and resource budgets.
+- Tool input validation.
+- Audit logs for decisions and external actions.
+- Approval gates for consequential operations.
+- Data retention and deletion policies.
+- Protection against cross-project data leakage.
+
+Require explicit approval before:
+- Production deployment.
+- External customer communications that commit to terms.
+- Financial transactions and purchases.
+- Destructive operations.
+- Access to sensitive production data.
+- Changes to permissions or security policies.
+
+Agents must never approve their own restricted actions.
+
+## 15. PERFORMANCE AND COST CONTROL
+
+Implement:
+- Per-agent and per-project budgets.
+- Per-run token and time limits.
+- Maximum delegation depth.
+- Maximum retries.
+- Configurable concurrency limits.
+- Model selection by task complexity.
+- Caching where safe.
+- Usage dashboards and cost alerts.
+- Graceful handling of provider failures.
+- Cancellation and resumability.
+
+Support low-cost models for routine classification and formatting, and stronger models for architecture, complex reasoning, and code review when justified.
+
+Never assume a model, integration, or tool is free or available without configuration.
+
+## 16. DEVELOPMENT PROCESS
+
+Before coding:
+1. Inspect the repository.
+2. Identify existing implementations and constraints.
+3. Produce a system architecture and module boundaries.
+4. Create an initial ER diagram and workflow diagrams.
+5. Define permissions and human approval gates.
+6. Produce an implementation roadmap with dependencies and acceptance criteria.
+
+Implement incrementally:
+
+Phase 1: Company foundation
+- Authentication and authorization.
+- Departments, organizational hierarchy, and AI employee definitions.
+- Project and task management.
+- Persistent database and audit logging.
+
+Phase 2: AI employee execution
+- AI provider abstraction.
+- Employee role configuration.
+- Agent task execution.
+- Tool registry and permission enforcement.
+- Execution history and cost tracking.
+
+Phase 3: Orchestration
+- Task delegation.
+- Dependencies and parallel execution.
+- Review workflows.
+- Retries, timeouts, cancellation, and recovery.
+- Human approval inbox.
+
+Phase 4: Software House operations
+- Requirements and project estimation.
+- Project planning.
+- Repository integration.
+- Controlled coding, testing, and code review.
+- Deliverable management.
+
+Phase 5: Company management
+- Finance and usage reporting.
+- Internal knowledge.
+- Document generation.
+- HR and performance reports.
+- External integrations.
+
+Phase 6: Production readiness
+- Security testing.
+- Reliability and concurrency testing.
+- Observability and cost optimization.
+- Backup and recovery.
+- Deployment documentation.
+
+## 17. ACCEPTANCE CRITERIA
+
+A feature is complete only when:
+- The implementation exists.
+- Data persists correctly.
+- Permissions are enforced server-side.
+- Relevant automated tests pass.
+- Errors are handled.
+- Audit records exist where required.
+- The UI reflects actual backend state.
+- Documentation is updated.
+
+Demonstrate an end-to-end workflow:
+CEO creates a project → agents analyze requirements → a manager assigns tasks → a developer executes an authorized task → QA runs tests → a reviewer evaluates deliverables → the CEO approves the final result.
+
+Do not mark a workflow complete if any required step is mocked or missing.
+
+## 18. FIRST ACTION
+
+Start by inspecting the existing repository and presenting:
+1. Architecture proposal.
+2. Organizational and agent execution model.
+3. Database schema.
+4. Security and approval design.
+5. Phased implementation plan.
+6. Initial operating cost considerations.
+7. Testable acceptance criteria.
+
+Then implement Phase 1, run its tests, and report actual results.
+
+Do not attempt to build the entire company in one unverified code-generation pass. Deliver working, testable increments while preserving the long-term architecture.

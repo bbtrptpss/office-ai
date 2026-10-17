@@ -1,0 +1,287 @@
+"use client";
+
+import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
+
+const th = {
+  appName: "AI Software House",
+  welcome: "ยินดีต้อนรับกลับสู่ออฟฟิศ ✦",
+  hello: "สวัสดี",
+  heroLine: "ทีม AI พร้อมทำงานแล้ววันนี้",
+  login: "เข้าสู่ระบบ",
+  logout: "ออกจากระบบ",
+  email: "อีเมล",
+  password: "รหัสผ่าน",
+  loginFailed: "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+  lockedOut: "บัญชีถูกล็อกชั่วคราว ลองใหม่ภายหลัง",
+  save: "บันทึก",
+  cancel: "ยกเลิก",
+  create: "สร้าง",
+  edit: "แก้ไข",
+  close: "ปิด",
+  add: "เพิ่ม",
+  loading: "กำลังโหลด…",
+  empty: "ยังไม่มีข้อมูล",
+  conflict: "ข้อมูลนี้ถูกแก้ไขโดยคนอื่นแล้ว ระบบโหลดข้อมูลล่าสุดให้แล้ว",
+  forbidden: "คุณไม่มีสิทธิ์ทำรายการนี้",
+  comingInPhase: "Phase",
+
+  // navigation
+  navDashboard: "Executive Dashboard",
+  navOrganization: "ผังองค์กร",
+  navEmployees: "พนักงาน",
+  navDepartments: "แผนกและตำแหน่ง",
+  navProjects: "โปรเจกต์และ Task Board",
+  navActivity: "กิจกรรมของ Agent",
+  navApprovals: "การอนุมัติ",
+  navChat: "แชทบริษัท",
+  navKnowledge: "เอกสารและคลังความรู้",
+  navFinance: "การเงินและค่าใช้จ่าย",
+  navQuality: "คุณภาพและความปลอดภัย",
+  navIntegrations: "Integrations",
+  navSecurity: "สิทธิ์และผู้ใช้",
+  navAudit: "Audit Log",
+
+  // dashboard
+  activeProjects: "โปรเจกต์ที่กำลังทำ",
+  tasksTotal: "งานทั้งหมด",
+  tasksDone: "งานที่เสร็จ",
+  tasksBlocked: "งานที่ติดขัด",
+  tasksOverdue: "งานเลยกำหนด",
+  waitingApproval: "รออนุมัติ",
+  aiEmployees: "พนักงาน AI",
+  humanEmployees: "พนักงานคน",
+  aiAvailable: "ว่าง",
+  aiWorking: "กำลังทำงาน",
+  workload: "ภาระงานของพนักงาน",
+  openTasks: "งานที่เปิดอยู่",
+  notYet: "ยังไม่มีในเฟสนี้",
+
+  // org
+  displayName: "ชื่อ",
+  kind: "ประเภท",
+  jobTitle: "ตำแหน่ง",
+  department: "แผนก",
+  manager: "หัวหน้า",
+  status: "สถานะ",
+  code: "รหัส",
+  name: "ชื่อ",
+  description: "รายละเอียด",
+  level: "ระดับ",
+  skills: "ทักษะ",
+  requiresHuman: "ต้องเป็นคนเท่านั้น",
+  positions: "ตำแหน่งงาน",
+  departments: "แผนก",
+  newEmployee: "เพิ่มพนักงาน",
+  newDepartment: "เพิ่มแผนก",
+  newPosition: "เพิ่มตำแหน่ง",
+  none: "— ไม่มี —",
+  human: "คน",
+  ai: "AI",
+
+  // projects & tasks
+  projects: "โปรเจกต์",
+  newProject: "สร้างโปรเจกต์",
+  budget: "งบประมาณ (ประมาณการ)",
+  startDate: "วันเริ่ม",
+  dueDate: "กำหนดเสร็จ",
+  progress: "ความคืบหน้า",
+  newTask: "เพิ่มงาน",
+  title: "หัวข้อ",
+  priority: "ความสำคัญ",
+  acceptanceCriteria: "เกณฑ์การยอมรับ",
+  assignee: "ผู้รับผิดชอบ",
+  assign: "มอบหมาย",
+  moveTo: "ย้ายไปสถานะ",
+  dependsOn: "ต้องรอให้งานนี้เสร็จก่อน",
+  addDependency: "เพิ่มงานที่ต้องรอ",
+  milestones: "Milestones",
+  newMilestone: "เพิ่ม milestone",
+  live: "อัปเดตสด",
+  showCancelled: "แสดงงานที่ยกเลิก",
+
+  // security & audit
+  roles: "บทบาท",
+  permissions: "สิทธิ์",
+  users: "ผู้ใช้",
+  newUser: "เพิ่มผู้ใช้",
+  isAgent: "บัญชี AI Agent",
+  when: "เวลา",
+  actor: "ผู้ทำ",
+  action: "การกระทำ",
+  entity: "ข้อมูล",
+  changes: "การเปลี่ยนแปลง",
+};
+
+type Dict = typeof th;
+
+const en: Dict = {
+  appName: "AI Software House",
+  welcome: "Welcome back to the office ✦",
+  hello: "Hello",
+  heroLine: "Your AI team is ready to work today",
+  login: "Sign in",
+  logout: "Sign out",
+  email: "Email",
+  password: "Password",
+  loginFailed: "Invalid email or password",
+  lockedOut: "Account is temporarily locked. Try again later.",
+  save: "Save",
+  cancel: "Cancel",
+  create: "Create",
+  edit: "Edit",
+  close: "Close",
+  add: "Add",
+  loading: "Loading…",
+  empty: "Nothing here yet",
+  conflict: "Someone else changed this record. The latest data has been reloaded.",
+  forbidden: "You don't have permission to do this",
+  comingInPhase: "Phase",
+  navDashboard: "Executive Dashboard",
+  navOrganization: "Organization",
+  navEmployees: "Employees",
+  navDepartments: "Departments & positions",
+  navProjects: "Projects & Task Board",
+  navActivity: "Agent Activity",
+  navApprovals: "Approvals",
+  navChat: "Company Chat",
+  navKnowledge: "Documents & Knowledge",
+  navFinance: "Finance & Cost Control",
+  navQuality: "Quality & Security",
+  navIntegrations: "Integrations",
+  navSecurity: "Access & users",
+  navAudit: "Audit Log",
+  activeProjects: "Active projects",
+  tasksTotal: "Total tasks",
+  tasksDone: "Completed",
+  tasksBlocked: "Blocked",
+  tasksOverdue: "Overdue",
+  waitingApproval: "Waiting approval",
+  aiEmployees: "AI employees",
+  humanEmployees: "Human employees",
+  aiAvailable: "Available",
+  aiWorking: "Working",
+  workload: "Employee workload",
+  openTasks: "Open tasks",
+  notYet: "Not in this phase yet",
+  displayName: "Name",
+  kind: "Type",
+  jobTitle: "Position",
+  department: "Department",
+  manager: "Manager",
+  status: "Status",
+  code: "Code",
+  name: "Name",
+  description: "Description",
+  level: "Level",
+  skills: "Skills",
+  requiresHuman: "Human only",
+  positions: "Positions",
+  departments: "Departments",
+  newEmployee: "Add employee",
+  newDepartment: "Add department",
+  newPosition: "Add position",
+  none: "— none —",
+  human: "Human",
+  ai: "AI",
+  projects: "Projects",
+  newProject: "New project",
+  budget: "Budget (estimate)",
+  startDate: "Start date",
+  dueDate: "Due date",
+  progress: "Progress",
+  newTask: "Add task",
+  title: "Title",
+  priority: "Priority",
+  acceptanceCriteria: "Acceptance criteria",
+  assignee: "Assignee",
+  assign: "Assign",
+  moveTo: "Move to",
+  dependsOn: "Waits for",
+  addDependency: "Add dependency",
+  milestones: "Milestones",
+  newMilestone: "Add milestone",
+  live: "Live",
+  showCancelled: "Show cancelled",
+  roles: "Roles",
+  permissions: "Permissions",
+  users: "Users",
+  newUser: "Add user",
+  isAgent: "AI agent account",
+  when: "When",
+  actor: "Actor",
+  action: "Action",
+  entity: "Entity",
+  changes: "Changes",
+};
+
+const statusTh: Record<string, string> = {
+  Todo: "รอเริ่ม", Assigned: "มอบหมายแล้ว", InProgress: "กำลังทำ", Blocked: "ติดขัด", InReview: "รอตรวจ",
+  WaitingApproval: "รออนุมัติ", Done: "เสร็จ", Failed: "ล้มเหลว", Cancelled: "ยกเลิก",
+  Available: "ว่าง", Working: "กำลังทำงาน", WaitingForApproval: "รออนุมัติ", Inactive: "ปิดใช้งาน",
+  Draft: "ร่าง", Active: "กำลังทำ", OnHold: "พักไว้", Completed: "เสร็จสิ้น",
+  Low: "ต่ำ", Medium: "กลาง", High: "สูง", Critical: "วิกฤต",
+  Executive: "ผู้บริหาร", Head: "หัวหน้า", Senior: "อาวุโส", Staff: "พนักงาน",
+};
+
+const statusEn: Record<string, string> = {
+  InProgress: "In progress", InReview: "In review", WaitingApproval: "Waiting approval",
+  WaitingForApproval: "Waiting approval", OnHold: "On hold",
+};
+
+export type Lang = "th" | "en";
+
+interface I18n {
+  lang: Lang;
+  t: Dict;
+  /** Human label for an enum value coming from the API. */
+  label: (value: string) => string;
+  setLang: (l: Lang) => void;
+}
+
+const I18nContext = createContext<I18n | null>(null);
+
+// The chosen language lives in localStorage (a per-viewer convenience); Thai is the default.
+const langListeners = new Set<() => void>();
+let memoryLang: Lang = "th";
+
+function readLang(): Lang {
+  try {
+    return localStorage.getItem("lang") === "en" ? "en" : "th";
+  } catch {
+    return memoryLang;
+  }
+}
+
+function subscribeLang(listener: () => void) {
+  langListeners.add(listener);
+  return () => langListeners.delete(listener);
+}
+
+export function I18nProvider({ children }: { children: React.ReactNode }) {
+  const lang = useSyncExternalStore(subscribeLang, readLang, () => "th" as Lang);
+
+  const setLang = useCallback((l: Lang) => {
+    memoryLang = l;
+    try {
+      localStorage.setItem("lang", l);
+    } catch {
+      // storage unavailable: keep it in memory for this session
+    }
+    langListeners.forEach((fn) => fn());
+  }, []);
+
+  const label = useCallback(
+    (value: string) => (lang === "th" ? statusTh[value] : statusEn[value]) ?? value,
+    [lang],
+  );
+
+  return (
+    <I18nContext.Provider value={{ lang, t: lang === "th" ? th : en, label, setLang }}>{children}</I18nContext.Provider>
+  );
+}
+
+export function useI18n() {
+  const ctx = useContext(I18nContext);
+  if (!ctx) throw new Error("useI18n must be used inside I18nProvider");
+  return ctx;
+}

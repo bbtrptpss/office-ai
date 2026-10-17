@@ -1,0 +1,330 @@
+"use client";
+
+import { use, useMemo, useState } from "react";
+import {
+  Alert, Box, Button, Card, CardActionArea, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
+  Divider, FormControlLabel, MenuItem, Stack, Switch, TextField, Typography,
+} from "@mui/material";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react";
+import AddIcon from "@mui/icons-material/Add";
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import { api, Employee, Milestone, Project, Task, TaskPriority, TaskStatus } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
+import { useRealtime } from "@/lib/realtime";
+import { KindIcon, Loading, PageHeader, StatusChip, useErrorMessage, useLoad } from "@/components/common";
+
+const COLUMNS: TaskStatus[] = ["Todo", "Assigned", "InProgress", "Blocked", "InReview", "WaitingApproval", "Done", "Failed"];
+const PRIORITIES: TaskPriority[] = ["Low", "Medium", "High", "Critical"];
+const COLUMN_COLORS: Record<TaskStatus, string> = {
+  Todo: "#CDB8F5", Assigned: "#A9C7FF", InProgress: "#7B4FC9", Blocked: "#FF8A8A", InReview: "#FF7EB9",
+  WaitingApproval: "#FFC56E", Done: "#7ED6A8", Failed: "#E06060", Cancelled: "#BDB6CC",
+};
+const COLUMN_EMOJI: Record<TaskStatus, string> = {
+  Todo: "🌙", Assigned: "📌", InProgress: "💜", Blocked: "🧱", InReview: "🔍",
+  WaitingApproval: "📝", Done: "🎀", Failed: "💥", Cancelled: "🗑️",
+};
+
+interface TaskForm {
+  title: string;
+  description: string;
+  acceptanceCriteria: string;
+  priority: TaskPriority;
+  dueDate: string;
+  milestoneId: string;
+}
+
+const emptyForm: TaskForm = { title: "", description: "", acceptanceCriteria: "", priority: "Medium", dueDate: "", milestoneId: "" };
+
+export default function ProjectBoardPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const { t, label } = useI18n();
+  const { can } = useAuth();
+  const errorMessage = useErrorMessage();
+  const reduce = useReducedMotion();
+
+  const { data, error, reload } = useLoad(async () => {
+    const [project, tasks, milestones, employees] = await Promise.all([
+      api.get<Project>(`/api/projects/${id}`),
+      api.get<Task[]>(`/api/projects/${id}/tasks`),
+      api.get<Milestone[]>(`/api/projects/${id}/milestones`),
+      api.get<Employee[]>("/api/employees"),
+    ]);
+    return { project, tasks, milestones, employees };
+  }, id);
+
+  const live = useRealtime<{ projectId: string }>("taskChanged", (e) => {
+    if (e.projectId === id) void reload();
+  });
+
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [form, setForm] = useState<TaskForm | null>(null);
+  const [newTask, setNewTask] = useState<TaskForm | null>(null);
+  const [milestoneName, setMilestoneName] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [showCancelled, setShowCancelled] = useState(false);
+
+  const titles = useMemo(() => new Map(data?.tasks.map((x) => [x.id, x.title])), [data]);
+  if (!data) return <Loading error={error} />;
+
+  const current = data.tasks.find((x) => x.id === openTaskId) ?? null;
+  const columns = showCancelled ? [...COLUMNS, "Cancelled" as TaskStatus] : COLUMNS;
+
+  async function act(action: () => Promise<unknown>, onOk?: () => void) {
+    setMessage(null);
+    try {
+      await action();
+      onOk?.();
+    } catch (e) {
+      setMessage(errorMessage(e));
+    }
+    await reload();
+  }
+
+  function openTask(task: Task) {
+    setMessage(null);
+    setOpenTaskId(task.id);
+    setForm({
+      title: task.title, description: task.description ?? "", acceptanceCriteria: task.acceptanceCriteria ?? "",
+      priority: task.priority, dueDate: task.dueDate ?? "", milestoneId: task.milestoneId ?? "",
+    });
+  }
+
+  const toBody = (f: TaskForm) => ({ ...f, dueDate: f.dueDate || null, milestoneId: f.milestoneId || null });
+
+  return (
+    <>
+      <PageHeader
+        title={data.project.name}
+        subtitle={
+          <Stack direction="row" spacing={1} component="span" sx={{ alignItems: "center" }}>
+            <span>{data.project.code}</span>
+            <StatusChip value={data.project.status} />
+            <Chip
+              size="small"
+              icon={<FiberManualRecordIcon sx={{ fontSize: 10 }} color={live ? "success" : "disabled"} />}
+              label={t.live}
+              variant="outlined"
+            />
+          </Stack>
+        }
+        actions={
+          <>
+            {can("project.manage") && <Button onClick={() => setMilestoneName("")}>{t.newMilestone}</Button>}
+            {can("task.manage") && (
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setMessage(null); setNewTask(emptyForm); }}>
+                {t.newTask}
+              </Button>
+            )}
+          </>
+        }
+      />
+
+      {data.milestones.length > 0 && (
+        <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap", rowGap: 1 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ alignSelf: "center" }}>{t.milestones}:</Typography>
+          {data.milestones.map((m) => <Chip key={m.id} size="small" label={`${m.name}${m.dueDate ? ` · ${m.dueDate}` : ""}`} />)}
+        </Stack>
+      )}
+      <FormControlLabel control={<Switch size="small" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />} label={t.showCancelled} sx={{ mb: 1 }} />
+      {message && !openTaskId && <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
+
+      <LayoutGroup>
+      <Box sx={{ display: "flex", gap: 2, overflowX: "auto", pb: 2, alignItems: "flex-start" }}>
+        {columns.map((status) => {
+          const items = data.tasks.filter((x) => x.status === status);
+          return (
+            <Box
+              key={status}
+              sx={{
+                minWidth: 256, width: 256, flexShrink: 0, p: 1.25, borderRadius: 5, minHeight: 160,
+                bgcolor: (th) => `rgba(${th.vars?.palette.primary.mainChannel} / 0.06)`,
+                borderTop: `4px solid ${COLUMN_COLORS[status]}`,
+              }}
+            >
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1, px: 0.5 }}>
+                <Box component="span" aria-hidden>{COLUMN_EMOJI[status]}</Box>
+                <Typography fontWeight={600} sx={{ fontFamily: "var(--font-cute)" }}>{label(status)}</Typography>
+                <Chip size="small" label={items.length} />
+              </Stack>
+              <Stack spacing={1}>
+                <AnimatePresence initial={false}>
+                {items.map((task) => (
+                  <motion.div
+                    key={task.id}
+                    layoutId={task.id}
+                    layout
+                    initial={reduce ? false : { opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={reduce ? undefined : { opacity: 0, scale: 0.9 }}
+                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                    whileHover={reduce ? undefined : { y: -3 }}
+                  >
+                  <Card>
+                    <CardActionArea onClick={() => openTask(task)}>
+                      <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+                        <Typography fontWeight={500} sx={{ mb: 0.5 }}>{task.title}</Typography>
+                        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 0.5 }}>
+                          <StatusChip value={task.priority} />
+                          {task.dependsOn.length > 0 && <Chip size="small" variant="outlined" label={`⧗ ${task.dependsOn.length}`} />}
+                        </Stack>
+                        {task.assignees.map((a) => (
+                          <Stack key={a.employeeId} direction="row" spacing={0.5} sx={{ alignItems: "center", mt: 0.5 }}>
+                            <KindIcon kind={a.kind} seed={a.displayName} size={22} />
+                            <Typography variant="body2" color="text.secondary" noWrap>{a.displayName}</Typography>
+                          </Stack>
+                        ))}
+                      </CardContent>
+                    </CardActionArea>
+                  </Card>
+                  </motion.div>
+                ))}
+                </AnimatePresence>
+              </Stack>
+            </Box>
+          );
+        })}
+      </Box>
+      </LayoutGroup>
+
+      {/* Task detail */}
+      <Dialog open={!!current} onClose={() => setOpenTaskId(null)} fullWidth maxWidth="md">
+        {current && form && (
+          <>
+            <DialogTitle>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <span>{current.title}</span>
+                <StatusChip value={current.status} />
+              </Stack>
+            </DialogTitle>
+            <DialogContent>
+              <Stack spacing={2} sx={{ mt: 1 }}>
+                {message && <Alert severity="warning">{message}</Alert>}
+
+                {current.nextStates.length > 0 && can("task.update_status") && (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>{t.moveTo}</Typography>
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
+                      {current.nextStates
+                        .filter((s) => s !== "Done" || can("task.approve"))
+                        .map((s) => (
+                          <Button key={s} size="small" variant="outlined" color={s === "Cancelled" || s === "Failed" ? "error" : "primary"}
+                            onClick={() => act(() => api.post(`/api/tasks/${current.id}/status`, { status: s, version: current.version }))}>
+                            {label(s)}
+                          </Button>
+                        ))}
+                    </Stack>
+                  </Box>
+                )}
+
+                {can("task.assign") && !["Done", "Cancelled"].includes(current.status) && (
+                  <TextField
+                    select size="small" label={t.assignee}
+                    value={current.assignees[0]?.employeeId ?? ""}
+                    onChange={(e) => act(() => api.post(`/api/tasks/${current.id}/assign`, { employeeId: e.target.value, version: current.version }))}
+                  >
+                    {data.employees.filter((e) => e.status !== "Inactive").map((e) => (
+                      <MenuItem key={e.id} value={e.id}>{e.kind === "AI" ? "🤖 " : ""}{e.displayName} — {e.jobTitle}</MenuItem>
+                    ))}
+                  </TextField>
+                )}
+
+                <Divider />
+                <TaskFields form={form} setForm={setForm} milestones={data.milestones} disabled={!can("task.manage")} />
+
+                <Box>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>{t.dependsOn}</Typography>
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
+                    {current.dependsOn.map((d) => (
+                      <Chip key={d} label={titles.get(d) ?? d}
+                        onDelete={can("task.manage") ? () => act(() => api.del(`/api/tasks/${current.id}/dependencies/${d}`)) : undefined} />
+                    ))}
+                    {current.dependsOn.length === 0 && <Typography variant="body2">—</Typography>}
+                  </Stack>
+                  {can("task.manage") && (
+                    <TextField select size="small" label={t.addDependency} value="" sx={{ mt: 1, minWidth: 260 }}
+                      onChange={(e) => act(() => api.post(`/api/tasks/${current.id}/dependencies`, { dependsOnTaskId: e.target.value }))}>
+                      {data.tasks.filter((x) => x.id !== current.id && !current.dependsOn.includes(x.id)).map((x) => (
+                        <MenuItem key={x.id} value={x.id}>{x.title}</MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                </Box>
+              </Stack>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setOpenTaskId(null)}>{t.close}</Button>
+              {can("task.manage") && (
+                <Button variant="contained" disabled={!form.title}
+                  onClick={() => act(() => api.put(`/api/tasks/${current.id}`, { ...toBody(form), version: current.version }))}>
+                  {t.save}
+                </Button>
+              )}
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+
+      {/* New task */}
+      <Dialog open={!!newTask} onClose={() => setNewTask(null)} fullWidth maxWidth="sm">
+        <DialogTitle>{t.newTask}</DialogTitle>
+        {newTask && (
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              {message && <Alert severity="error">{message}</Alert>}
+              <TaskFields form={newTask} setForm={setNewTask} milestones={data.milestones} />
+            </Stack>
+          </DialogContent>
+        )}
+        <DialogActions>
+          <Button onClick={() => setNewTask(null)}>{t.cancel}</Button>
+          <Button variant="contained" disabled={!newTask?.title}
+            onClick={() => act(() => api.post(`/api/projects/${id}/tasks`, toBody(newTask!)), () => setNewTask(null))}>
+            {t.create}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* New milestone */}
+      <Dialog open={milestoneName !== null} onClose={() => setMilestoneName(null)} fullWidth maxWidth="xs">
+        <DialogTitle>{t.newMilestone}</DialogTitle>
+        <DialogContent>
+          <TextField label={t.name} value={milestoneName ?? ""} onChange={(e) => setMilestoneName(e.target.value)} fullWidth sx={{ mt: 1 }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMilestoneName(null)}>{t.cancel}</Button>
+          <Button variant="contained" disabled={!milestoneName}
+            onClick={() => act(() => api.post(`/api/projects/${id}/milestones`, { name: milestoneName, sortOrder: data.milestones.length }), () => setMilestoneName(null))}>
+            {t.create}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
+
+function TaskFields({ form, setForm, milestones, disabled }: {
+  form: TaskForm;
+  setForm: (f: TaskForm) => void;
+  milestones: Milestone[];
+  disabled?: boolean;
+}) {
+  const { t, label } = useI18n();
+  return (
+    <>
+      <TextField label={t.title} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required disabled={disabled} />
+      <TextField label={t.description} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} multiline minRows={2} disabled={disabled} />
+      <TextField label={t.acceptanceCriteria} value={form.acceptanceCriteria} onChange={(e) => setForm({ ...form, acceptanceCriteria: e.target.value })} multiline minRows={2} disabled={disabled} />
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+        <TextField select label={t.priority} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })} fullWidth disabled={disabled}>
+          {PRIORITIES.map((p) => <MenuItem key={p} value={p}>{label(p)}</MenuItem>)}
+        </TextField>
+        <TextField label={t.dueDate} type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth disabled={disabled} />
+        <TextField select label="Milestone" value={form.milestoneId} onChange={(e) => setForm({ ...form, milestoneId: e.target.value })} fullWidth disabled={disabled}>
+          <MenuItem value="">{t.none}</MenuItem>
+          {milestones.map((m) => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)}
+        </TextField>
+      </Stack>
+    </>
+  );
+}

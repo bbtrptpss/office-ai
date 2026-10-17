@@ -1,0 +1,124 @@
+using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using OfficeAI.Application.Abstractions;
+using OfficeAI.Domain.Audit;
+using OfficeAI.Domain.Common;
+using OfficeAI.Domain.Organization;
+using OfficeAI.Domain.Work;
+using OfficeAI.Infrastructure.Identity;
+
+namespace OfficeAI.Infrastructure.Persistence;
+
+public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser currentUser, TimeProvider clock)
+    : IdentityDbContext<AppUser, AppRole, Guid>(options), IAppDbContext, IDataProtectionKeyContext
+{
+    public DbSet<Department> Departments => Set<Department>();
+    public DbSet<EmployeeRoleDefinition> RoleDefinitions => Set<EmployeeRoleDefinition>();
+    public DbSet<EmployeeProfile> Employees => Set<EmployeeProfile>();
+    public DbSet<Project> Projects => Set<Project>();
+    public DbSet<Milestone> Milestones => Set<Milestone>();
+    public DbSet<WorkTask> Tasks => Set<WorkTask>();
+    public DbSet<TaskDependency> TaskDependencies => Set<TaskDependency>();
+    public DbSet<TaskAssignment> TaskAssignments => Set<TaskAssignment>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
+    protected override void OnModelCreating(ModelBuilder b)
+    {
+        base.OnModelCreating(b);
+        b.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        b.Entity<IdentityUserRole<Guid>>().ToTable("UserRoles");
+        b.Entity<IdentityUserClaim<Guid>>().ToTable("UserClaims");
+        b.Entity<IdentityUserLogin<Guid>>().ToTable("UserLogins");
+        b.Entity<IdentityUserToken<Guid>>().ToTable("UserTokens");
+        b.Entity<IdentityRoleClaim<Guid>>().ToTable("RoleClaims");
+    }
+
+    public void ExpectVersion<T>(T entity, uint version) where T : Entity =>
+        Entry(entity).Property(e => e.Version).OriginalValue = version;
+
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken ct = default)
+    {
+        var now = clock.GetUtcNow();
+        StampEntities(now);
+        AuditLogs.AddRange(BuildAuditEntries(now));
+        try
+        {
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyException();
+        }
+    }
+
+    private void StampEntities(DateTimeOffset now)
+    {
+        foreach (var entry in ChangeTracker.Entries<Entity>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                entry.Entity.CreatedAt = now;
+                entry.Entity.CreatedBy = currentUser.UserId;
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                entry.Entity.UpdatedAt = now;
+                entry.Entity.UpdatedBy = currentUser.UserId;
+            }
+        }
+    }
+
+    private static readonly HashSet<string> SkippedProperties =
+        [nameof(Entity.Version), nameof(Entity.CreatedAt), nameof(Entity.CreatedBy), nameof(Entity.UpdatedAt), nameof(Entity.UpdatedBy)];
+
+    private List<AuditLog> BuildAuditEntries(DateTimeOffset now)
+    {
+        var logs = new List<AuditLog>();
+        foreach (var entry in ChangeTracker.Entries().Where(e => e.Entity is IAuditable))
+        {
+            var action = entry.State switch
+            {
+                EntityState.Added => AuditActions.Created,
+                EntityState.Modified => AuditActions.Updated,
+                EntityState.Deleted => AuditActions.Deleted,
+                _ => null,
+            };
+            if (action is null) continue;
+
+            var props = entry.Properties.Where(p => !SkippedProperties.Contains(p.Metadata.Name)).ToList();
+            Dictionary<string, object?>? oldValues = null, newValues = null;
+            if (entry.State != EntityState.Added)
+                oldValues = props.Where(p => entry.State == EntityState.Deleted || p.IsModified)
+                    .ToDictionary(p => p.Metadata.Name, p => p.OriginalValue);
+            if (entry.State != EntityState.Deleted)
+                newValues = props.Where(p => entry.State == EntityState.Added || p.IsModified)
+                    .ToDictionary(p => p.Metadata.Name, p => p.CurrentValue);
+
+            if (entry.State == EntityState.Modified && newValues!.Count == 0) continue;
+
+            logs.Add(new AuditLog
+            {
+                OccurredAt = now,
+                ActorUserId = currentUser.UserId,
+                ActorName = currentUser.Name,
+                Action = action,
+                EntityType = entry.Metadata.ClrType.Name,
+                EntityId = KeyOf(entry),
+                OldValues = oldValues is null ? null : JsonSerializer.Serialize(oldValues),
+                NewValues = newValues is null ? null : JsonSerializer.Serialize(newValues),
+                CorrelationId = currentUser.CorrelationId,
+            });
+        }
+        return logs;
+    }
+
+    private static string KeyOf(EntityEntry entry) =>
+        string.Join("/", entry.Metadata.FindPrimaryKey()!.Properties.Select(p => entry.Property(p.Name).CurrentValue));
+}
