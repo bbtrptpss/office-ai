@@ -4,6 +4,8 @@ using OfficeAI.Api.Infrastructure;
 using OfficeAI.Application.Abstractions;
 using OfficeAI.Application.Agents;
 using OfficeAI.Application.Code;
+using OfficeAI.Application.Knowledge;
+using OfficeAI.Domain.Knowledge;
 using OfficeAI.Application.Delivery;
 using OfficeAI.Application.Organization;
 using OfficeAI.Application.Work;
@@ -33,6 +35,9 @@ public static class Endpoints
         MapWorkflows(api);
         MapDelivery(api);
         MapCode(api);
+        MapReports(api);
+        MapKnowledge(api);
+        MapIntegrations(api);
         app.MapHub<EventsHub>("/hubs/events");
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
     }
@@ -192,6 +197,43 @@ public static class Endpoints
         api.MapPost("/repositories/{id:guid}/test-runs", (Guid id, RunBranchTestsRequest? r, CodeService s, TimeProvider clock, CancellationToken ct) => s.RunTestsAsync(id, r?.Branch, clock, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapGet("/projects/{id:guid}/merge-requests", (Guid id, CodeService s, CancellationToken ct) => s.MergeRequestsAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/merge-requests/{id:guid}", (Guid id, CodeService s, CancellationToken ct) => s.MergeRequestAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+    }
+
+    private static void MapReports(RouteGroupBuilder api)
+    {
+        api.MapGet("/reports/finance", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.FinanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
+        api.MapGet("/reports/performance", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.PerformanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
+        api.MapGet("/budgets", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.ListBudgetsAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
+        api.MapPut("/budgets", (OfficeAI.Application.Reports.SetBudgetRequest r, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.SetBudgetAsync(r, ct)).RequirePermission(Permissions.FinanceManage);
+        api.MapDelete("/budgets/{id:guid}", async (Guid id, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) =>
+        {
+            await s.DeleteBudgetAsync(id, ct);
+            return Results.NoContent();
+        }).RequirePermission(Permissions.FinanceManage);
+    }
+
+    private static void MapKnowledge(RouteGroupBuilder api)
+    {
+        api.MapGet("/knowledge", (string? q, KnowledgeStatus? status, Guid? projectId, KnowledgeService s, CancellationToken ct) => s.ListAsync(q, status, projectId, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapPost("/knowledge", (SaveKnowledgeRequest r, KnowledgeService s, CancellationToken ct) => s.CreateAsync(r, ct)).RequirePermission(Permissions.KnowledgeManage);
+        api.MapPost("/knowledge/{id:guid}/status", (Guid id, SetKnowledgeStatusRequest r, KnowledgeService s, CancellationToken ct) => s.SetStatusAsync(id, r, ct)).RequirePermission(Permissions.KnowledgeManage);
+        api.MapGet("/projects/{id:guid}/documents", (Guid id, KnowledgeService s, CancellationToken ct) => s.ListDocumentsAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/documents/{id:guid}", (Guid id, KnowledgeService s, CancellationToken ct) => s.GetDocumentAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/documents/{id:guid}/download", async (Guid id, KnowledgeService s, CancellationToken ct) =>
+        {
+            var d = await s.GetDocumentAsync(id, ct);
+            var name = string.Concat(d.Title.Select(c => char.IsLetterOrDigit(c) ? c : '-')) + $"-v{d.Version}.md";
+            return Results.File(System.Text.Encoding.UTF8.GetBytes(d.Content ?? ""), "text/markdown; charset=utf-8", name);
+        }).RequirePermission(Permissions.ProjectRead);
+        api.MapPost("/documents/{id:guid}/finalize", (Guid id, KnowledgeService s, CancellationToken ct) => s.FinalizeDocumentAsync(id, ct)).RequirePermission(Permissions.KnowledgeManage);
+    }
+
+    private static void MapIntegrations(RouteGroupBuilder api)
+    {
+        api.MapGet("/integrations", (OfficeAI.Application.Integrations.IntegrationService s, CancellationToken ct) => s.ListAsync(ct)).RequirePermission(Permissions.SecurityManage);
+        api.MapPost("/integrations", (OfficeAI.Application.Integrations.SaveIntegrationRequest r, OfficeAI.Application.Integrations.IntegrationService s, CancellationToken ct) => s.CreateAsync(r, ct)).RequirePermission(Permissions.SecurityManage);
+        api.MapPut("/integrations/{id:guid}", (Guid id, OfficeAI.Application.Integrations.SaveIntegrationRequest r, OfficeAI.Application.Integrations.IntegrationService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(Permissions.SecurityManage);
+        api.MapGet("/integrations/{id:guid}/deliveries", (Guid id, OfficeAI.Application.Integrations.IntegrationService s, CancellationToken ct) => s.DeliveriesAsync(id, ct)).RequirePermission(Permissions.SecurityManage);
     }
 
     private static void MapSecurity(RouteGroupBuilder api)

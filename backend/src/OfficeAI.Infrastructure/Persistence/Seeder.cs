@@ -103,6 +103,22 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
         }
         await db.SaveChangesAsync(ct);
         await SeedDeliveryAsync(now, ct);
+        await GrantNewToolsOnceAsync("phase5-tool-grants",
+            [OfficeAI.Application.Knowledge.SearchKnowledgeTool.ToolId, OfficeAI.Application.Knowledge.ProposeKnowledgeTool.ToolId, OfficeAI.Application.Knowledge.WriteDocumentTool.ToolId], now, ct);
+    }
+
+    /// <summary>Gives existing AI employees the default grants of tools introduced in a release (once; later changes by people are kept).</summary>
+    private async Task GrantNewToolsOnceAsync(string marker, string[] tools, DateTimeOffset now, CancellationToken ct)
+    {
+        if (await db.SeedMarkers.AnyAsync(m => m.Key == marker, ct)) return;
+        var employees = await db.AgentConfigurations.Join(db.Employees, c => c.EmployeeId, e => e.Id, (c, e) => new { e.Id, e.RoleDefinition!.Level, e.RoleDefinition.Code }).ToListAsync(ct);
+        var existing = (await db.AgentToolPermissions.Select(p => new { p.EmployeeId, p.ToolId }).ToListAsync(ct)).ToHashSet();
+        foreach (var e in employees)
+            foreach (var tool in tools.Intersect(AgentDefaults.ToolsFor(e.Level, e.Code)))
+                if (!existing.Contains(new { EmployeeId = e.Id, ToolId = tool }))
+                    db.AgentToolPermissions.Add(new AgentToolPermission { EmployeeId = e.Id, ToolId = tool, GrantedAt = now });
+        db.SeedMarkers.Add(new SeedMarker { Key = marker, AppliedAt = now });
+        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>Phase 4: company settings, a starting rate card and the specialist tools (each applied once).</summary>

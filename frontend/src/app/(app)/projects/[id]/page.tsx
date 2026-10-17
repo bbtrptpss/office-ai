@@ -15,7 +15,7 @@ import { useRealtime } from "@/lib/realtime";
 import { KindIcon, Loading, PageHeader, StatusChip, useErrorMessage, useLoad } from "@/components/common";
 import { DeliverableList, RunList } from "@/components/agents";
 import { ObjectivesPanel } from "@/components/objectives";
-import { DecisionsPanel, EstimatesPanel, RepositoryPanel, RequirementsPanel } from "@/components/workspace";
+import { DecisionsPanel, DocumentsPanel, EstimatesPanel, RepositoryPanel, RequirementsPanel } from "@/components/workspace";
 
 const COLUMNS: TaskStatus[] = ["Todo", "Assigned", "InProgress", "Blocked", "InReview", "WaitingApproval", "Done", "Failed"];
 const PRIORITIES: TaskPriority[] = ["Low", "Medium", "High", "Critical"];
@@ -66,7 +66,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   const [milestoneName, setMilestoneName] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showCancelled, setShowCancelled] = useState(false);
-  const [tab, setTab] = useState<"board" | "requirements" | "decisions" | "estimates" | "repository">("board");
+  const [tab, setTab] = useState<"board" | "requirements" | "decisions" | "estimates" | "repository" | "documents">("board");
 
   const titles = useMemo(() => new Map(data?.tasks.map((x) => [x.id, x.title])), [data]);
   if (!data) return <Loading error={error} />;
@@ -130,11 +130,13 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
         <Tab value="decisions" label={t.decisionsTab} />
         <Tab value="estimates" label={t.estimates} />
         <Tab value="repository" label={t.repository} />
+        <Tab value="documents" label={t.documents} />
       </Tabs>
       {tab === "requirements" && <RequirementsPanel projectId={id} />}
       {tab === "decisions" && <DecisionsPanel projectId={id} />}
       {tab === "estimates" && <EstimatesPanel projectId={id} />}
       {tab === "repository" && <RepositoryPanel projectId={id} />}
+      {tab === "documents" && <DocumentsPanel projectId={id} />}
 
       {tab === "board" && <>
       {data.milestones.length > 0 && (

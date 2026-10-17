@@ -85,10 +85,19 @@ Decisions: Git hosting starts local (bare repos in a volume); GitHub/GitLab inte
 interface. Customer prices in THB, AI costs in USD converted with a configurable rate. The sandbox image is a
 generic toolchain image (.NET SDK + Node); per-project test commands are configured on the repository.
 
-## Phase 5 — Company management (next, branch `phase-5`)
+## Phase 5 — Company management ✅ (merged to master)
 
 Finance and usage reporting (planned vs actual), internal knowledge with validation before promotion, document generation, HR/performance reports, external integrations.
 
-## Later phases
+| # | Milestone | Status |
+| --- | --- | --- |
+| M1 | Budgets (company / department / project, per month, USD) enforced at run start with 80% / 100% alerts; finance report: planned (approved estimate) vs actual AI cost per project, spend by department and employee | done (backend + tests) |
+| M2 | Performance report per AI employee: runs, success rate, cost per run, review approvals vs changes requested, tasks done, tool denials | done (backend + tests) |
+| M3 | Knowledge base: agents propose, people validate before it becomes authoritative; permission/project-scoped search with source references | done (backend + tests) |
+| M4 | Documents: agents write versioned project documents (proposal, SOW, release notes, completion report) from templates | done (backend + tests; markdown download) |
+| M5 | Integrations: outbound webhook notifications configured by people (secrets from environment only) | done (backend + tests) |
+| M6 | UI for all of the above | done (finance/performance, knowledge, integrations pages; documents tab; verified in browser) |
 
-6 Production readiness
+## Phase 6 — Production readiness (next, branch `phase-6`)
+
+Security testing, reliability/concurrency testing, observability, backup/restore, deployment docs; Quality & Security overview page; company chat/announcements still open.

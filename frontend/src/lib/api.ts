@@ -503,3 +503,94 @@ export interface MergeRequest {
 }
 
 export const thb = (n: number) => `฿${n.toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+// ---------- Phase 5: company management ----------
+
+export type BudgetScope = "Company" | "Department" | "Project";
+export type BudgetLevel = "Ok" | "Warning" | "Exceeded";
+
+export interface Budget {
+  id: string;
+  scope: BudgetScope;
+  scopeId: string | null;
+  scopeName: string;
+  month: string;
+  amountUsd: number;
+  spentUsd: number;
+  level: BudgetLevel;
+  version: number;
+}
+
+export interface FinanceReport {
+  month: string;
+  usdToThb: number;
+  totalUsd: number;
+  totalThb: number;
+  simulatedUsd: number;
+  projects: {
+    projectId: string; code: string; name: string; estimateRevision: number | null; plannedTotalCostThb: number | null; priceThb: number | null;
+    plannedAiCostThb: number | null; actualAiUsdMonth: number; actualAiUsdAllTime: number; actualAiThbAllTime: number; aiVarianceThb: number | null;
+  }[];
+  departments: { id: string; name: string; costUsd: number; tokens: number; runs: number }[];
+  employees: { id: string; name: string; costUsd: number; tokens: number; runs: number }[];
+  budgets: Budget[];
+}
+
+export interface PerformanceRow {
+  employeeId: string; name: string; jobTitle: string; department: string; runs: number; succeeded: number; failed: number; limitReached: number;
+  successRate: number; costUsd: number; costPerRunUsd: number; avgTurns: number; toolCalls: number; toolDenied: number; tasksDone: number;
+  reviewsApproved: number; changesRequested: number; firstPassApprovalRate: number;
+}
+
+export interface KnowledgeEntry {
+  id: string;
+  kind: "Policy" | "Standard" | "Decision" | "Lesson" | "Template" | "Reference";
+  title: string;
+  body: string;
+  tags: string[];
+  projectId: string | null;
+  projectName: string | null;
+  status: "Proposed" | "Validated" | "Archived";
+  source: string | null;
+  authorName: string | null;
+  validatedAt: string | null;
+  createdAt: string;
+  version: number;
+}
+
+export interface ProjectDocument {
+  id: string;
+  projectId: string;
+  kind: string;
+  title: string;
+  version: number;
+  status: "Draft" | "Final";
+  authorName: string | null;
+  isSimulated: boolean;
+  createdAt: string;
+  content: string | null;
+}
+
+export interface Integration {
+  id: string;
+  name: string;
+  kind: "Webhook";
+  secretEnvVar: string;
+  secretPresent: boolean;
+  events: string[];
+  isEnabled: boolean;
+  cursor: string;
+  version: number;
+}
+
+export interface Delivery {
+  id: number;
+  event: string;
+  title: string;
+  status: "Sent" | "Failed";
+  statusCode: number | null;
+  error: string | null;
+  createdAt: string;
+}
+
+export const INTEGRATION_EVENTS = ["approval.requested", "workflow.completed", "workflow.escalated", "budget.reached", "run.failed"];

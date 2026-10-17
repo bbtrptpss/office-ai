@@ -1,0 +1,186 @@
+using Microsoft.EntityFrameworkCore;
+using OfficeAI.Application.Abstractions;
+using OfficeAI.Application.Delivery;
+using OfficeAI.Domain.Agents;
+using OfficeAI.Domain.Common;
+using OfficeAI.Domain.Delivery;
+using OfficeAI.Domain.Finance;
+using OfficeAI.Domain.Organization;
+using OfficeAI.Domain.Work;
+using OfficeAI.Domain.Workflows;
+
+namespace OfficeAI.Application.Reports;
+
+public record BudgetDto(Guid Id, BudgetScope Scope, Guid? ScopeId, string ScopeName, DateOnly Month, decimal AmountUsd, decimal SpentUsd, BudgetLevel Level, uint Version);
+public record SetBudgetRequest(BudgetScope Scope, Guid? ScopeId, DateOnly Month, decimal AmountUsd);
+
+public record ProjectFinanceDto(Guid ProjectId, string Code, string Name, int? EstimateRevision, decimal? PlannedTotalCostThb, decimal? PriceThb,
+    decimal? PlannedAiCostThb, decimal ActualAiUsdMonth, decimal ActualAiUsdAllTime, decimal ActualAiThbAllTime, decimal? AiVarianceThb);
+public record SpendRowDto(Guid Id, string Name, decimal CostUsd, long Tokens, int Runs);
+public record FinanceReportDto(DateOnly Month, decimal UsdToThb, decimal TotalUsd, decimal TotalThb, decimal SimulatedUsd,
+    List<ProjectFinanceDto> Projects, List<SpendRowDto> Departments, List<SpendRowDto> Employees, List<BudgetDto> Budgets);
+
+public record PerformanceRowDto(Guid EmployeeId, string Name, string JobTitle, string Department, int Runs, int Succeeded, int Failed, int LimitReached,
+    decimal SuccessRate, decimal CostUsd, decimal CostPerRunUsd, double AvgTurns, int ToolCalls, int ToolDenied, int TasksDone, int ReviewsApproved,
+    int ChangesRequested, decimal FirstPassApprovalRate);
+public record PerformanceReportDto(DateOnly Month, List<PerformanceRowDto> Rows);
+
+/// <summary>Deterministic finance and performance figures. Estimates and actuals are always reported separately.</summary>
+public class ReportsService(IAppDbContext db, TimeProvider clock)
+{
+    public DateOnly CurrentMonth => BudgetMath.MonthOf(clock.GetUtcNow());
+
+    // ---------------- budgets ----------------
+
+    private async Task<decimal> SpentAsync(BudgetScope scope, Guid? scopeId, DateOnly month, CancellationToken ct)
+    {
+        var (from, to) = BudgetMath.Range(month);
+        var costs = db.CostRecords.Where(c => c.Kind == CostKind.Actual && c.OccurredAt >= from && c.OccurredAt < to);
+        costs = scope switch
+        {
+            BudgetScope.Project => costs.Where(c => c.ProjectId == scopeId),
+            BudgetScope.Department => costs.Where(c => db.Employees.Any(e => e.Id == c.EmployeeId && e.DepartmentId == scopeId)),
+            _ => costs,
+        };
+        return await costs.SumAsync(c => (decimal?)c.AmountUsd, ct) ?? 0m;
+    }
+
+    public async Task<List<BudgetDto>> ListBudgetsAsync(DateOnly? month, CancellationToken ct)
+    {
+        var m = month ?? CurrentMonth;
+        var rows = await db.BudgetAllocations.AsNoTracking().Where(b => b.Month == m).OrderBy(b => b.Scope).ToListAsync(ct);
+        var depts = await db.Departments.AsNoTracking().ToDictionaryAsync(d => d.Id, d => d.Name, ct);
+        var projects = await db.Projects.AsNoTracking().ToDictionaryAsync(p => p.Id, p => p.Name, ct);
+        var list = new List<BudgetDto>();
+        foreach (var b in rows)
+        {
+            var spent = await SpentAsync(b.Scope, b.ScopeId, b.Month, ct);
+            var name = b.Scope switch
+            {
+                BudgetScope.Department => depts.GetValueOrDefault(b.ScopeId!.Value, "?"),
+                BudgetScope.Project => projects.GetValueOrDefault(b.ScopeId!.Value, "?"),
+                _ => "Company",
+            };
+            list.Add(new BudgetDto(b.Id, b.Scope, b.ScopeId, name, b.Month, b.AmountUsd, spent, BudgetMath.Level(spent, b.AmountUsd), b.Version));
+        }
+        return list;
+    }
+
+    public async Task<BudgetDto> SetBudgetAsync(SetBudgetRequest req, CancellationToken ct)
+    {
+        if (!Enum.IsDefined(req.Scope)) throw new DomainException("validation", "scope is invalid.");
+        if (req.AmountUsd is < 0 or > 1_000_000) throw new DomainException("validation", "amountUsd must be between 0 and 1,000,000.");
+        if (req.Month.Day != 1) throw new DomainException("validation", "month must be the first day of a month.");
+        if (req.Scope == BudgetScope.Company && req.ScopeId is not null) throw new DomainException("validation", "A company budget has no scopeId.");
+        if (req.Scope == BudgetScope.Department && !await db.Departments.AnyAsync(d => d.Id == req.ScopeId, ct)) throw new NotFoundException("Department", req.ScopeId ?? Guid.Empty);
+        if (req.Scope == BudgetScope.Project && !await db.Projects.AnyAsync(p => p.Id == req.ScopeId, ct)) throw new NotFoundException("Project", req.ScopeId ?? Guid.Empty);
+
+        var b = await db.BudgetAllocations.FirstOrDefaultAsync(x => x.Scope == req.Scope && x.ScopeId == req.ScopeId && x.Month == req.Month, ct);
+        if (b is null) db.BudgetAllocations.Add(b = new BudgetAllocation { Scope = req.Scope, ScopeId = req.ScopeId, Month = req.Month });
+        b.AmountUsd = req.AmountUsd;
+        await db.SaveChangesAsync(ct);
+        return (await ListBudgetsAsync(req.Month, ct)).First(x => x.Id == b.Id);
+    }
+
+    public async Task DeleteBudgetAsync(Guid id, CancellationToken ct)
+    {
+        var b = await db.BudgetAllocations.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Budget", id);
+        db.BudgetAllocations.Remove(b);
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Null when a run may start; otherwise which budget is used up.</summary>
+    public async Task<string?> BudgetBlockAsync(Guid employeeId, Guid projectId, CancellationToken ct)
+    {
+        var month = CurrentMonth;
+        var deptId = await db.Employees.Where(e => e.Id == employeeId).Select(e => (Guid?)e.DepartmentId).FirstOrDefaultAsync(ct);
+        var budgets = await db.BudgetAllocations.AsNoTracking()
+            .Where(b => b.Month == month && (b.Scope == BudgetScope.Company || (b.Scope == BudgetScope.Department && b.ScopeId == deptId) || (b.Scope == BudgetScope.Project && b.ScopeId == projectId)))
+            .ToListAsync(ct);
+        foreach (var b in budgets)
+            if (await SpentAsync(b.Scope, b.ScopeId, month, ct) >= b.AmountUsd)
+                return $"The {b.Scope.ToString().ToLowerInvariant()} AI budget for {month:yyyy-MM} ({b.AmountUsd} USD) is used up.";
+        return null;
+    }
+
+    // ---------------- finance ----------------
+
+    public async Task<FinanceReportDto> FinanceAsync(DateOnly? month, CancellationToken ct)
+    {
+        var m = month ?? CurrentMonth;
+        var (from, to) = BudgetMath.Range(m);
+        var settings = await DeliveryService.SettingsAsync(db, ct);
+        var monthCosts = await db.CostRecords.AsNoTracking().Where(c => c.Kind == CostKind.Actual && c.OccurredAt >= from && c.OccurredAt < to)
+            .Select(c => new { c.AmountUsd, c.ProjectId, c.EmployeeId, c.RunId }).ToListAsync(ct);
+        var simulatedRuns = await db.AgentRuns.AsNoTracking().Where(r => r.IsSimulated && r.CreatedAt >= from.AddDays(-1) && r.CreatedAt < to).Select(r => r.Id).ToListAsync(ct);
+        var allTime = await db.CostRecords.AsNoTracking().Where(c => c.Kind == CostKind.Actual && c.ProjectId != null)
+            .GroupBy(c => c.ProjectId!.Value).Select(g => new { ProjectId = g.Key, Usd = g.Sum(c => c.AmountUsd) }).ToDictionaryAsync(x => x.ProjectId, x => x.Usd, ct);
+        var estimates = (await db.Estimates.AsNoTracking().Where(e => e.Status == EstimateStatus.Approved).ToListAsync(ct))
+            .GroupBy(e => e.ProjectId).ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.Revision).First());
+        var projects = await db.Projects.AsNoTracking().Where(p => p.Status != ProjectStatus.Cancelled).OrderBy(p => p.Code).ToListAsync(ct);
+
+        var projectRows = projects.Select(p =>
+        {
+            var est = estimates.GetValueOrDefault(p.Id);
+            var allUsd = allTime.GetValueOrDefault(p.Id);
+            var allThb = Math.Round(allUsd * settings.UsdToThb, 2);
+            return new ProjectFinanceDto(p.Id, p.Code, p.Name, est?.Revision, est?.TotalCost, est?.Price, est?.AiCost,
+                monthCosts.Where(c => c.ProjectId == p.Id).Sum(c => c.AmountUsd), allUsd, allThb, est is null ? null : allThb - est.AiCost);
+        }).Where(r => r.EstimateRevision is not null || r.ActualAiUsdAllTime > 0).ToList();
+
+        var usage = await db.UsageRecords.AsNoTracking().Where(u => u.OccurredAt >= from && u.OccurredAt < to)
+            .Select(u => new { u.EmployeeId, u.RunId, Tokens = u.InputTokens + u.OutputTokens + u.CacheReadTokens + u.CacheWriteTokens }).ToListAsync(ct);
+        var employees = await db.Employees.AsNoTracking().Select(e => new { e.Id, e.DisplayName, e.DepartmentId }).ToDictionaryAsync(e => e.Id, ct);
+        var departments = await db.Departments.AsNoTracking().ToDictionaryAsync(d => d.Id, d => d.Name, ct);
+
+        var byEmployee = monthCosts.Where(c => c.EmployeeId != null).GroupBy(c => c.EmployeeId!.Value)
+            .Select(g => new SpendRowDto(g.Key, employees.TryGetValue(g.Key, out var e) ? e.DisplayName : "?", g.Sum(c => c.AmountUsd),
+                usage.Where(u => u.EmployeeId == g.Key).Sum(u => u.Tokens), usage.Where(u => u.EmployeeId == g.Key).Select(u => u.RunId).Distinct().Count()))
+            .OrderByDescending(r => r.CostUsd).ToList();
+        var byDept = byEmployee.Where(r => employees.ContainsKey(r.Id)).GroupBy(r => employees[r.Id].DepartmentId)
+            .Select(g => new SpendRowDto(g.Key, departments.GetValueOrDefault(g.Key, "?"), g.Sum(r => r.CostUsd), g.Sum(r => r.Tokens), g.Sum(r => r.Runs)))
+            .OrderByDescending(r => r.CostUsd).ToList();
+
+        var total = monthCosts.Sum(c => c.AmountUsd);
+        return new FinanceReportDto(m, settings.UsdToThb, total, Math.Round(total * settings.UsdToThb, 2),
+            monthCosts.Where(c => c.RunId is { } r && simulatedRuns.Contains(r)).Sum(c => c.AmountUsd),
+            projectRows, byDept, byEmployee.Take(50).ToList(), await ListBudgetsAsync(m, ct));
+    }
+
+    // ---------------- performance ----------------
+
+    public async Task<PerformanceReportDto> PerformanceAsync(DateOnly? month, CancellationToken ct)
+    {
+        var m = month ?? CurrentMonth;
+        var (from, to) = BudgetMath.Range(m);
+        var runs = await db.AgentRuns.AsNoTracking().Where(r => r.CreatedAt >= from && r.CreatedAt < to)
+            .Select(r => new { r.Id, r.EmployeeId, r.Status, r.Turns, r.ToolCalls, r.CostUsd, r.TaskId, r.Purpose }).ToListAsync(ct);
+        var runIds = runs.Select(r => r.Id).ToList();
+        var denied = await db.ToolExecutions.AsNoTracking().Where(x => runIds.Contains(x.RunId) && x.Status == ToolExecutionStatus.Denied)
+            .GroupBy(x => x.RunId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+
+        // Work outcome per employee: reviews of tasks they were assigned to, and tasks they completed.
+        var reviews = await db.Reviews.AsNoTracking().Where(r => r.CreatedAt >= from && r.CreatedAt < to)
+            .Join(db.TaskAssignments, r => r.TaskId, a => a.TaskId, (r, a) => new { a.EmployeeId, r.Outcome, r.TaskId }).ToListAsync(ct);
+        var done = await db.Tasks.AsNoTracking().Where(t => t.Status == WorkTaskStatus.Done && t.UpdatedAt >= from && t.UpdatedAt < to)
+            .Join(db.TaskAssignments.Where(a => a.UnassignedAt == null), t => t.Id, a => a.TaskId, (t, a) => a.EmployeeId).ToListAsync(ct);
+        var people = await db.Employees.AsNoTracking().Where(e => e.Kind == EmployeeKind.AI)
+            .Select(e => new { e.Id, e.DisplayName, Title = e.RoleDefinition!.Title, Dept = e.Department!.Name }).ToListAsync(ct);
+
+        var rows = people.Select(p =>
+        {
+            var mine = runs.Where(r => r.EmployeeId == p.Id).ToList();
+            var approved = reviews.Count(r => r.EmployeeId == p.Id && r.Outcome == Domain.Workflows.ReviewOutcome.Approved);
+            var changes = reviews.Count(r => r.EmployeeId == p.Id && r.Outcome == Domain.Workflows.ReviewOutcome.ChangesRequested);
+            var reviewedTasks = reviews.Where(r => r.EmployeeId == p.Id).GroupBy(r => r.TaskId).ToList();
+            var firstPass = reviewedTasks.Count == 0 ? 0m : Math.Round(100m * reviewedTasks.Count(g => g.All(r => r.Outcome == Domain.Workflows.ReviewOutcome.Approved)) / reviewedTasks.Count, 1);
+            var cost = mine.Sum(r => r.CostUsd);
+            return new PerformanceRowDto(p.Id, p.DisplayName, p.Title, p.Dept, mine.Count,
+                mine.Count(r => r.Status == AgentRunStatus.Succeeded), mine.Count(r => r.Status == AgentRunStatus.Failed), mine.Count(r => r.Status == AgentRunStatus.LimitReached),
+                mine.Count == 0 ? 0 : Math.Round(100m * mine.Count(r => r.Status == AgentRunStatus.Succeeded) / mine.Count, 1),
+                cost, mine.Count == 0 ? 0 : Math.Round(cost / mine.Count, 6), mine.Count == 0 ? 0 : Math.Round(mine.Average(r => r.Turns), 1),
+                mine.Sum(r => r.ToolCalls), mine.Sum(r => denied.GetValueOrDefault(r.Id)), done.Count(e => e == p.Id), approved, changes, firstPass);
+        }).Where(r => r.Runs > 0 || r.TasksDone > 0).OrderByDescending(r => r.Runs).ToList();
+        return new PerformanceReportDto(m, rows);
+    }
+}

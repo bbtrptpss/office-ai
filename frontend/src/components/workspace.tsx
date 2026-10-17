@@ -7,7 +7,7 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import { api, Decision, Estimate, MergeRequest, Repository, Requirement, TestRun, thb } from "@/lib/api";
+import { api, Decision, Estimate, MergeRequest, ProjectDocument, Repository, Requirement, TestRun, thb } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -402,5 +402,58 @@ function TestRunsList({ repo, canRun, onError }: { repo: Repository; canRun: boo
         {data?.length === 0 && <Typography color="text.secondary">{t.empty}</Typography>}
       </Stack>
     </Box>
+  );
+}
+
+// ---------------- Documents ----------------
+
+export function DocumentsPanel({ projectId }: { projectId: string }) {
+  const { t, label } = useI18n();
+  const { can } = useAuth();
+  const errorMessage = useErrorMessage();
+  const { data, error, reload } = useLoad(() => api.get<ProjectDocument[]>(`/api/projects/${projectId}/documents`), projectId);
+  useRealtime("agentRunChanged", () => void reload());
+  const [open, setOpen] = useState<ProjectDocument | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  if (!data) return <Loading error={error} />;
+  if (data.length === 0) return <Typography color="text.secondary">{t.empty}</Typography>;
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+
+  return (
+    <Grid container spacing={2}>
+      <Grid size={{ xs: 12, md: 4 }}>
+        <Stack spacing={1}>
+          {data.map((d) => (
+            <Paper key={d.id} variant="outlined" sx={{ p: 1.5, cursor: "pointer", bgcolor: open?.id === d.id ? "action.selected" : undefined }}
+              onClick={async () => setOpen(await api.get<ProjectDocument>(`/api/documents/${d.id}`))}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <Typography fontWeight={600} sx={{ flex: 1 }} noWrap>📄 {d.title}</Typography>
+                <Chip size="small" label={`v${d.version}`} />
+                <StatusChip value={d.status} />
+              </Stack>
+              <Typography variant="caption" color="text.secondary">{label(d.kind)}{d.authorName ? ` · ${d.authorName}` : ""}{d.isSimulated ? " · 🧪" : ""}</Typography>
+            </Paper>
+          ))}
+        </Stack>
+      </Grid>
+      <Grid size={{ xs: 12, md: 8 }}>
+        {message && <Alert severity="warning" sx={{ mb: 1 }}>{message}</Alert>}
+        {open && (
+          <>
+            <Stack direction="row" spacing={1} sx={{ mb: 1, alignItems: "center" }}>
+              <Typography variant="h6" sx={{ flex: 1 }}>{open.title} v{open.version}</Typography>
+              <Button size="small" href={`${base}/api/documents/${open.id}/download`}>{t.download}</Button>
+              {can("knowledge.manage") && open.status === "Draft" && !open.isSimulated && (
+                <Button size="small" variant="contained" onClick={async () => {
+                  try { setOpen(await api.post<ProjectDocument>(`/api/documents/${open.id}/finalize`)); } catch (e) { setMessage(errorMessage(e)); }
+                  await reload();
+                }}>{t.finalize}</Button>
+              )}
+            </Stack>
+            <Box component="pre" sx={{ ...pre, fontFamily: "inherit", fontSize: 14, maxHeight: 600 }}>{open.content}</Box>
+          </>
+        )}
+      </Grid>
+    </Grid>
   );
 }

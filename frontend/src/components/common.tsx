@@ -78,6 +78,7 @@ const STATUS_COLORS: Record<string, ChipProps["color"]> = {
   Succeeded: "success", Running: "primary", Queued: "info", LimitReached: "warning", Cancelled: "default",
   Planning: "info", AwaitingPlanApproval: "warning", Executing: "primary", Pending: "warning", Approved: "success", Expired: "default", ChangesRequested: "warning",
   Merged: "success", Passed: "success", Open: "info", Conflict: "error", Proposed: "info", Must: "error", Should: "warning",
+  Ok: "success", Warning: "warning", Exceeded: "error", Validated: "success", Final: "success", Sent: "success", Archived: "default",
   Denied: "error", TimedOut: "warning", InvalidInput: "warning", Submitted: "info", Accepted: "success", Rejected: "error",
 };
 

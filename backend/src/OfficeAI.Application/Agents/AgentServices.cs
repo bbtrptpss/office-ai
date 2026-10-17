@@ -134,7 +134,7 @@ public class AgentAdminService(IAppDbContext db, AiProviderRegistry providers, T
 }
 
 /// <summary>Starting, cancelling and inspecting AI runs.</summary>
-public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAgentRunQueue queue, IRealtimeNotifier notifier, ICurrentUser current, TimeProvider clock)
+public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAgentRunQueue queue, IRealtimeNotifier notifier, ICurrentUser current, TimeProvider clock, Reports.ReportsService reports)
 {
     /// <summary>A person starts a work run on a task assigned to an AI employee.</summary>
     public async Task<AgentRunDto> StartAsync(Guid taskId, StartRunRequest req, CancellationToken ct)
@@ -184,6 +184,8 @@ public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAg
         var spent = await db.CostRecords.Where(c => c.EmployeeId == employeeId && c.Kind == CostKind.Actual && c.OccurredAt >= monthStart).SumAsync(c => c.AmountUsd, ct);
         if (spent >= config.MonthlyBudgetUsd)
             throw new DomainException("agent.budget_exceeded", $"{employee.DisplayName} has used its monthly budget ({config.MonthlyBudgetUsd} USD).");
+        if (await reports.BudgetBlockAsync(employeeId, task.ProjectId, ct) is { } blocked)
+            throw new DomainException("agent.budget_exceeded", blocked);
         if (await db.AgentRuns.AnyAsync(r => r.TaskId == taskId && (r.Status == AgentRunStatus.Queued || r.Status == AgentRunStatus.Running), ct))
             throw new DomainException("agent.already_running", "This task already has a run in progress.");
 
