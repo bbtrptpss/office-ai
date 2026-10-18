@@ -126,6 +126,9 @@ public static class Endpoints
         api.MapGet("/dashboard", (WorkService s, CancellationToken ct) => s.GetDashboardAsync(ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/tasks/recent", (int? take, WorkService s, CancellationToken ct) => s.RecentTasksAsync(take ?? 8, ct)).RequirePermission(Permissions.TaskRead);
         api.MapGet("/assistant", (OfficeAI.Application.Communication.AssistantService s, CancellationToken ct) => s.GetAsync(ct)).RequirePermission(Permissions.OrgRead);
+        // The owner's own Claude Code session on the host; agent.manage only (people who run the AI setup, never AI identities).
+        api.MapPost("/assistant/claude", (OfficeAI.Application.Communication.ClaudeAskRequest r, OfficeAI.Application.Communication.ClaudeChatService s, CancellationToken ct) =>
+            s.AskAsync(r, ct)).RequirePermission(Permissions.AgentManage);
 
         api.MapGet("/projects", (WorkService s, CancellationToken ct) => s.ListProjectsAsync(ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/projects/{id:guid}", (Guid id, WorkService s, CancellationToken ct) => s.GetProjectAsync(id, ct)).RequirePermission(Permissions.ProjectRead);

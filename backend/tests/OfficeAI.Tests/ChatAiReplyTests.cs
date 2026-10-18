@@ -235,6 +235,34 @@ public class ChatAiReplyTests(ApiFixture fx)
         Assert.Equal("Chat run", recent[0].ProjectName);
     }
 
+    [Fact]
+    public async Task Claude_chat_continues_one_conversation_per_person_is_recorded_and_is_for_AI_managers_only()
+    {
+        var ceo = await fx.CeoAsync();
+        Assert.True((await ceo.GetAsync<AssistantDto>("/api/assistant")).ClaudeAvailable);
+
+        var first = await ceo.PostAsync<ClaudeReplyDto>("/api/assistant/claude", new { message = "สรุปวันนี้" });
+        Assert.Equal("echo: สรุปวันนี้", first.Reply);
+        Assert.False(first.Continued);
+        var call = fx.Claude.Calls.Last();
+        Assert.Null(call.SessionId);
+        Assert.Contains("You have no tools here", call.System);
+        Assert.Contains("Approvals waiting for a person", call.System); // live company data
+
+        var second = await ceo.PostAsync<ClaudeReplyDto>("/api/assistant/claude", new { message = "แล้วพรุ่งนี้ล่ะ" });
+        Assert.True(second.Continued);
+        Assert.NotNull(fx.Claude.Calls.Last().SessionId);
+        var fresh = await ceo.PostAsync<ClaudeReplyDto>("/api/assistant/claude", new { message = "เริ่มใหม่", newChat = true });
+        Assert.False(fresh.Continued);
+
+        var channel = (await ceo.GetAsync<AssistantDto>("/api/assistant")).ChannelId;
+        var messages = await ceo.GetAsync<List<MessageDto>>($"/api/chat/channels/{channel}/messages?limit=10");
+        Assert.Contains(messages, m => m.AuthorName == ClaudeChatService.ClaudeName && m.IsAgent && m.Body == "echo: เริ่มใหม่");
+
+        var member = await fx.UserWithRolesAsync(SystemRoles.Member);
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, (await member.PostAsJsonAsync("/api/assistant/claude", new { message = "hi" })).StatusCode);
+    }
+
     [Theory]
     [InlineData("@Dev /run add login", "add login")]
     [InlineData("/ทำ  เพิ่มหน้า   รายงาน @Dev", "เพิ่มหน้า รายงาน")]

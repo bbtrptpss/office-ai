@@ -73,6 +73,16 @@ try {
     $ErrorActionPreference = 'Stop'
     if ($composeExit -ne 0) { throw "docker compose failed (exit $composeExit)" }
 
+    # Claude Code bridge for the dashboard chat (only when it is set up in .env and Node is installed).
+    $envText = Get-Content (Join-Path $Root '.env') -Raw -ErrorAction SilentlyContinue
+    if ($envText -match '(?m)^CLAUDE_BRIDGE_TOKEN=\S{24,}' -and (Get-Command node -ErrorAction SilentlyContinue)) {
+        if (Test-Url 'http://127.0.0.1:8765/health') { Log 'Claude bridge is already running' }
+        else {
+            Start-Process -FilePath (Get-Command node).Source -ArgumentList "`"$(Join-Path $PSScriptRoot 'claude-bridge.mjs')`"" -WorkingDirectory $Root -WindowStyle Hidden
+            Log 'Started the Claude bridge'
+        }
+    }
+
     if (-not (Wait-Until { Test-Url $ApiHealth } 180 'the API')) { throw 'The API did not start. See: docker compose logs api' }
     if (-not (Wait-Until { Test-Url $WebUrl } 120 'the web app')) { throw 'The web app did not start. See: docker compose logs web' }
     Log "Office AI is running at $WebUrl"

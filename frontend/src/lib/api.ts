@@ -264,6 +264,14 @@ export interface RecentTask {
 export interface Assistant {
   channelId: string;
   members: { employeeId: string; displayName: string; jobTitle: string; status: EmployeeStatus; openTasks: number; currentTask: string | null }[];
+  /** The host's Claude Code bridge is set up (only people with agent.manage may use it). */
+  claudeAvailable: boolean;
+}
+
+export interface ClaudeReply {
+  reply: string;
+  continued: boolean;
+  equivalentCostUsd: number;
 }
 
 export interface AgentRun {

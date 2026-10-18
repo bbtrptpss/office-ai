@@ -22,6 +22,7 @@ public sealed class ApiFixture : IAsyncLifetime
     private readonly PostgreSqlContainer _db = new PostgreSqlBuilder("postgres:17-alpine").Build();
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
     public ScriptedProvider Scripted { get; } = new();
+    public FakeClaudeBridge Claude { get; } = new();
     public string RepoRoot { get; } = Path.Combine(Path.GetTempPath(), "officeai-tests", Guid.NewGuid().ToString("N"));
     public string ConnectionString => _db.GetConnectionString();
 
@@ -51,6 +52,7 @@ public sealed class ApiFixture : IAsyncLifetime
             {
                 s.AddSingleton<IAiProvider>(Scripted);
                 s.AddSingleton<IAgentTool, ApprovalRequiredTool>();
+                s.AddSingleton<OfficeAI.Application.Communication.IClaudeBridge>(Claude);
             });
         });
         _ = Factory.Server; // start host: runs migrations + seed

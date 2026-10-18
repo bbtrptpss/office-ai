@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { AgentRun, api, Assistant, ChatMessage, Dashboard, Meeting, RecentTask, usd } from "@/lib/api";
+import { AgentRun, api, Assistant, ChatMessage, ClaudeReply, Dashboard, Meeting, RecentTask, usd } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -154,6 +154,15 @@ function NowRunningCard() {
 
 type Bubble = { question?: string; answer?: string; typing?: boolean; from?: string };
 
+/** Chat answers use light markdown: show **bold** as bold, keep the rest (line breaks are kept by the bubble's CSS). */
+function Rich({ text }: { text: string }) {
+  return <>{text.split(/(\*\*[^*\n]+\*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={i}>{part.slice(2, -2)}</strong> : part)}</>;
+}
+
+/** The owner's own Claude Code session (see ClaudeChatService); shown first among the assistants when set up. */
+const CLAUDE_ID = "claude";
+
 const CHIPS = [
   { key: "dashChipSummary", prompt: "dashPromptSummary", Icon: Doc },
   { key: "dashChipPlan", prompt: "dashPromptPlan", Icon: Calendar },
@@ -177,9 +186,15 @@ function Stage() {
   const stageRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState(false);
 
-  const members = assistant?.members ?? [];
+  const [newChat, setNewChat] = useState(false);
+  const claudeOn = !!assistant?.claudeAvailable && can("agent.manage");
+  const members = [
+    ...(claudeOn ? [{ employeeId: CLAUDE_ID, displayName: "Claude", jobTitle: t.dashClaudeTitle, status: "Available" as const, openTasks: 0, currentTask: null }] : []),
+    ...(assistant?.members ?? []),
+  ];
   const current = members.find((m) => m.employeeId === pickedId) ?? members[0];
-  const canAsk = can("comms.post") && !!current && !!assistant;
+  const isClaude = current?.employeeId === CLAUDE_ID;
+  const canAsk = !!current && !!assistant && (isClaude || can("comms.post"));
 
   const checkReply = async () => {
     const w = waiting.current;
@@ -212,6 +227,19 @@ function Stage() {
     if (!question || !canAsk) return;
     setInput("");
     setBubble({ question, typing: true });
+    if (isClaude) {
+      setPending(true);
+      try {
+        const res = await api.post<ClaudeReply>("/api/assistant/claude", { message: question, newChat });
+        setNewChat(false);
+        setBubble({ question, answer: res.reply, from: "Claude" });
+      } catch (err) {
+        setBubble({ question, answer: err instanceof Error ? err.message : String(err), from: "Claude" });
+      } finally {
+        setPending(false);
+      }
+      return;
+    }
     try {
       const sent = await api.post<ChatMessage>(`/api/chat/channels/${assistant!.channelId}/messages`, {
         body: `@${current!.displayName} ${question}`, mentionedEmployeeIds: [current!.employeeId],
@@ -224,7 +252,7 @@ function Stage() {
   };
 
   const status = (m: NonNullable<typeof current>) =>
-    m.currentTask ? `${t.dashFriendWorking} ${m.currentTask}` : m.openTasks > 0 ? `${label(m.status)} · ${t.dashFriendOpen} ${m.openTasks}` : label(m.status);
+    m.employeeId === CLAUDE_ID ? t.dashClaudeStatus : m.currentTask ? `${t.dashFriendWorking} ${m.currentTask}` : m.openTasks > 0 ? `${label(m.status)} · ${t.dashFriendOpen} ${m.openTasks}` : label(m.status);
 
   return (
     <>
@@ -254,7 +282,7 @@ function Stage() {
               ) : (
                 <>
                   <b>{bubble.from ?? current?.displayName}</b>
-                  {bubble.answer}
+                  <Rich text={bubble.answer ?? ""} />
                 </>
               )}
             </>
@@ -266,7 +294,7 @@ function Stage() {
             {members.map((m, i) => (
               <button key={m.employeeId} className={cx(s.friend, s[`friend${i % 4}`], m.employeeId === current?.employeeId && s.active)}
                 onClick={() => { setPickedId(m.employeeId); setBubble({ answer: `${m.jobTitle} — ${status(m)}`, from: m.displayName }); }}>
-                <Art name={FRIEND_ART[i % FRIEND_ART.length]} size={32} round />
+                <Art name={m.employeeId === CLAUDE_ID ? "logo" : FRIEND_ART[(i - (claudeOn ? 1 : 0)) % FRIEND_ART.length]} size={32} round />
                 <span style={{ minWidth: 0 }}>
                   <b>{m.displayName}</b>
                   <small>{status(m)}</small>
@@ -287,6 +315,11 @@ function Stage() {
           {CHIPS.map(({ key, prompt, Icon }) => (
             <button key={key} className={s.chip} onClick={() => setInput(t[prompt])}><Icon />{t[key]}</button>
           ))}
+          {isClaude && (
+            <button className={s.chip} onClick={() => { setNewChat(true); setBubble({ answer: t.dashClaudeNew, from: "Claude" }); }}>
+              <Sparkle />{t.dashChipNewChat}
+            </button>
+          )}
           <Link href={assistant ? `/chat?channel=${assistant.channelId}` : "/chat"} className={s.chip}><Dots />{t.dashChipChat}</Link>
         </div>
       </div>

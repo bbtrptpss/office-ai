@@ -10,13 +10,14 @@ using OfficeAI.Domain.Workflows;
 namespace OfficeAI.Application.Communication;
 
 public record AssistantMemberDto(Guid EmployeeId, string DisplayName, string JobTitle, EmployeeStatus Status, int OpenTasks, string? CurrentTask);
-public record AssistantDto(Guid ChannelId, List<AssistantMemberDto> Members);
+/// <param name="ClaudeAvailable">The host's Claude Code bridge is configured (see <see cref="ClaudeChatService"/>).</param>
+public record AssistantDto(Guid ChannelId, List<AssistantMemberDto> Members, bool ClaudeAvailable = false);
 
 /// <summary>
 /// The dashboard's "ask the AI" box. Questions are ordinary chat messages in the company channel
 /// <see cref="ChatService.AssistantChannel"/>, so answers use the chat reply rules: talk only, priced, budgeted, never AI-to-AI.
 /// </summary>
-public class AssistantService(IAppDbContext db)
+public class AssistantService(IAppDbContext db, IClaudeBridge claude)
 {
     /// <summary>The AI employees offered as assistants, in this order when they exist.</summary>
     public static readonly string[] AssistantRoles = ["COO", "PM", "CTO"];
@@ -39,7 +40,7 @@ public class AssistantService(IAppDbContext db)
             .ToListAsync(ct);
         var members = rows.OrderBy(r => Array.IndexOf(AssistantRoles, r.Code)).ThenBy(r => r.DisplayName, StringComparer.Ordinal)
             .Select(r => new AssistantMemberDto(r.Id, r.DisplayName, r.JobTitle, r.Status, r.Open, r.Current)).ToList();
-        return new AssistantDto(channel.Id, members);
+        return new AssistantDto(channel.Id, members, claude.IsConfigured);
     }
 
     /// <summary>

@@ -143,6 +143,9 @@ public static class DependencyInjection
         services.AddScoped<OfficeAI.Application.Communication.ChatReplyService>();
         services.AddScoped<OfficeAI.Application.Communication.ChatCommandService>();
         services.AddScoped<OfficeAI.Application.Communication.AssistantService>();
+        services.AddScoped<OfficeAI.Application.Communication.ClaudeChatService>();
+        services.Configure<OfficeAI.Infrastructure.Ai.ClaudeBridgeOptions>(config.GetSection("ClaudeBridge"));
+        services.AddHttpClient<OfficeAI.Application.Communication.IClaudeBridge, OfficeAI.Infrastructure.Ai.HttpClaudeBridge>(c => c.Timeout = TimeSpan.FromSeconds(200));
         services.Configure<OfficeAI.Application.Integrations.IntegrationSettings>(config.GetSection("Integrations"));
         services.AddHttpClient("integrations", c => c.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<OfficeAI.Application.Integrations.IntegrationService>();

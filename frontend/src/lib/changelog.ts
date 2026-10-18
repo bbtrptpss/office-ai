@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.12.0",
+    date: "2026-10-19",
+    title: { th: "คุยกับ Claude จากหน้าภาพรวม", en: "Chat with Claude from the dashboard" },
+    changes: [
+      { type: "added", th: "“Claude” เป็นผู้ช่วยตัวแรกบนเวทีหน้าภาพรวม: ใช้ Claude Code ที่ login ไว้บนเครื่องนี้ (แพ็กเกจของคุณ ไม่ต้องเติมเครดิต API) คุยต่อเนื่องได้ กด “แชทใหม่” เพื่อเริ่มใหม่ และเห็นข้อมูลบริษัทแบบสด", en: "“Claude” is the first assistant on the dashboard stage: the Claude Code signed in on this PC (your plan, no API credit needed), with a continuing conversation, a “New chat” button and live company data" },
+      { type: "security", th: "คุยได้อย่างเดียว: Claude ไม่มีเครื่องมือใด ๆ (รันคำสั่ง/อ่านไฟล์ไม่ได้) ใช้ได้เฉพาะคนที่มีสิทธิ์จัดการ AI ตัวเชื่อมรับคำขอจากเครื่องนี้เท่านั้นและต้องมี token ใน .env", en: "Talk only: Claude has no tools (cannot run commands or read files); only people with agent.manage can use it; the bridge accepts requests from this PC only, with a token from .env" },
+      { type: "added", th: "บทสนทนากับ Claude เก็บไว้ในห้องแชท “AI Assistant” และตัวเชื่อมเปิดเองเมื่อเริ่มระบบด้วยไอคอน Office AI", en: "Claude conversations are kept in the “AI Assistant” chat channel, and the bridge starts with the Office AI icon" },
+    ],
+  },
+  {
     version: "0.11.3",
     date: "2026-10-19",
     title: { th: "รูปกลางหน้าภาพรวมเคลื่อนไหวแบบ 2.5D", en: "2.5D animated stage picture" },
