@@ -263,7 +263,8 @@ public static class Endpoints
     private static async Task<ChatAccess> ChatAccessAsync(PermissionService perms, ICurrentUser me, CancellationToken ct)
     {
         var granted = me.UserId is { } id ? await perms.GetPermissionsAsync(id, ct) : [];
-        return new ChatAccess(granted.Contains(Permissions.CommsManage), granted.Contains(Permissions.CommsManage) || granted.Contains(Permissions.ProjectManage));
+        return new ChatAccess(granted.Contains(Permissions.CommsManage), granted.Contains(Permissions.CommsManage) || granted.Contains(Permissions.ProjectManage),
+            granted.Contains(Permissions.TaskManage) && granted.Contains(Permissions.TaskAssign) && granted.Contains(Permissions.AgentRun));
     }
 
     private static async Task<bool> HasAsync(PermissionService perms, ICurrentUser me, string permission, CancellationToken ct) =>

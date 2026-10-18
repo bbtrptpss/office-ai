@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using OfficeAI.Application.Agents;
 using OfficeAI.Application.Communication;
 using OfficeAI.Application.Organization;
+using OfficeAI.Application.Work;
 using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Communication;
 using OfficeAI.Domain.Security;
@@ -146,4 +147,81 @@ public class ChatAiReplyTests(ApiFixture fx)
         Assert.Equal(System.Net.HttpStatusCode.Forbidden,
             (await auditor.PostAsJsonAsync($"/api/chat/channels/{general.Id}/messages", new { body = "x", mentionedEmployeeIds = new[] { person.Id } })).StatusCode);
     }
+
+    private static async Task<(Guid Project, ChannelDto Channel)> ProjectChannelAsync(HttpClient ceo, params Guid[] members)
+    {
+        var project = (await ceo.PostAsync<ProjectDto>("/api/projects", new { code = $"RUN-{Guid.NewGuid():N}"[..14], name = "Chat run", status = "Active" })).Id;
+        foreach (var m in members) (await ceo.PostAsync($"/api/projects/{project}/members/{m}", null)).EnsureSuccessStatusCode();
+        return (project, await ceo.PostAsync<ChannelDto>("/api/chat/channels/open", new { projectId = project }));
+    }
+
+    [Fact]
+    public async Task Run_in_a_project_channel_creates_an_assigned_task_runs_it_with_tools_and_reports_back()
+    {
+        var ceo = await fx.CeoAsync();
+        AiRequest? seen = null;
+        var ai = await AiAsync(ceo, (req, _) =>
+        {
+            seen = req;
+            return Task.FromResult(ScriptedProvider.Text("เพิ่มหน้า login เรียบร้อยครับ"));
+        });
+        var (project, channel) = await ProjectChannelAsync(ceo, ai.Id);
+        var msg = await ceo.PostAsync<MessageDto>($"/api/chat/channels/{channel.Id}/messages",
+            new { body = $"@{ai.DisplayName} /run เพิ่มหน้า login", mentionedEmployeeIds = new[] { ai.Id } });
+
+        var said = await RepliesFromAsync(ceo, channel.Id, ai.Id, 2);
+        Assert.Contains("รับงานแล้ว", said[0].Body);
+        Assert.Contains("✅", said[1].Body);
+        Assert.Contains("เพิ่มหน้า login เรียบร้อยครับ", said[1].Body);
+
+        var task = Assert.Single(await ceo.GetAsync<List<TaskDto>>($"/api/projects/{project}/tasks"));
+        Assert.Equal("เพิ่มหน้า login", task.Title);
+        Assert.Equal(ai.Id, Assert.Single(task.Assignees).EmployeeId);
+        Assert.NotEmpty(seen!.Tools); // a real work run, unlike a chat answer
+
+        await using var scope = fx.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var command = await db.ChatCommands.AsNoTracking().SingleAsync(c => c.TriggerMessageId == msg.Id);
+        Assert.Equal(ChatCommandStatus.Finished, command.Status);
+        Assert.Equal(task.Id, command.TaskId);
+        Assert.False(await db.ChatReplies.AnyAsync(r => r.TriggerMessageId == msg.Id)); // a command is not also answered as chat
+        var run = await db.AgentRuns.AsNoTracking().SingleAsync(r => r.Id == command.RunId);
+        Assert.Equal(AgentRunStatus.Succeeded, run.Status);
+    }
+
+    [Fact]
+    public async Task Run_is_refused_without_permission_outside_project_channels_and_for_several_AIs()
+    {
+        var ceo = await fx.CeoAsync();
+        var calls = 0;
+        var ai = await AiAsync(ceo, (_, _) => { calls++; return Task.FromResult(ScriptedProvider.Text("x")); });
+        var other = await AiAsync(ceo, (_, _) => { calls++; return Task.FromResult(ScriptedProvider.Text("x")); });
+        var member = await fx.UserWithRolesAsync(SystemRoles.Member);
+
+        var general = await GeneralAsync(ceo);
+        await ceo.PostAsync<MessageDto>($"/api/chat/channels/{general.Id}/messages",
+            new { body = $"@{ai.DisplayName} /run something", mentionedEmployeeIds = new[] { ai.Id } });
+        Assert.Contains("ห้องแชทของโปรเจกต์", Assert.Single(await RepliesFromAsync(ceo, general.Id, ai.Id, 1)).Body);
+
+        var (project, channel) = await ProjectChannelAsync(ceo, ai.Id, other.Id);
+        await member.PostAsync<MessageDto>($"/api/chat/channels/{general.Id}/messages",
+            new { body = $"@{other.DisplayName} /run something", mentionedEmployeeIds = new[] { other.Id } });
+        Assert.Contains("สิทธิ์", Assert.Single(await RepliesFromAsync(ceo, general.Id, other.Id, 1)).Body);
+
+        await ceo.PostAsync<MessageDto>($"/api/chat/channels/{channel.Id}/messages",
+            new { body = $"@{ai.DisplayName} @{other.DisplayName} /run something", mentionedEmployeeIds = new[] { ai.Id, other.Id } });
+        Assert.Contains("ทีละ 1 คน", Assert.Single(await RepliesFromAsync(ceo, channel.Id, ai.Id, 1)).Body);
+
+        Assert.Empty(await ceo.GetAsync<List<TaskDto>>($"/api/projects/{project}/tasks"));
+        Assert.Equal(0, calls);
+    }
+
+    [Theory]
+    [InlineData("@Dev /run add login", "add login")]
+    [InlineData("/ทำ  เพิ่มหน้า   รายงาน @Dev", "เพิ่มหน้า รายงาน")]
+    [InlineData("@Dev /run", "")]
+    [InlineData("@Dev please check /runbook", null)]
+    [InlineData("@Dev see src/run/x", null)]
+    public void Parse_finds_the_instruction(string body, string? expected) =>
+        Assert.Equal(expected, ChatCommandService.Parse(body, ["Dev"]));
 }

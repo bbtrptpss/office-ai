@@ -18,13 +18,15 @@ public record ChannelMemberDto(Guid EmployeeId, string DisplayName, EmployeeKind
 /// <summary>What the caller may do in chat, resolved from their permissions by the API.</summary>
 /// <param name="CanModerate">comms.manage: delete any message, archive channels.</param>
 /// <param name="SeesAllProjects">comms.manage or project.manage: read every project channel without being a member.</param>
-public record ChatAccess(bool CanModerate, bool SeesAllProjects);
+/// <param name="CanCommandAi">task.manage, task.assign and agent.run: give an AI employee real work from chat with <c>/run</c>.</param>
+public record ChatAccess(bool CanModerate, bool SeesAllProjects, bool CanCommandAi = false);
 
 /// <summary>
 /// Company chat. Company and department channels are open to every signed-in person; a project channel only to the project's
 /// members (see <see cref="ProjectMembership"/>) and to people who manage projects or communication. Posting needs comms.post.
 /// </summary>
-public class ChatService(IAppDbContext db, ICurrentUser current, IRealtimeNotifier notifier, TimeProvider clock, IChatReplyQueue replies)
+public class ChatService(IAppDbContext db, ICurrentUser current, IRealtimeNotifier notifier, TimeProvider clock, IChatReplyQueue replies,
+    ChatCommandService commands)
 {
     /// <summary>At most this many AI employees answer one message.</summary>
     public const int MaxAiRepliesPerMessage = 3;
@@ -201,18 +203,24 @@ public class ChatService(IAppDbContext db, ICurrentUser current, IRealtimeNotifi
         db.ChatMessages.Add(m);
         var notified = await NotificationService.AddForEmployeesAsync(db, mentions, current.UserId, NotificationKinds.Mention,
             $"{m.AuthorName} · #{channel.Name}", body, $"/chat?channel={channelId}", clock.GetUtcNow(), ct);
-        // A person @mentioning AI employees asks them to answer here. AI never triggers AI, so replies cannot loop.
+        // A person @mentioning AI employees asks them to answer here, or with /run to do the work. AI never triggers AI, so nothing loops.
         var queued = new List<ChatReply>();
+        (Guid EmployeeId, string Instruction, string? Problem)? command = null;
         if (!current.IsAgent && mentions.Count > 0)
         {
-            var ai = await db.Employees.AsNoTracking().Where(e => mentions.Contains(e.Id) && e.Kind == EmployeeKind.AI).Select(e => e.Id).ToListAsync(ct);
-            foreach (var e in mentions.Where(ai.Contains).Take(MaxAiRepliesPerMessage))
-                queued.Add(db.ChatReplies.Add(new ChatReply { ChannelId = channelId, TriggerMessageId = m.Id, EmployeeId = e, CreatedAt = clock.GetUtcNow() }).Entity);
+            var named = await db.Employees.AsNoTracking().Where(e => mentions.Contains(e.Id)).Select(e => new { e.Id, e.DisplayName, e.Kind }).ToListAsync(ct);
+            var ai = mentions.Where(id => named.Any(e => e.Id == id && e.Kind == EmployeeKind.AI)).ToList();
+            if (ai.Count > 0 && ChatCommandService.Parse(body, named.Select(e => e.DisplayName)) is { } instruction)
+                command = (ai[0], instruction, ai.Count > 1 ? "สั่งงานได้ทีละ 1 คนต่อข้อความ ให้ mention พนักงาน AI คนเดียว" : null);
+            else
+                foreach (var e in ai.Take(MaxAiRepliesPerMessage))
+                    queued.Add(db.ChatReplies.Add(new ChatReply { ChannelId = channelId, TriggerMessageId = m.Id, EmployeeId = e, CreatedAt = clock.GetUtcNow() }).Entity);
         }
         await db.SaveChangesAsync(ct);
         await notifier.ChatMessageAsync(channelId, m.Id, ct);
         if (notified.Count > 0) await notifier.NotificationsChangedAsync(notified, ct);
         foreach (var r in queued) await replies.EnqueueAsync(r.Id, ct);
+        if (command is { } c) await commands.StartAsync(channel, m, c.EmployeeId, c.Instruction, access.CanCommandAi, c.Problem, ct);
         await TryMarkReadAsync(channelId, m.CreatedAt, ct);
         return ToDto(m, access.CanModerate);
     }

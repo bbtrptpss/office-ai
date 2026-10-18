@@ -172,3 +172,18 @@ internal class ChatReplyConfig : IEntityTypeConfiguration<ChatReply>
         b.HasOne<EmployeeProfile>().WithMany().HasForeignKey(r => r.EmployeeId).OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+internal class ChatCommandConfig : IEntityTypeConfiguration<ChatCommand>
+{
+    public void Configure(EntityTypeBuilder<ChatCommand> b)
+    {
+        b.ToTable("ChatCommands");
+        b.HasKey(c => c.Id);
+        b.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(c => c.Error).HasMaxLength(1000);
+        b.HasIndex(c => new { c.TriggerMessageId, c.EmployeeId }).IsUnique();
+        b.HasIndex(c => c.RunId);
+        b.HasOne<ChatChannel>().WithMany().HasForeignKey(c => c.ChannelId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne<EmployeeProfile>().WithMany().HasForeignKey(c => c.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+    }
+}

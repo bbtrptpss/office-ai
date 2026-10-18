@@ -194,6 +194,32 @@ public class Notification
     public DateTimeOffset? ReadAt { get; set; }
 }
 
+public enum ChatCommandStatus
+{
+    Running = 1,
+    Rejected = 2,
+    Finished = 3,
+}
+
+/// <summary>
+/// A person told an AI employee to do real work from chat (<c>@AI /run …</c>). The work itself is an ordinary task and agent run,
+/// with the usual tools, limits, budgets and human approvals; this row only links them back to the chat so progress is reported there.
+/// </summary>
+public class ChatCommand
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid ChannelId { get; set; }
+    public Guid TriggerMessageId { get; set; }
+    public Guid EmployeeId { get; set; }
+    public Guid? RequestedByUserId { get; set; }
+    public Guid? TaskId { get; set; }
+    public Guid? RunId { get; set; }
+    public ChatCommandStatus Status { get; set; } = ChatCommandStatus.Running;
+    public string? Error { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? FinishedAt { get; set; }
+}
+
 public enum ChatReplyStatus
 {
     Queued = 1,

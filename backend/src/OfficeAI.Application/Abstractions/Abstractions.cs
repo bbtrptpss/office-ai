@@ -64,6 +64,7 @@ public interface IAppDbContext
     DbSet<ProjectMember> ProjectMembers { get; }
     DbSet<Notification> Notifications { get; }
     DbSet<ChatReply> ChatReplies { get; }
+    DbSet<ChatCommand> ChatCommands { get; }
 
     /// <summary>Sets the concurrency token the client last saw, so a stale update fails with <see cref="Domain.Common.ConcurrencyException"/>.</summary>
     void ExpectVersion<T>(T entity, uint version) where T : Domain.Common.Entity;

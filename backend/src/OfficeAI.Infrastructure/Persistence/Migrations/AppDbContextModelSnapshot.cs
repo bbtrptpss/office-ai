@@ -1173,6 +1173,59 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                     b.ToTable("ChatChannels", (string)null);
                 });
 
+            modelBuilder.Entity("OfficeAI.Domain.Communication.ChatCommand", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChannelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TriggerMessageId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("RunId");
+
+                    b.HasIndex("TriggerMessageId", "EmployeeId")
+                        .IsUnique();
+
+                    b.ToTable("ChatCommands", (string)null);
+                });
+
             modelBuilder.Entity("OfficeAI.Domain.Communication.ChatMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3440,6 +3493,21 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade);
+                });
+
+            modelBuilder.Entity("OfficeAI.Domain.Communication.ChatCommand", b =>
+                {
+                    b.HasOne("OfficeAI.Domain.Communication.ChatChannel", null)
+                        .WithMany()
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OfficeAI.Domain.Organization.EmployeeProfile", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("OfficeAI.Domain.Communication.ChatMessage", b =>

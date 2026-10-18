@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.8.0",
+    date: "2026-10-18",
+    title: { th: "สั่งงาน AI จากแชทด้วย /run", en: "Give AI work from chat with /run" },
+    changes: [
+      { type: "added", th: "พิมพ์ “@พนักงาน AI /run สิ่งที่ต้องการ” ในห้องแชทของโปรเจกต์ ระบบสร้างงานในโปรเจกต์ มอบหมายให้ AI และเริ่มทำจริงทันที (ใช้ /ทำ ก็ได้)", en: "Write “@AI employee /run what to do” in a project channel: a task is created in the project, assigned to the AI and started right away (/ทำ works too)" },
+      { type: "added", th: "AI แจ้งในแชทเมื่อรับงาน และเมื่อเสร็จจะสรุปผล ผลงาน และค่าใช้จ่ายกลับมาในห้องเดิม", en: "The AI confirms in chat when it starts and, when done, posts the outcome, deliverables and cost in the same channel" },
+      { type: "security", th: "ใช้เครื่องมือ ขีดจำกัด งบ และการอนุมัติของคนเหมือนสั่งจากหน้างานทุกอย่าง สั่งได้เฉพาะคนที่มีสิทธิ์สร้างงาน มอบหมายงาน และสั่ง AI ทำงาน สั่งได้ทีละ 1 AI ต่อข้อความ และ AI สั่ง AI ไม่ได้", en: "Same tools, limits, budgets and human approvals as a run started from the task page; only people allowed to create and assign tasks and run AI can do it, one AI per message, never AI-to-AI" },
+    ],
+  },
+  {
     version: "0.7.12",
     date: "2026-10-18",
     title: { th: "ไอคอนเปิดระบบบน Desktop + เริ่มเองเมื่อเปิดเครื่อง", en: "Desktop icon + start on sign-in" },

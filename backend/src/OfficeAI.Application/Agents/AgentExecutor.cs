@@ -357,6 +357,14 @@ public sealed class AgentExecutor(
         await notifier.AgentRunChangedAsync(run.Id, run.TaskId, run.ProjectId, status.ToString(), CancellationToken.None);
         await notifier.TaskChangedAsync(run.ProjectId, run.TaskId, CancellationToken.None);
         await notifier.OrganizationChangedAsync(CancellationToken.None);
+        try
+        {
+            await Communication.ChatCommandService.ReportRunFinishedAsync(db, notifier, clock, run);
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "Could not report run {RunId} in chat", run.Id);
+        }
     }
 
     private async Task StepAsync(AgentRun run, RunStepKind kind, string content, string? toolCallId = null)
