@@ -60,6 +60,8 @@ public static class AgentDefaults
         ["PM"] = [Delivery.AddRequirementTool.ToolId],
         ["CTO"] = [Delivery.ProposeDecisionTool.ToolId],
         ["ARCH"] = [Delivery.ProposeDecisionTool.ToolId],
+        // Corporate Operations has no head position; its operations lead plans the department's objectives.
+        ["OPERATIONS"] = [Workflows.PlanSubmitTool.ToolId],
     };
 
     private static readonly HashSet<string> Engineers = new(StringComparer.OrdinalIgnoreCase) { "ARCH", "BACKEND", "FRONTEND", "MOBILE", "DBENG", "DEVOPS", "INTEG" };

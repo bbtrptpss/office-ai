@@ -48,11 +48,12 @@ export function OrderDialog({ target, onClose }: { target: OrderTarget | null; o
   const members = target?.kind === "department" ? target.members : [];
   const aiMembers = members.filter((m) => m.kind === "AI");
   const head = target?.kind === "department" ? departmentHead(members) : undefined;
-  const plannerId = assigneeId && aiMembers.some((m) => m.id === assigneeId) ? assigneeId : (head?.kind === "AI" ? head.id : aiMembers[0]?.id ?? "");
+  // "" = automatic: the server picks the department's most senior AI employee who may plan.
+  const plannerId = assigneeId && aiMembers.some((m) => m.id === assigneeId) ? assigneeId : "";
   const person = target?.kind === "person" ? target.employee : members.find((m) => m.id === (assigneeId || head?.id));
   const planning = target?.kind === "department" && mode === "plan";
   const project = projectId || projects?.[0]?.id || "";
-  const allowed = planning ? canPlan && !!plannerId : canTask;
+  const allowed = planning ? canPlan && aiMembers.length > 0 : canTask;
 
   const close = () => {
     setText(""); setResult(null); setAssigneeId(""); setMode("plan"); setBusy(false);
@@ -64,7 +65,9 @@ export function OrderDialog({ target, onClose }: { target: OrderTarget | null; o
     setResult(null);
     try {
       if (planning) {
-        await api.post(`/api/projects/${project}/objectives`, { objective: text.trim(), plannerEmployeeId: plannerId, departmentId: target?.kind === "department" ? target.id : undefined });
+        await api.post(`/api/projects/${project}/objectives`, {
+          objective: text.trim(), plannerEmployeeId: plannerId || undefined, departmentId: target?.kind === "department" ? target.id : undefined,
+        });
         setResult({ ok: true, text: t.orderPlanned, projectId: project, approvals: true });
       } else if (person) {
         const lines = text.trim().split("\n");
@@ -109,7 +112,9 @@ export function OrderDialog({ target, onClose }: { target: OrderTarget | null; o
             </RadioGroup>
           )}
           {target.kind === "department" && (
-            <TextField select label={planning ? t.orderPlanner : t.orderAssignee} value={planning ? plannerId : person?.id ?? ""} onChange={(e) => setAssigneeId(e.target.value)}>
+            <TextField select label={planning ? t.orderPlanner : t.orderAssignee} value={planning ? plannerId : person?.id ?? ""} onChange={(e) => setAssigneeId(e.target.value)}
+              slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}>
+              {planning && <MenuItem value="">{t.orderPlannerAuto}</MenuItem>}
               {(planning ? aiMembers : members).map((m) => (
                 <MenuItem key={m.id} value={m.id}>{m.displayName}{m.id === head?.id ? ` · ${t.orderHead}` : ""} — {label(m.status)}</MenuItem>
               ))}

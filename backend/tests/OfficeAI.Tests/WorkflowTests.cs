@@ -189,6 +189,46 @@ public class WorkflowTests(ApiFixture fx)
         }
     }
 
+    [Fact]
+    public async Task Operations_plans_its_own_objectives_and_executives_do_their_departments_work()
+    {
+        var (ceo, project) = await ProjectAsync();
+        var ops = await NewAgentAsync(ceo, "OPERATIONS");
+        var coo = await NewAgentAsync(ceo, "COO");
+        var cto = await NewAgentAsync(ceo, "CTO");
+        var developer = await NewAgentAsync(ceo, "BACKEND");
+        Assert.Equal(coo.DepartmentId, cto.DepartmentId);
+        await OnlyTheseAgentsAsync(ops.Id, coo.Id, cto.Id, developer.Id);
+
+        // Operations has only staff positions; its operations lead may still plan, so "automatic" finds a planner.
+        var opsObjective = await ceo.PostAsync<WorkflowDto>($"/api/projects/{project.Id}/objectives",
+            new { objective = "Tidy up the supplier list", departmentId = ops.DepartmentId });
+        await using (var scope = fx.Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var planner = await db.Employees.AsNoTracking().Include(e => e.RoleDefinition).SingleAsync(e => e.Id == opsObjective.PlannerEmployeeId);
+            Assert.Equal("OPERATIONS", planner.RoleDefinition!.Code);
+        }
+        (await ceo.PostAsJsonAsync($"/api/workflows/{opsObjective.Id}/cancel", new { })).EnsureSuccessStatusCode();
+
+        // The executive team's own objective is done by executives (normally they are never assigned work).
+        var workflow = await ceo.PostAsync<WorkflowDto>($"/api/projects/{project.Id}/objectives",
+            new { objective = "Build a meeting-room booking API", plannerEmployeeId = coo.Id, departmentId = coo.DepartmentId });
+        for (var round = 0; round < 40; round++)
+        {
+            await TickAsync();
+            await WaitForIdleAsync();
+            foreach (var a in await PendingAsync(ceo, workflow.Id)) await ApproveAsync(ceo, a);
+            workflow = await ceo.GetAsync<WorkflowDto>($"/api/workflows/{workflow.Id}");
+            if (workflow.Status is not (WorkflowStatus.Executing or WorkflowStatus.Planning or WorkflowStatus.AwaitingPlanApproval)) break;
+        }
+        Assert.Equal(WorkflowStatus.Completed, workflow.Status);
+        var tasks = await ceo.GetAsync<List<TaskDto>>($"/api/projects/{project.Id}/tasks");
+        var done = tasks.Where(t => t.Status == WorkTaskStatus.Done && t.Assignees.Count > 0 && !t.Title.StartsWith("Plan:")).ToList();
+        Assert.NotEmpty(done);
+        Assert.All(done, t => Assert.All(t.Assignees, a => Assert.Contains(a.EmployeeId, new[] { coo.Id, cto.Id })));
+    }
+
     // ---------------- approvals ----------------
 
     [Fact]

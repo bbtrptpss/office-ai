@@ -11,7 +11,8 @@ public sealed record AgentChoice(Guid EmployeeId, string DisplayName, string Rea
 
 /// <summary>
 /// Picks an AI employee for a task: must be able to run (enabled, provider configured, budget left), then
-/// best skill match, then lightest workload, then name for a stable tie-break. Executives are not assigned work.
+/// best skill match, then lightest workload, then name for a stable tie-break. Executives are not assigned work,
+/// except on an objective given to their own department (the executive team's own work).
 /// </summary>
 public sealed class AgentSelector(IAppDbContext db, AiProviderRegistry providers, TimeProvider clock)
 {
@@ -49,7 +50,7 @@ public sealed class AgentSelector(IAppDbContext db, AiProviderRegistry providers
             : $"{task.Title} {task.Description}".ToLowerInvariant().Split([' ', ',', '.', '/', '(', ')'], StringSplitOptions.RemoveEmptyEntries).Where(w => w.Length > 2).Distinct().ToList();
 
         var best = (await CandidatesAsync(departmentId, ct))
-            .Where(c => c.Level != OrgLevel.Executive)
+            .Where(c => departmentId != null || c.Level != OrgLevel.Executive)
             .Select(c => new { c, score = SkillScore(c, wanted) })
             .OrderByDescending(x => x.score).ThenBy(x => x.c.OpenTasks).ThenBy(x => x.c.Name, StringComparer.Ordinal)
             .FirstOrDefault();
@@ -60,7 +61,7 @@ public sealed class AgentSelector(IAppDbContext db, AiProviderRegistry providers
     /// <summary>A reviewer is never the assignee; QA specialists first, then a senior colleague from the same department.</summary>
     public async Task<AgentChoice?> ChooseReviewerAsync(WorkTask task, IReadOnlyCollection<Guid> assignees, Guid? departmentId, CancellationToken ct)
     {
-        var candidates = (await CandidatesAsync(departmentId, ct)).Where(c => !assignees.Contains(c.Id) && c.Level != OrgLevel.Executive).ToList();
+        var candidates = (await CandidatesAsync(departmentId, ct)).Where(c => !assignees.Contains(c.Id) && (departmentId != null || c.Level != OrgLevel.Executive)).ToList();
         var assigneeDept = await db.Employees.AsNoTracking().Where(e => assignees.Contains(e.Id)).Select(e => (Guid?)e.DepartmentId).FirstOrDefaultAsync(ct);
 
         var best = candidates

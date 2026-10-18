@@ -109,12 +109,25 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
             [OfficeAI.Application.Knowledge.SearchKnowledgeTool.ToolId, OfficeAI.Application.Knowledge.ProposeKnowledgeTool.ToolId, OfficeAI.Application.Knowledge.WriteDocumentTool.ToolId], now, ct);
         await GrantNewToolsOnceAsync("phase7-tool-grants",
             [.. AgentDefaults.CommsTools, OfficeAI.Application.Communication.DraftMinutesTool.ToolId, OfficeAI.Application.Communication.DraftAnnouncementTool.ToolId], now, ct);
+        await GrantRoleToolOnceAsync("v0.10.4-operations-planner", "OPERATIONS", PlanSubmitTool.ToolId, now, ct);
 
         if (!await db.ChatChannels.AnyAsync(c => c.Kind == ChannelKind.Company && c.Name == ChatService.GeneralChannel, ct))
         {
             db.ChatChannels.Add(new ChatChannel { Kind = ChannelKind.Company, Name = ChatService.GeneralChannel, Description = "Company-wide conversation" });
             await db.SaveChangesAsync(ct);
         }
+    }
+
+    /// <summary>Gives one tool to the existing AI employees of one position (once; other positions and later changes by people are untouched).</summary>
+    private async Task GrantRoleToolOnceAsync(string marker, string roleCode, string tool, DateTimeOffset now, CancellationToken ct)
+    {
+        if (await db.SeedMarkers.AnyAsync(m => m.Key == marker, ct)) return;
+        var ids = await db.AgentConfigurations.Join(db.Employees, c => c.EmployeeId, e => e.Id, (c, e) => new { e.Id, e.RoleDefinition!.Code })
+            .Where(e => e.Code == roleCode).Select(e => e.Id).ToListAsync(ct);
+        var has = await db.AgentToolPermissions.Where(p => p.ToolId == tool && ids.Contains(p.EmployeeId)).Select(p => p.EmployeeId).ToListAsync(ct);
+        foreach (var id in ids.Except(has)) db.AgentToolPermissions.Add(new AgentToolPermission { EmployeeId = id, ToolId = tool, GrantedAt = now });
+        db.SeedMarkers.Add(new SeedMarker { Key = marker, AppliedAt = now });
+        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>Gives existing AI employees the default grants of tools introduced in a release (once; later changes by people are kept).</summary>

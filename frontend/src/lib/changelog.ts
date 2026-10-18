@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.10.4",
+    date: "2026-10-19",
+    title: { th: "ทุกแผนกสั่งงานแบบวางแผนได้", en: "Every department can take planned work" },
+    changes: [
+      { type: "added", th: "ฝ่ายปฏิบัติการองค์กร: Operations AI ได้สิทธิ์วางแผนงานของแผนก (แผนกนี้ไม่มีตำแหน่งหัวหน้า)", en: "Corporate Operations: Operations AI may now plan the department's objectives (the department has no head position)" },
+      { type: "changed", th: "ฝ่ายบริหาร: เมื่อสั่งงานให้ฝ่ายบริหารโดยตรง ผู้บริหาร AI (COO, CTO, CFO, HR) รับงานและตรวจงานเองได้ — งานอื่นยังไม่มอบให้ผู้บริหารเหมือนเดิม", en: "Executive team: on objectives given to the executive department itself, the AI executives do and review the work — other work still never goes to executives" },
+      { type: "changed", th: "เมนูสั่งงานแผนกมีตัวเลือกผู้วางแผน “อัตโนมัติ” ระบบเลือกหัวหน้าที่มีสิทธิ์วางแผนให้เอง", en: "The department order menu has an “Automatic” planner: the system picks the head who may plan" },
+    ],
+  },
+  {
     version: "0.10.3",
     date: "2026-10-18",
     title: { th: "งานของแผนกใช้เฉพาะคนในแผนก", en: "Department work stays in the department" },
