@@ -18,10 +18,22 @@
 | `POSTGRES_PASSWORD` | รหัสผ่านฐานข้อมูล (สุ่มยาวอย่างน้อย 32 ตัวอักษร) |
 | `CEO_EMAIL`, `CEO_PASSWORD` | บัญชี CEO ที่สร้างตอนเริ่มครั้งแรกเท่านั้น — เปลี่ยนรหัสผ่านหลังเข้าสู่ระบบครั้งแรก |
 | `SANDBOX_RUNNER_TOKEN` | รหัสลับระหว่าง API กับ sandbox runner (สุ่มยาว) |
+| `DATAPROTECTION_CERT_PASSWORD` | รหัสผ่านของ certificate ที่เข้ารหัสกุญแจ cookie (ดูด้านล่าง) |
 | `ANTHROPIC_API_KEY` | (ไม่บังคับ) เปิดใช้ Claude; ไม่ใส่ = ปิด AI จริง |
+| `GIT_REMOTE_GITHUB`, `GIT_REMOTE_GITLAB` | (ไม่บังคับ) token สำหรับส่งโค้ดที่อนุมัติแล้วขึ้น GitHub / GitLab — ใช้ token ที่จำกัดสิทธิ์เฉพาะ repository นั้น (contents: write) แล้วตั้งชื่อตัวแปรที่หน้า repository ของโปรเจกต์ |
+| `OPENAI_API_KEY`, `GEMINI_API_KEY` | (ไม่บังคับ) เปิดใช้ OpenAI / Google Gemini — จากนั้นเพิ่มโมเดลและราคาที่หน้า “ตั้งค่า AI” ก่อนกำหนดให้พนักงาน AI |
 | `INTEGRATION_*` | (ไม่บังคับ) URL ของ webhook เช่น `INTEGRATION_SLACK_URL=https://hooks.slack.com/...` |
 
 สร้างค่าสุ่มได้ด้วย `openssl rand -base64 36`
+
+จากนั้นสร้าง certificate สำหรับเข้ารหัสกุญแจ cookie (ทำครั้งเดียว ต้องมี `openssl`):
+
+```bash
+set -a; . ./.env; set +a
+scripts/new-dataprotection-cert.sh        # เขียนไฟล์ secrets/dataprotection.pfx
+```
+
+เก็บไฟล์ `.pfx` และรหัสผ่านไว้กับชุดสำรองข้อมูลด้วย ถ้าหาย กุญแจที่เข้ารหัสไว้จะอ่านไม่ได้ (ทุกคนถูก sign out แต่ข้อมูลอื่นไม่เสียหาย)
 
 > secret ทุกตัวอยู่ใน `.env` หรือ secret manager ของเครื่องเท่านั้น ไม่เก็บในฐานข้อมูล ตั้งสิทธิ์ไฟล์ด้วย `chmod 600 .env`
 
@@ -82,5 +94,5 @@ migration รันอัตโนมัติตอน API เริ่ม แ�
 
 - `sandbox-runner` เป็น service เดียวที่ต่อกับ Docker socket ซึ่งมีสิทธิ์เทียบเท่า root ของเครื่อง จึงไม่เปิดพอร์ตออกนอกเครือข่ายภายใน รับเฉพาะคำขอที่มี `SANDBOX_RUNNER_TOKEN` และรันได้เฉพาะ image ที่อยู่ใน allow-list
 - ถ้าต้องการแยกขาดยิ่งขึ้น ให้ย้าย runner ไปเครื่องแยก หรือใช้ rootless Docker / gVisor (`--runtime runsc`)
-- กุญแจเข้ารหัส cookie (DataProtection) เก็บในฐานข้อมูลแบบไม่เข้ารหัส ถ้าต้องการเข้ารหัส ให้ตั้ง certificate ผ่าน `ProtectKeysWithCertificate` (ยังไม่ได้ตั้งไว้)
+- กุญแจเข้ารหัส cookie (DataProtection) ถูกเข้ารหัสด้วย certificate ก่อนเก็บลงฐานข้อมูล การเปลี่ยน certificate: สร้างไฟล์ใหม่ ย้ายไฟล์เดิมไปไว้ข้างกัน แล้วตั้ง `DataProtection__PreviousCertificatePaths__0=<path ไฟล์เดิม>` ให้ service `api` เพื่อให้อ่านกุญแจเก่าได้จนหมดอายุ (90 วัน)
 - เซิร์ฟเวอร์ตัวเดียวรองรับ workflow engine ได้หลาย instance เพราะใช้ PostgreSQL advisory lock แต่คิวงาน AI อยู่ในหน่วยความจำของแต่ละ instance จึงแนะนำให้รัน API instance เดียว

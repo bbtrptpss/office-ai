@@ -90,8 +90,13 @@ public sealed class AgentRunWorker(AgentRunQueue queue, IServiceScopeFactory sco
         }
     }
 
-    /// <summary>A run that was Running when the process stopped cannot be resumed mid-call: mark it failed. Queued runs are re-queued.</summary>
-    private async Task RecoverAsync(CancellationToken ct)
+    public const int MaxResumes = 2;
+
+    /// <summary>
+    /// A run that was Running when the process stopped continues from its last checkpoint (at most <see cref="MaxResumes"/> times;
+    /// only the model call in flight is repeated). Runs without a checkpoint are marked failed. Queued runs are re-queued.
+    /// </summary>
+    public async Task RecoverAsync(CancellationToken ct)
     {
         try
         {
@@ -100,11 +105,27 @@ public sealed class AgentRunWorker(AgentRunQueue queue, IServiceScopeFactory sco
             using var acting = ActingAs.Use(new ActingIdentity(null, "System", IsAgent: false, "recovery"));
 
             var interrupted = await db.AgentRuns.Where(r => r.Status == AgentRunStatus.Running).ToListAsync(ct);
+            var resumed = 0;
             foreach (var run in interrupted)
             {
+                var step = (await db.AgentRunSteps.Where(s => s.RunId == run.Id).MaxAsync(s => (int?)s.Sequence, ct) ?? 0) + 1;
+                if (run.ConversationJson is not null && run.ResumeCount < MaxResumes && !run.CancelRequested)
+                {
+                    run.Status = AgentRunStatus.Queued;
+                    run.ResumeCount++;
+                    db.AgentRunSteps.Add(new AgentRunStep
+                    {
+                        RunId = run.Id, Sequence = step, Kind = RunStepKind.Notice, CreatedAt = DateTimeOffset.UtcNow,
+                        Content = $"The server restarted during this run; it continues from the last saved step (resume {run.ResumeCount} of {MaxResumes}).",
+                    });
+                    resumed++;
+                    continue;
+                }
                 run.Status = AgentRunStatus.Failed;
                 run.StopReason = "interrupted";
-                run.Error = "The server restarted while this run was in progress. Start a new run.";
+                run.Error = run.ConversationJson is null
+                    ? "The server restarted while this run was in progress. Start a new run."
+                    : $"The server restarted during this run more than {MaxResumes} times. Start a new run.";
                 run.FinishedAt = DateTimeOffset.UtcNow;
                 var employee = await db.Employees.FirstAsync(e => e.Id == run.EmployeeId, ct);
                 if (employee.Status == EmployeeStatus.Working) employee.Status = EmployeeStatus.Available;
@@ -113,7 +134,7 @@ public sealed class AgentRunWorker(AgentRunQueue queue, IServiceScopeFactory sco
 
             foreach (var id in await db.AgentRuns.Where(r => r.Status == AgentRunStatus.Queued).OrderBy(r => r.CreatedAt).Select(r => r.Id).ToListAsync(ct))
                 await queue.EnqueueAsync(id, ct);
-            if (interrupted.Count > 0) log.LogWarning("Marked {Count} interrupted agent runs as failed", interrupted.Count);
+            if (interrupted.Count > 0) log.LogWarning("Interrupted agent runs: {Resumed} resumed, {Failed} marked failed", resumed, interrupted.Count - resumed);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

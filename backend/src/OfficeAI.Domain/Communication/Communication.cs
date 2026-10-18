@@ -31,6 +31,9 @@ public class ChatMessage : Entity
     public bool IsSimulated { get; set; }
     public required string Body { get; set; }
 
+    /// <summary>Employees @mentioned in the message (picked in the composer, checked by the server).</summary>
+    public List<Guid> MentionedEmployeeIds { get; set; } = [];
+
     /// <summary>Set when an AI employee posted it during a run.</summary>
     public Guid? RunId { get; set; }
 
@@ -160,4 +163,33 @@ public class MeetingActionItem : Entity, IAuditable
     public DateOnly? DueDate { get; set; }
     public bool IsDone { get; set; }
     public Guid? TaskId { get; set; }
+}
+
+/// <summary>Someone added to a project by hand. Owners and task assignees are members without a row here.</summary>
+public class ProjectMember : Entity, IAuditable
+{
+    public Guid ProjectId { get; set; }
+    public Guid EmployeeId { get; set; }
+}
+
+public static class NotificationKinds
+{
+    public const string Mention = "mention";
+    public const string MeetingInvite = "meeting_invite";
+    public const string ActionItem = "action_item";
+}
+
+/// <summary>A personal notification shown under the bell. Only ever for people (AI employees are never notified).</summary>
+public class Notification
+{
+    public long Id { get; set; }
+    public Guid UserId { get; set; }
+    public required string Kind { get; set; }
+    public required string Title { get; set; }
+    public string? Body { get; set; }
+
+    /// <summary>App path to open, e.g. "/chat?channel=…".</summary>
+    public string? Link { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? ReadAt { get; set; }
 }

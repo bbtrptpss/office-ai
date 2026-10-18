@@ -102,6 +102,12 @@ public class AgentRun : Entity
     public string? Error { get; set; }
     public bool CancelRequested { get; set; }
 
+    /// <summary>The conversation so far, saved after every model answer and every round of tool results, so a restart can resume the run.</summary>
+    public string? ConversationJson { get; set; }
+
+    /// <summary>How many times this run was resumed after the server stopped mid-run.</summary>
+    public int ResumeCount { get; set; }
+
     public bool IsActive => Status is AgentRunStatus.Queued or AgentRunStatus.Running;
 }
 

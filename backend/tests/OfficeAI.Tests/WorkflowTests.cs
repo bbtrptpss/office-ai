@@ -308,7 +308,23 @@ public class WorkflowTests(ApiFixture fx)
         workflow = await ceo.GetAsync<WorkflowDto>($"/api/workflows/{workflow.Id}");
         Assert.Equal(1m, workflow.SpentUsd); // exactly one run before the cap
         var pending = await PendingAsync(ceo, workflow.Id);
-        Assert.Contains(pending, a => a.Kind == ApprovalKind.Escalation && a.Title.StartsWith("Budget reached"));
+        var escalation = Assert.Single(pending, a => a.Kind == ApprovalKind.Escalation && a.Title.StartsWith("Budget reached"));
+
+        // The budget must stay above what is already spent.
+        var tooLow = await ceo.PostAsJsonAsync($"/api/approvals/{escalation.Id}/decision", new { approve = true, payloadHash = escalation.PayloadHash, newBudgetUsd = 1m });
+        Assert.Equal(HttpStatusCode.BadRequest, tooLow.StatusCode);
+
+        // Approving raises the budget: one more run happens, then the new limit asks again.
+        await ceo.PostAsync<ApprovalDto>($"/api/approvals/{escalation.Id}/decision", new { approve = true, payloadHash = escalation.PayloadHash, newBudgetUsd = 2m });
+        Assert.Equal(2m, (await ceo.GetAsync<WorkflowDto>($"/api/workflows/{workflow.Id}")).BudgetUsd);
+        for (var i = 0; i < 4; i++)
+        {
+            await TickAsync();
+            await WaitForIdleAsync();
+        }
+        workflow = await ceo.GetAsync<WorkflowDto>($"/api/workflows/{workflow.Id}");
+        Assert.Equal(2m, workflow.SpentUsd);
+        Assert.Single(await PendingAsync(ceo, workflow.Id), a => a.Kind == ApprovalKind.Escalation && a.Title.StartsWith("Budget reached"));
         await ceo.PostAsync<WorkflowDto>($"/api/workflows/{workflow.Id}/cancel", new { });
     }
 

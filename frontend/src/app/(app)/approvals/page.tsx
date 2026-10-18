@@ -66,12 +66,17 @@ function ApprovalCard({ approval: a, onDone }: { approval: Approval; onDone: () 
   const [message, setMessage] = useState<string | null>(null);
   const kindLabel = { Plan: t.kindPlan, TaskCompletion: t.kindTaskCompletion, ToolAction: t.kindToolAction, Escalation: t.kindEscalation, Estimate: t.kindEstimate, Merge: t.kindMerge }[a.kind];
   const allowed = can(a.requiredPermission);
+  // A workflow-level escalation (no task) is the budget cap: approving raises the budget.
+  const budgetEscalation = a.kind === "Escalation" && !a.taskId && !!a.workflowExecutionId;
+  const [newBudget, setNewBudget] = useState(() => {
+    try { return String((JSON.parse(a.payloadJson).budget ?? 0) * 2); } catch { return ""; }
+  });
 
   async function decide(approve: boolean) {
     setBusy(true);
     setMessage(null);
     try {
-      await api.post(`/api/approvals/${a.id}/decision`, { approve, payloadHash: a.payloadHash, note: note || null });
+      await api.post(`/api/approvals/${a.id}/decision`, { approve, payloadHash: a.payloadHash, note: note || null, newBudgetUsd: budgetEscalation && newBudget ? Number(newBudget) : null });
       onDone();
     } catch (e) {
       setMessage(errorMessage(e));
@@ -110,10 +115,16 @@ function ApprovalCard({ approval: a, onDone }: { approval: Approval; onDone: () 
             {a.details && <Typography variant="body2" sx={{ mb: 2, whiteSpace: "pre-wrap" }}>{a.details}</Typography>}
             <Payload approval={a} />
             {a.decisionNote && <Alert severity="info" sx={{ mt: 2 }}>{a.decisionNote}</Alert>}
-            {a.kind === "Escalation" && a.status === "Pending" && <Typography variant="caption" color="text.secondary">{t.escalationHint}</Typography>}
+            {a.kind === "Escalation" && a.status === "Pending" && (
+              <Typography variant="caption" color="text.secondary">{budgetEscalation ? t.budgetEscalationHint : t.escalationHint}</Typography>
+            )}
             {message && <Alert severity="warning" sx={{ mt: 2 }}>{message}</Alert>}
             {a.status === "Pending" && (
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 2, alignItems: { sm: "center" } }}>
+                {budgetEscalation && (
+                  <TextField size="small" type="number" label={t.newBudgetUsd} value={newBudget} onChange={(e) => setNewBudget(e.target.value)}
+                    sx={{ width: 170 }} disabled={!allowed} slotProps={{ htmlInput: { min: 0, step: 1 } }} />
+                )}
                 <TextField size="small" label={t.note} value={note} onChange={(e) => setNote(e.target.value)} sx={{ flex: 1 }} disabled={!allowed} />
                 <Button color="error" variant="outlined" disabled={busy || !allowed} onClick={() => decide(false)}>{t.reject}</Button>
                 <Button variant="contained" disabled={busy || !allowed} onClick={() => decide(true)}>{t.approve}</Button>

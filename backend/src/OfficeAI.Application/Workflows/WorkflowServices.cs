@@ -14,7 +14,8 @@ public record ApprovalDto(Guid Id, ApprovalKind Kind, ApprovalStatus Status, str
     Guid? ProjectId, Guid? TaskId, Guid? WorkflowExecutionId, Guid? RunId, Guid? RequestedByEmployeeId, string? RequestedByName,
     DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, Guid? DecidedByUserId, DateTimeOffset? DecidedAt, string? DecisionNote,
     bool IsSimulated, string RequiredPermission);
-public record DecideApprovalRequest(bool Approve, string PayloadHash, string? Note);
+/// <param name="NewBudgetUsd">Only for a workflow budget escalation: the new workflow budget. Defaults to twice the current one.</param>
+public record DecideApprovalRequest(bool Approve, string PayloadHash, string? Note, decimal? NewBudgetUsd = null);
 
 public record StartObjectiveRequest(string Objective, Guid? PlannerEmployeeId = null, decimal? BudgetUsd = null, int? MaxParallelRuns = null);
 public record WorkflowDto(Guid Id, Guid ProjectId, string Objective, WorkflowStatus Status, Guid PlannerEmployeeId, string PlannerName,
@@ -91,7 +92,7 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
                 await ApplyCompletionDecisionAsync(approval, req.Approve, now, ct);
                 break;
             case ApprovalKind.Escalation:
-                await ApplyEscalationDecisionAsync(approval, req.Approve, now, ct);
+                await ApplyEscalationDecisionAsync(approval, req, now, ct);
                 break;
             case ApprovalKind.Estimate:
                 await ApplyEstimateDecisionAsync(approval, req.Approve, ct);
@@ -165,9 +166,14 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
             Approvals.Event(db, wf, task.Id, approve ? "task_done" : "task_rejected", approve ? $"'{task.Title}' approved as done." : $"'{task.Title}' sent back for changes.", now);
     }
 
-    private async Task ApplyEscalationDecisionAsync(ApprovalRequest approval, bool approve, DateTimeOffset now, CancellationToken ct)
+    private async Task ApplyEscalationDecisionAsync(ApprovalRequest approval, DecideApprovalRequest req, DateTimeOffset now, CancellationToken ct)
     {
-        if (approval.TaskId is not { } taskId) return;
+        var approve = req.Approve;
+        if (approval.TaskId is not { } taskId)
+        {
+            if (approval.WorkflowExecutionId is { } workflowId) await ApplyBudgetDecisionAsync(workflowId, req, now, ct);
+            return;
+        }
         var task = await db.Tasks.FirstAsync(t => t.Id == taskId, ct);
         if (approve)
         {
@@ -181,6 +187,24 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
         }
         if (task.WorkflowExecutionId is { } wf)
             Approvals.Event(db, wf, task.Id, approve ? "escalation_retry" : "escalation_cancel", approve ? $"'{task.Title}' will be retried." : $"'{task.Title}' was cancelled.", now);
+    }
+
+    /// <summary>A workflow hit its budget. Approving raises it (new runs start again); rejecting keeps it, so the workflow stays paused.</summary>
+    private async Task ApplyBudgetDecisionAsync(Guid workflowId, DecideApprovalRequest req, DateTimeOffset now, CancellationToken ct)
+    {
+        var w = await db.WorkflowExecutions.FirstAsync(x => x.Id == workflowId, ct);
+        if (!req.Approve)
+        {
+            Approvals.Event(db, w.Id, null, "budget_kept", $"Budget kept at {w.BudgetUsd} USD; no new runs start.", now);
+            return;
+        }
+        var spent = await WorkflowEngine.SpentAsync(db, w.Id, ct);
+        var next = req.NewBudgetUsd ?? w.BudgetUsd * 2;
+        if (next <= spent) throw new DomainException("validation", $"The new budget must be more than the {spent} USD already spent.");
+        if (next > 100_000m) throw new DomainException("validation", "The new budget is too large.");
+        var old = w.BudgetUsd;
+        w.BudgetUsd = next;
+        Approvals.Event(db, w.Id, null, "budget_raised", $"Budget raised from {old} to {next} USD.", now);
     }
 
     private async Task ApplyEstimateDecisionAsync(ApprovalRequest approval, bool approve, CancellationToken ct)
@@ -225,6 +249,12 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
             mr.Status = Domain.Code.MergeRequestStatus.Merged;
             mr.MergedSha = outcome.Sha;
             mr.MergedAt = now;
+            // Approved code goes to GitHub/GitLab too (best effort; failures are shown on the repository).
+            if (repo.RemoteUrl is not null && mr.TargetBranch == repo.DefaultBranch)
+            {
+                var tracked = await db.CodeRepositories.FirstAsync(r => r.Id == repo.Id, ct);
+                await Code.CodeService.PushDefaultBranchAsync(code, tracked, clock, ct);
+            }
         }
         else
         {

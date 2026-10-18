@@ -8,6 +8,8 @@
 
 ใส่ `ANTHROPIC_API_KEY` ใน `.env` แล้ว `docker compose up -d` จากนั้นเปลี่ยนพนักงาน AI ให้ใช้ provider `anthropic` ที่หน้าโปรไฟล์ ถ้ายังไม่ใส่ key ระบบมี provider **จำลอง** ไว้ทดลองทั้ง flow ผลงานจากตัวจำลองมีป้าย 🧪 และไม่นับเป็นงานจริง (ปิดได้ด้วย `SIMULATED_AI=false`)
 
+ใช้ OpenAI หรือ Google Gemini ได้ด้วย: ใส่ `OPENAI_API_KEY` / `GEMINI_API_KEY` ใน `.env` แล้วเพิ่มโมเดลพร้อมราคาต่อ 1M token ที่หน้า “ตั้งค่า AI” (ระบบไม่ใส่ราคาให้เอง เพื่อไม่ให้คำนวณค่าใช้จ่ายผิด)
+
 ## เริ่มใช้งาน
 
 ต้องมี Docker Desktop

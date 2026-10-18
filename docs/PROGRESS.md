@@ -124,11 +124,21 @@ Company chat, internal announcements, meeting agendas/minutes (Master Prompt §8
 
 Decisions taken without the CEO: new permissions `comms.post` (Member, Manager, AI agents) and `comms.manage` (CEO, Manager; human-only). Every signed-in person can read every channel (there is no per-project membership model yet). Chat messages are not written to the audit log row by row; they keep author, AI and simulated flags themselves. Only executives' AI employees may draft announcements; writers, heads and executives may draft minutes.
 
+## Phase 8 — Remaining planned work ✅ (merged to master)
+
+The planned items left open after Phase 7, each with its own commit and Update log entry (v0.7.2–v0.7.7).
+
+| Item | Status |
+| --- | --- |
+| Approving a budget escalation raises the workflow budget (default ×2, must exceed spend; asks again at the new limit) | done |
+| DataProtection keys encrypted at rest with a certificate (required in production; rotation supported; `scripts/new-dataprotection-cert.sh`) | done (verified in the Linux image) |
+| Project channel membership (owner, task assignees, people added by hand; managers see all), @mentions, notification bell (mentions, meeting invites, action items) | done (also fixed: editing meeting participants/agenda failed with 409) |
+| OpenAI and Google Gemini adapters over HTTP (tools, cached-token accounting, error mapping); disabled until a key is set; models/prices added in AI settings | done (adapter tests against a fake endpoint; no real call yet) |
+| GitHub / GitLab remotes: push the default branch after approved merges or on demand (never forced), import an existing repository; tokens only from `GIT_REMOTE_*`; `security.manage` chooses the destination | done (tested against local bare repositories) |
+| Interrupted AI runs resume from a checkpoint after a restart (max 2 resumes; tools are not repeated) | done |
+
+159 tests; `dotnet list package --vulnerable` and `npm audit` clean on 2026-10-18.
+
 ## Open items (not built yet)
 
-- Per-project channel membership (today every signed-in person can read all channels); mentions and notifications for chat.
-- OpenAI / Gemini adapters (waiting on which accounts exist); first real Claude run needs ANTHROPIC_API_KEY.
-- Remote Git hosting (GitHub/GitLab) behind the repository interface.
-- Encrypting DataProtection keys at rest (certificate).
-- A budget escalation does not raise a workflow budget by itself.
-- Durable mid-call resume of AI runs (interrupted runs are failed and retried by the engine).
+- First real run with any provider needs its key (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY); OpenAI/Gemini models and prices are added by the CEO in AI settings.

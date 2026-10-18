@@ -62,8 +62,9 @@ public sealed class AgentExecutor(
             return;
         }
 
+        var resuming = run.ConversationJson is not null;
         run.Status = AgentRunStatus.Running;
-        run.StartedAt = clock.GetUtcNow();
+        run.StartedAt ??= clock.GetUtcNow(); // a resumed run keeps its original start
         try
         {
             var tracked = await db.Tasks.FirstAsync(t => t.Id == run.TaskId, CancellationToken.None);
@@ -80,7 +81,9 @@ public sealed class AgentExecutor(
         await notifier.AgentRunChangedAsync(run.Id, run.TaskId, run.ProjectId, run.Status.ToString(), CancellationToken.None);
         await notifier.TaskChangedAsync(run.ProjectId, run.TaskId, CancellationToken.None);
 
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(config!.TimeoutSeconds));
+        // The time limit counts from the original start; a resumed run gets at least a short grace period to wrap up.
+        var remaining = TimeSpan.FromSeconds(config!.TimeoutSeconds) - (clock.GetUtcNow() - run.StartedAt!.Value);
+        using var timeout = new CancellationTokenSource(resuming && remaining < TimeSpan.FromSeconds(30) ? TimeSpan.FromSeconds(30) : remaining > TimeSpan.Zero ? remaining : TimeSpan.FromMilliseconds(1));
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancel, timeout.Token);
 
         try
@@ -113,16 +116,40 @@ public sealed class AgentExecutor(
         var toolDefs = available.Select(t => new AiToolDefinition(WireName(t.Descriptor.Id), t.Descriptor.Description, t.Descriptor.InputSchema)).ToList();
 
         var system = BuildSystemPrompt(employee, available.Select(t => t.Descriptor.Id).ToList(), run.Purpose);
-        var firstMessage = BuildTaskMessage(task, run.Purpose);
-        await StepAsync(run, RunStepKind.Instructions, system);
-        await StepAsync(run, RunStepKind.Input, firstMessage);
-
-        var messages = new List<AiMessage> { new(AiRole.User, [new AiText(firstMessage)]) };
+        List<AiMessage> messages;
+        if (run.ConversationJson is { } saved)
+        {
+            // Resuming after a restart: continue from the last checkpoint instead of starting over.
+            messages = ConversationCodec.Decode(saved);
+        }
+        else
+        {
+            var firstMessage = BuildTaskMessage(task, run.Purpose);
+            await StepAsync(run, RunStepKind.Instructions, system);
+            await StepAsync(run, RunStepKind.Input, firstMessage);
+            messages = [new(AiRole.User, [new AiText(firstMessage)])];
+            await CheckpointAsync(run, messages);
+        }
         var monthStart = new DateTimeOffset(clock.GetUtcNow().Year, clock.GetUtcNow().Month, 1, 0, 0, 0, TimeSpan.Zero);
         var spentBefore = await db.CostRecords.Where(c => c.EmployeeId == employee.Id && c.Kind == CostKind.Actual && c.OccurredAt >= monthStart && c.RunId != run.Id)
             .SumAsync(c => c.AmountUsd, ct);
 
-        for (var turn = 1; turn <= config.MaxTurnsPerRun; turn++)
+        // Stopped after the model asked for tools but before all results were recorded: finish those calls first.
+        // Tool executions are idempotent per (run, call), so a call that already ran returns its recorded result.
+        if (messages[^1] is { Role: AiRole.Assistant } pending && pending.Content.OfType<AiToolCall>().ToList() is { Count: > 0 } pendingCalls)
+        {
+            var (results, stopForLimit) = await RunToolsAsync(run, employee, task, config, pendingCalls, byName, ct);
+            messages.Add(new AiMessage(AiRole.User, results));
+            await CheckpointAsync(run, messages);
+            if (stopForLimit)
+                return (AgentRunStatus.LimitReached, "tool_calls", $"Tool call limit of {config.MaxToolCallsPerRun} reached.");
+        }
+        else if (messages[^1].Role == AiRole.Assistant)
+        {
+            return (AgentRunStatus.Succeeded, "end_turn", null); // the last answer was final; only the bookkeeping was lost
+        }
+
+        for (var turn = run.Turns + 1; turn <= config.MaxTurnsPerRun; turn++)
         {
             ct.ThrowIfCancellationRequested();
             if (await db.AgentRuns.AsNoTracking().AnyAsync(r => r.Id == run.Id && r.CancelRequested, ct))
@@ -138,6 +165,7 @@ public sealed class AgentExecutor(
             run.Turns = turn;
 
             messages.Add(new AiMessage(AiRole.Assistant, response.Content));
+            await CheckpointAsync(run, messages);
             foreach (var text in response.Content.OfType<AiText>().Where(t => !string.IsNullOrWhiteSpace(t.Text)))
                 await StepAsync(run, RunStepKind.AssistantText, text.Text);
 
@@ -151,22 +179,36 @@ public sealed class AgentExecutor(
                     : (AgentRunStatus.Succeeded, "end_turn", null);
             }
 
-            var results = new List<AiContent>();
-            var stopForLimit = false;
-            foreach (var call in calls)
-            {
-                await StepAsync(run, RunStepKind.ToolCall, $"{call.Name} {call.Input.GetRawText()}", call.Id);
-                var (content, isError, limit) = await ExecuteToolAsync(run, employee, task, config, call, byName, ct);
-                stopForLimit |= limit;
-                results.Add(new AiToolResult(call.Id, content, isError));
-                await StepAsync(run, RunStepKind.ToolResult, (isError ? "ERROR: " : "") + content, call.Id);
-            }
+            var (results, stopForLimit) = await RunToolsAsync(run, employee, task, config, calls, byName, ct);
             messages.Add(new AiMessage(AiRole.User, results));
+            await CheckpointAsync(run, messages);
             await notifier.AgentRunChangedAsync(run.Id, run.TaskId, run.ProjectId, run.Status.ToString(), CancellationToken.None);
             if (stopForLimit)
                 return (AgentRunStatus.LimitReached, "tool_calls", $"Tool call limit of {config.MaxToolCallsPerRun} reached.");
         }
         return (AgentRunStatus.LimitReached, "turns", $"Turn limit of {config.MaxTurnsPerRun} reached.");
+    }
+
+    private async Task<(List<AiContent> Results, bool StopForLimit)> RunToolsAsync(AgentRun run, EmployeeProfile employee, WorkTask task,
+        AgentConfiguration config, List<AiToolCall> calls, Dictionary<string, IAgentTool> byName, CancellationToken ct)
+    {
+        var results = new List<AiContent>();
+        var stopForLimit = false;
+        foreach (var call in calls)
+        {
+            await StepAsync(run, RunStepKind.ToolCall, $"{call.Name} {call.Input.GetRawText()}", call.Id);
+            var (content, isError, limit) = await ExecuteToolAsync(run, employee, task, config, call, byName, ct);
+            stopForLimit |= limit;
+            results.Add(new AiToolResult(call.Id, content, isError));
+            await StepAsync(run, RunStepKind.ToolResult, (isError ? "ERROR: " : "") + content, call.Id);
+        }
+        return (results, stopForLimit);
+    }
+
+    private async Task CheckpointAsync(AgentRun run, List<AiMessage> messages)
+    {
+        run.ConversationJson = ConversationCodec.Encode(messages);
+        await db.SaveChangesAsync(CancellationToken.None);
     }
 
     private async Task<(string Content, bool IsError, bool LimitReached)> ExecuteToolAsync(

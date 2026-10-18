@@ -31,6 +31,7 @@ internal class ChatMessageConfig : IEntityTypeConfiguration<ChatMessage>
         b.ToTable("ChatMessages");
         b.Property(m => m.AuthorName).HasMaxLength(200);
         b.Property(m => m.Body).HasMaxLength(4000);
+        b.Property(m => m.MentionedEmployeeIds).HasDefaultValueSql("'{}'::uuid[]");
         b.HasIndex(m => new { m.ChannelId, m.CreatedAt });
         b.HasOne<ChatChannel>().WithMany().HasForeignKey(m => m.ChannelId).OnDelete(DeleteBehavior.Cascade);
     }
@@ -124,5 +125,32 @@ internal class MeetingActionItemConfig : IEntityTypeConfiguration<MeetingActionI
         b.ToTable("MeetingActionItems");
         b.Property(a => a.Title).HasMaxLength(300);
         b.HasOne<WorkTask>().WithMany().HasForeignKey(a => a.TaskId).OnDelete(DeleteBehavior.SetNull);
+    }
+}
+
+internal class ProjectMemberConfig : IEntityTypeConfiguration<ProjectMember>
+{
+    public void Configure(EntityTypeBuilder<ProjectMember> b)
+    {
+        EntityConfig.Base(b);
+        b.ToTable("ProjectMembers");
+        b.HasIndex(m => new { m.ProjectId, m.EmployeeId }).IsUnique();
+        b.HasOne<Project>().WithMany().HasForeignKey(m => m.ProjectId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne<EmployeeProfile>().WithMany().HasForeignKey(m => m.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal class NotificationConfig : IEntityTypeConfiguration<Notification>
+{
+    public void Configure(EntityTypeBuilder<Notification> b)
+    {
+        b.ToTable("Notifications");
+        b.HasKey(n => n.Id);
+        b.Property(n => n.Id).UseIdentityAlwaysColumn();
+        b.Property(n => n.Kind).HasMaxLength(30);
+        b.Property(n => n.Title).HasMaxLength(300);
+        b.Property(n => n.Body).HasMaxLength(500);
+        b.Property(n => n.Link).HasMaxLength(300);
+        b.HasIndex(n => new { n.UserId, n.Id });
     }
 }

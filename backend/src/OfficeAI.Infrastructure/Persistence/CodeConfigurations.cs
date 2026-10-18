@@ -11,6 +11,10 @@ internal class CodeRepositoryConfig : IEntityTypeConfiguration<CodeRepository>
     {
         EntityConfig.Base(b);
         b.ToTable("CodeRepositories");
+        b.Property(r => r.RemoteUrl).HasMaxLength(500);
+        b.Property(r => r.RemoteTokenEnvVar).HasMaxLength(80);
+        b.Property(r => r.RemotePushedSha).HasMaxLength(64);
+        b.Property(r => r.RemoteError).HasMaxLength(2000);
         b.Property(r => r.Name).HasMaxLength(63);
         b.Property(r => r.DefaultBranch).HasMaxLength(63);
         b.Property(r => r.SandboxImage).HasMaxLength(200);

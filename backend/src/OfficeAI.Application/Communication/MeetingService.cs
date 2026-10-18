@@ -96,18 +96,25 @@ public class MeetingService(IAppDbContext db, ICurrentUser current, IRealtimeNot
         m.Location = req.Location?.Trim();
 
         // The agenda is replaced as a whole; participants are merged so recorded attendance survives an edit.
+        // New rows are added to their DbSet explicitly: their ids are generated client-side, so EF would otherwise
+        // take them for existing rows of an existing meeting and try to UPDATE them.
         db.MeetingAgendaItems.RemoveRange(m.AgendaItems);
         m.AgendaItems = agenda.Select((i, n) => new MeetingAgendaItem
         {
             MeetingId = m.Id, SortOrder = n + 1, Title = i.Title.Trim(), Notes = i.Notes?.Trim(), OwnerEmployeeId = i.OwnerEmployeeId, DurationMinutes = i.DurationMinutes,
         }).ToList();
+        db.MeetingAgendaItems.AddRange(m.AgendaItems);
         foreach (var gone in m.Participants.Where(p => !participants.Contains(p.EmployeeId)).ToList())
         {
             db.MeetingParticipants.Remove(gone);
             m.Participants.Remove(gone);
         }
         foreach (var e in participants.Where(e => m.Participants.All(p => p.EmployeeId != e)))
-            m.Participants.Add(new MeetingParticipant { MeetingId = m.Id, EmployeeId = e });
+        {
+            var participant = new MeetingParticipant { MeetingId = m.Id, EmployeeId = e };
+            db.MeetingParticipants.Add(participant);
+            m.Participants.Add(participant);
+        }
     }
 
     private Task<Guid?> MyEmployeeIdAsync(CancellationToken ct) =>
@@ -119,10 +126,17 @@ public class MeetingService(IAppDbContext db, ICurrentUser current, IRealtimeNot
         await ApplyAsync(m, req, ct);
         m.OrganizerEmployeeId = await MyEmployeeIdAsync(ct);
         db.Meetings.Add(m);
+        var invited = await InviteAsync(m, m.Participants.Select(p => p.EmployeeId), ct);
         await db.SaveChangesAsync(ct);
         await notifier.MeetingChangedAsync(m.Id, ct);
+        if (invited.Count > 0) await notifier.NotificationsChangedAsync(invited, ct);
         return await GetAsync(m.Id, ct);
     }
+
+    /// <summary>Notifies people newly invited to a meeting (never the person doing the inviting).</summary>
+    private Task<List<Guid>> InviteAsync(Meeting m, IEnumerable<Guid> employeeIds, CancellationToken ct) =>
+        NotificationService.AddForEmployeesAsync(db, employeeIds, current.UserId, NotificationKinds.MeetingInvite,
+            m.Title, $"{m.ScheduledAt:yyyy-MM-dd HH:mm} UTC · {m.DurationMinutes} min", $"/meetings/{m.Id}", clock.GetUtcNow(), ct);
 
     private async Task<Meeting> LoadAsync(Guid id, CancellationToken ct) =>
         await db.Meetings.Include(x => x.AgendaItems).Include(x => x.Participants).Include(x => x.ActionItems)
@@ -133,9 +147,12 @@ public class MeetingService(IAppDbContext db, ICurrentUser current, IRealtimeNot
         var m = await LoadAsync(id, ct);
         if (req.Version is { } v) db.ExpectVersion(m, v);
         if (m.Status == MeetingStatus.Cancelled) throw new DomainException("validation", "A cancelled meeting cannot be edited.");
+        var before = m.Participants.Select(p => p.EmployeeId).ToHashSet();
         await ApplyAsync(m, req, ct);
+        var invited = await InviteAsync(m, m.Participants.Select(p => p.EmployeeId).Where(e => !before.Contains(e)), ct);
         await db.SaveChangesAsync(ct);
         await notifier.MeetingChangedAsync(m.Id, ct);
+        if (invited.Count > 0) await notifier.NotificationsChangedAsync(invited, ct);
         return await GetAsync(m.Id, ct);
     }
 
@@ -234,11 +251,16 @@ public class MeetingService(IAppDbContext db, ICurrentUser current, IRealtimeNot
     public async Task<MeetingDto> AddActionItemAsync(Guid id, AddActionItemRequest req, CancellationToken ct)
     {
         Validate.Required(req.Title, "title");
-        if (!await db.Meetings.AnyAsync(x => x.Id == id, ct)) throw new NotFoundException("Meeting", id);
+        var meeting = await db.Meetings.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Meeting", id);
         if (req.OwnerEmployeeId is { } o && !await db.Employees.AnyAsync(e => e.Id == o, ct)) throw new NotFoundException("Employee", o);
         db.MeetingActionItems.Add(new MeetingActionItem { MeetingId = id, Title = req.Title.Trim(), OwnerEmployeeId = req.OwnerEmployeeId, DueDate = req.DueDate });
+        var notified = req.OwnerEmployeeId is { } owner
+            ? await NotificationService.AddForEmployeesAsync(db, [owner], current.UserId, NotificationKinds.ActionItem, req.Title.Trim(),
+                meeting.Title + (req.DueDate is { } d ? $" · {d:yyyy-MM-dd}" : ""), $"/meetings/{id}", clock.GetUtcNow(), ct)
+            : [];
         await db.SaveChangesAsync(ct);
         await notifier.MeetingChangedAsync(id, ct);
+        if (notified.Count > 0) await notifier.NotificationsChangedAsync(notified, ct);
         return await GetAsync(id, ct);
     }
 

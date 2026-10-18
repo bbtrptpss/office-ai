@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } f
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
-  Alert, Badge, Box, Button, Card, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, List, ListItemButton,
+  Alert, Autocomplete, Badge, Box, Button, Card, Chip, MenuItem, MenuList, Paper, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, List, ListItemButton,
   ListItemText, ListSubheader, Stack, TextField, Tooltip, Typography, useMediaQuery, useTheme,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -12,7 +12,8 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/DeleteOutline";
 import SendIcon from "@mui/icons-material/SendRounded";
 import InventoryIcon from "@mui/icons-material/Inventory2Outlined";
-import { api, ChannelKind, ChatChannel, ChatMessage } from "@/lib/api";
+import PeopleIcon from "@mui/icons-material/PeopleAltOutlined";
+import { api, ChannelKind, ChannelMember, ChatChannel, ChatMessage, Employee } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { emitLocal, useRealtime } from "@/lib/realtime";
@@ -131,10 +132,15 @@ function mergeById(a: ChatMessage[], b: ChatMessage[]) {
 
 function Conversation({ channel, canManage, onBack, onChanged }: { channel: ChatChannel; canManage: boolean; onBack?: () => void; onChanged: () => void }) {
   const { t, lang } = useI18n();
-  const { can } = useAuth();
+  const { can, me } = useAuth();
   const errorMessage = useErrorMessage();
   const reduce = useReducedMotion();
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
+  const { data: members, reload: reloadMembers } = useLoad(() => api.get<ChannelMember[]>(`/api/chat/channels/${channel.id}/members`), channel.id);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [mention, setMention] = useState<{ query: string; start: number; index: number } | null>(null);
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const input = useRef<HTMLTextAreaElement>(null);
   const [hasMore, setHasMore] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -205,16 +211,41 @@ function Conversation({ channel, canManage, onBack, onChanged }: { channel: Chat
     setSending(true);
     setProblem(null);
     try {
-      const m = await api.post<ChatMessage>(`${base}/messages`, { body });
+      // Only mentions whose "@Name" is still in the text are sent.
+      const mentionedEmployeeIds = Object.entries(picked).filter(([, name]) => body.includes(`@${name}`)).map(([id]) => id);
+      const m = await api.post<ChatMessage>(`${base}/messages`, { body, mentionedEmployeeIds });
       stickToBottom.current = true;
       setMessages((old) => mergeById(old ?? [], [m]));
       setDraft("");
+      setPicked({});
+      setMention(null);
       onChanged();
     } catch (e) { setProblem(errorMessage(e)); } finally { setSending(false); }
   }
 
   const fmt = new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
   const canPost = can("comms.post") && !channel.isArchived;
+  const names = new Map((members ?? []).map((x) => [x.employeeId, x.displayName]));
+  const suggestions = mention
+    ? (members ?? []).filter((x) => x.displayName.toLowerCase().includes(mention.query.toLowerCase())).slice(0, 6)
+    : [];
+
+  /** Opens the @ picker when the text right before the caret is "@something". */
+  function trackMention(text: string, caret: number) {
+    const m = /(^|\s)@([^\s@]{0,30})$/.exec(text.slice(0, caret));
+    setMention(m ? { query: m[2], start: caret - m[2].length - 1, index: 0 } : null);
+  }
+
+  function pick(member: ChannelMember) {
+    if (!mention) return;
+    const caret = mention.start + 1 + mention.query.length;
+    const next = `${draft.slice(0, mention.start)}@${member.displayName} ${draft.slice(caret)}`;
+    setDraft(next);
+    setPicked((p) => ({ ...p, [member.employeeId]: member.displayName }));
+    setMention(null);
+    const pos = mention.start + member.displayName.length + 2;
+    requestAnimationFrame(() => { input.current?.focus(); input.current?.setSelectionRange(pos, pos); });
+  }
 
   return (
     <Card sx={{ display: "flex", flexDirection: "column", height: { xs: "calc(100vh - 170px)", md: "100%" }, minHeight: 420 }}>
@@ -224,6 +255,11 @@ function Conversation({ channel, canManage, onBack, onChanged }: { channel: Chat
           <Typography fontWeight={700} noWrap># {channel.name}</Typography>
           {channel.description && <Typography variant="caption" color="text.secondary" noWrap component="div">{channel.description}</Typography>}
         </Box>
+        {channel.kind === "Project" && (
+          <Tooltip title={t.members}>
+            <IconButton onClick={() => setMembersOpen(true)}><Badge badgeContent={members?.length ?? 0} color="primary" max={99}><PeopleIcon /></Badge></IconButton>
+          </Tooltip>
+        )}
         {canManage && channel.kind !== "Project" && channel.kind !== "Department" && (
           <Tooltip title={channel.isArchived ? t.unarchive : t.archive}>
             <IconButton onClick={async () => {
@@ -267,7 +303,12 @@ function Conversation({ channel, canManage, onBack, onChanged }: { channel: Chat
                         {m.isDeleted ? (
                           <Typography variant="body2" color="text.disabled" fontStyle="italic">{t.messageDeleted}</Typography>
                         ) : (
-                          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{m.body}</Typography>
+                          <Typography variant="body2" sx={{
+                            whiteSpace: "pre-wrap", overflowWrap: "anywhere",
+                            ...(me?.employeeId && m.mentions.includes(me.employeeId) ? { bgcolor: "action.selected", borderRadius: 1, px: 0.75, mx: -0.75 } : {}),
+                          }}>
+                            <MentionText body={m.body ?? ""} names={m.mentions.map((id) => names.get(id)).filter((x): x is string => !!x)} />
+                          </Typography>
                         )}
                       </Box>
                       {m.canDelete && (
@@ -293,10 +334,43 @@ function Conversation({ channel, canManage, onBack, onChanged }: { channel: Chat
       {channel.isArchived ? (
         <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>{t.archivedChannel}</Typography>
       ) : canPost && (
-        <Stack direction="row" spacing={1} sx={{ p: 1.5, alignItems: "flex-end" }}>
-          <TextField fullWidth multiline maxRows={6} size="small" placeholder={t.messagePlaceholder} value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+        <Stack direction="row" spacing={1} sx={{ p: 1.5, alignItems: "flex-end", position: "relative" }}>
+          {suggestions.length > 0 && (
+            <Paper elevation={6} sx={{ position: "absolute", bottom: "100%", left: 12, mb: 0.5, minWidth: 240, zIndex: 2 }}>
+              <MenuList dense aria-label={t.mentionHint}>
+                {suggestions.map((x, i) => (
+                  <MenuItem key={x.employeeId} selected={i === mention!.index} onMouseDown={(e) => { e.preventDefault(); pick(x); }}>
+                    <Avatar kind={x.kind} seed={x.displayName} size={22} />
+                    <Box sx={{ ml: 1 }}>
+                      <Typography variant="body2">{x.displayName}</Typography>
+                      <Typography variant="caption" color="text.secondary">{x.jobTitle}</Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </MenuList>
+            </Paper>
+          )}
+          <TextField fullWidth multiline maxRows={6} size="small" placeholder={t.messagePlaceholder} value={draft} inputRef={input}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              trackMention(e.target.value, e.target.selectionStart ?? e.target.value.length);
+            }}
+            onBlur={() => setMention(null)}
             onKeyDown={(e) => {
+              if (suggestions.length > 0 && mention) {
+                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                  e.preventDefault();
+                  const step = e.key === "ArrowDown" ? 1 : -1;
+                  setMention({ ...mention, index: (mention.index + step + suggestions.length) % suggestions.length });
+                  return;
+                }
+                if ((e.key === "Enter" || e.key === "Tab") && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  pick(suggestions[mention.index] ?? suggestions[0]);
+                  return;
+                }
+                if (e.key === "Escape") { setMention(null); return; }
+              }
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 void send();
@@ -308,6 +382,71 @@ function Conversation({ channel, canManage, onBack, onChanged }: { channel: Chat
           </Badge>
         </Stack>
       )}
+      {membersOpen && members && (
+        <MembersDialog channel={channel} members={members} onClose={() => setMembersOpen(false)} onChanged={() => void reloadMembers()} />
+      )}
     </Card>
+  );
+}
+
+/** Message text with the @mentions of known people highlighted. */
+function MentionText({ body, names }: { body: string; names: string[] }) {
+  if (names.length === 0) return <>{body}</>;
+  const escaped = [...names].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const parts = body.split(new RegExp(`(@(?:${escaped.join("|")}))`, "g"));
+  return (
+    <>
+      {parts.map((part, i) => (part.startsWith("@") && names.includes(part.slice(1))
+        ? <Box key={i} component="span" sx={{ color: "secondary.main", fontWeight: 700 }}>{part}</Box>
+        : <span key={i}>{part}</span>))}
+    </>
+  );
+}
+
+/** Project channel members. Owners and task assignees are members automatically; managers add others by hand. */
+function MembersDialog({ channel, members, onClose, onChanged }: { channel: ChatChannel; members: ChannelMember[]; onClose: () => void; onChanged: () => void }) {
+  const { t } = useI18n();
+  const { can } = useAuth();
+  const errorMessage = useErrorMessage();
+  const canEdit = can("project.manage") && !!channel.projectId;
+  const { data: employees } = useLoad(() => (canEdit ? api.get<Employee[]>("/api/employees") : Promise.resolve([] as Employee[])), String(canEdit));
+  const [problem, setProblem] = useState<string | null>(null);
+  const memberIds = new Set(members.map((m) => m.employeeId));
+
+  async function change(fn: () => Promise<unknown>) {
+    setProblem(null);
+    try { await fn(); onChanged(); } catch (e) { setProblem(errorMessage(e)); }
+  }
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>{t.members} · #{channel.name}</DialogTitle>
+      <DialogContent>
+        {problem && <Alert severity="warning" sx={{ mb: 1 }}>{problem}</Alert>}
+        <List dense disablePadding>
+          {members.map((m) => (
+            <Stack key={m.employeeId} direction="row" spacing={1.5} sx={{ alignItems: "center", py: 0.75 }}>
+              <Avatar kind={m.kind} seed={m.displayName} size={30} />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" noWrap>{m.displayName}</Typography>
+                <Typography variant="caption" color="text.secondary" noWrap component="div">{m.isExplicit ? m.jobTitle : `${m.jobTitle} · ${t.memberByRole}`}</Typography>
+              </Box>
+              {canEdit && m.isExplicit && (
+                <IconButton size="small" aria-label="remove" onClick={() => change(() => api.del(`/api/projects/${channel.projectId}/members/${m.employeeId}`))}>
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              )}
+            </Stack>
+          ))}
+        </List>
+        {canEdit && (
+          <Autocomplete sx={{ mt: 2 }} options={(employees ?? []).filter((e) => !memberIds.has(e.id))} value={null}
+            getOptionLabel={(e) => `${e.displayName} · ${e.jobTitle}`}
+            onChange={(_, e) => e && change(() => api.post(`/api/projects/${channel.projectId}/members/${e.id}`))}
+            renderInput={(params) => <TextField {...params} size="small" label={t.addMember} />} />
+        )}
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>{t.close}</Button></DialogActions>
+    </Dialog>
   );
 }

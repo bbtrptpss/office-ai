@@ -204,7 +204,16 @@ public static class Endpoints
     {
         api.MapGet("/sandbox", (CodeService s) => s.SandboxInfo()).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/projects/{id:guid}/repositories", (Guid id, CodeService s, CancellationToken ct) => s.ListAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
-        api.MapPost("/projects/{id:guid}/repositories", (Guid id, CreateRepositoryRequest r, CodeService s, CancellationToken ct) => s.CreateAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/projects/{id:guid}/repositories", async (Guid id, CreateRepositoryRequest r, CodeService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+        {
+            // Importing also sets where approved code is pushed, so it needs the same right as setting a remote.
+            if (!string.IsNullOrWhiteSpace(r.ImportUrl) && !await HasAsync(perms, me, Permissions.SecurityManage, ct))
+                throw new OfficeAI.Domain.Common.ForbiddenException("Importing from a remote needs the security.manage permission.");
+            return await s.CreateAsync(id, r, ct);
+        }).RequirePermission(Permissions.ProjectManage);
+        // Where company code may be sent: only people who manage security choose that.
+        api.MapPut("/repositories/{id:guid}/remote", (Guid id, SetRemoteRequest r, CodeService s, CancellationToken ct) => s.SetRemoteAsync(id, r, ct)).RequirePermission(Permissions.SecurityManage);
+        api.MapPost("/repositories/{id:guid}/push", (Guid id, CodeService s, CancellationToken ct) => s.PushAsync(id, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapPut("/repositories/{id:guid}", (Guid id, UpdateRepositoryRequest r, CodeService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapGet("/repositories/{id:guid}/branches", (Guid id, CodeService s, CancellationToken ct) => s.BranchesAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/repositories/{id:guid}/files", (Guid id, string? branch, CodeService s, CancellationToken ct) => s.FilesAsync(id, branch, ct)).RequirePermission(Permissions.ProjectRead);
@@ -246,6 +255,12 @@ public static class Endpoints
         api.MapPost("/documents/{id:guid}/finalize", (Guid id, KnowledgeService s, CancellationToken ct) => s.FinalizeDocumentAsync(id, ct)).RequirePermission(Permissions.KnowledgeManage);
     }
 
+    private static async Task<ChatAccess> ChatAccessAsync(PermissionService perms, ICurrentUser me, CancellationToken ct)
+    {
+        var granted = me.UserId is { } id ? await perms.GetPermissionsAsync(id, ct) : [];
+        return new ChatAccess(granted.Contains(Permissions.CommsManage), granted.Contains(Permissions.CommsManage) || granted.Contains(Permissions.ProjectManage));
+    }
+
     private static async Task<bool> HasAsync(PermissionService perms, ICurrentUser me, string permission, CancellationToken ct) =>
         me.UserId is { } id && (await perms.GetPermissionsAsync(id, ct)).Contains(permission);
 
@@ -253,17 +268,22 @@ public static class Endpoints
     {
         const string read = Permissions.OrgRead, post = Permissions.CommsPost, manage = Permissions.CommsManage;
         var chat = api.MapGroup("/chat");
-        chat.MapGet("/channels", (bool? archived, ChatService s, CancellationToken ct) => s.ListChannelsAsync(archived ?? false, ct)).RequirePermission(read);
+        chat.MapGet("/channels", async (bool? archived, ChatService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+            await s.ListChannelsAsync(await ChatAccessAsync(perms, me, ct), archived ?? false, ct)).RequirePermission(read);
         chat.MapPost("/channels", (CreateChannelRequest r, ChatService s, CancellationToken ct) => s.CreateChannelAsync(r, ct)).RequirePermission(manage);
-        chat.MapPost("/channels/open", (OpenChannelRequest r, ChatService s, CancellationToken ct) => s.OpenChannelAsync(r, ct)).RequirePermission(read);
+        chat.MapPost("/channels/open", async (OpenChannelRequest r, ChatService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+            await s.OpenChannelAsync(r, await ChatAccessAsync(perms, me, ct), ct)).RequirePermission(read);
         chat.MapPost("/channels/{id:guid}/archive", (Guid id, ChatService s, CancellationToken ct) => s.SetArchivedAsync(id, true, ct)).RequirePermission(manage);
         chat.MapPost("/channels/{id:guid}/unarchive", (Guid id, ChatService s, CancellationToken ct) => s.SetArchivedAsync(id, false, ct)).RequirePermission(manage);
+        chat.MapGet("/channels/{id:guid}/members", async (Guid id, ChatService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+            await s.MembersAsync(id, await ChatAccessAsync(perms, me, ct), ct)).RequirePermission(read);
         chat.MapGet("/channels/{id:guid}/messages", async (Guid id, DateTimeOffset? before, int? limit, ChatService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
-            await s.ListMessagesAsync(id, before, limit ?? 50, await HasAsync(perms, me, manage, ct), ct)).RequirePermission(read);
-        chat.MapPost("/channels/{id:guid}/messages", (Guid id, PostMessageRequest r, ChatService s, CancellationToken ct) => s.PostAsync(id, r, ct)).RequirePermission(post);
-        chat.MapPost("/channels/{id:guid}/read", async (Guid id, ChatService s, CancellationToken ct) =>
+            await s.ListMessagesAsync(id, before, limit ?? 50, await ChatAccessAsync(perms, me, ct), ct)).RequirePermission(read);
+        chat.MapPost("/channels/{id:guid}/messages", async (Guid id, PostMessageRequest r, ChatService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+            await s.PostAsync(id, r, await ChatAccessAsync(perms, me, ct), ct)).RequirePermission(post);
+        chat.MapPost("/channels/{id:guid}/read", async (Guid id, ChatService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
         {
-            await s.MarkReadAsync(id, ct);
+            await s.MarkReadAsync(id, await ChatAccessAsync(perms, me, ct), ct);
             return Results.NoContent();
         }).RequirePermission(read);
         chat.MapDelete("/messages/{id:guid}", async (Guid id, ChatService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
@@ -271,6 +291,20 @@ public static class Endpoints
             await s.DeleteAsync(id, await HasAsync(perms, me, manage, ct), ct);
             return Results.NoContent();
         }).RequirePermission(post);
+
+        api.MapGet("/projects/{id:guid}/members", (Guid id, ChatService s, CancellationToken ct) => s.ProjectMembersAsync(id, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/projects/{id:guid}/members/{employeeId:guid}", (Guid id, Guid employeeId, ChatService s, CancellationToken ct) =>
+            s.AddProjectMemberAsync(id, employeeId, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapDelete("/projects/{id:guid}/members/{employeeId:guid}", (Guid id, Guid employeeId, ChatService s, CancellationToken ct) =>
+            s.RemoveProjectMemberAsync(id, employeeId, ct)).RequirePermission(Permissions.ProjectManage);
+
+        // Every signed-in person reads and clears only their own notifications.
+        api.MapGet("/notifications", (NotificationService s, CancellationToken ct) => s.ListAsync(ct)).RequireAuthorization();
+        api.MapPost("/notifications/read", async (long? id, NotificationService s, CancellationToken ct) =>
+        {
+            await s.MarkReadAsync(id, ct);
+            return Results.NoContent();
+        }).RequireAuthorization();
 
         api.MapGet("/announcements", async (AnnouncementStatus? status, AnnouncementService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
             await s.ListAsync(status, await HasAsync(perms, me, manage, ct), ct)).RequirePermission(read);

@@ -31,6 +31,69 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.7",
+    date: "2026-10-18",
+    title: { th: "งาน AI ทำต่อได้หลังเซิร์ฟเวอร์รีสตาร์ต", en: "AI runs resume after a server restart" },
+    changes: [
+      { type: "changed", th: "ถ้าเซิร์ฟเวอร์รีสตาร์ตระหว่างที่พนักงาน AI ทำงาน งานจะทำต่อจากขั้นล่าสุดที่บันทึกไว้ แทนที่จะล้มเหลวและเริ่มใหม่ (สูงสุด 2 ครั้งต่องาน)", en: "If the server restarts while an AI employee is working, the run continues from its last saved step instead of failing and starting over (at most twice per run)" },
+      { type: "fixed", th: "เครื่องมือที่ทำไปแล้วจะไม่ถูกทำซ้ำเมื่อทำต่อ — มีเพียงคำถามถึงโมเดลที่ค้างอยู่เท่านั้นที่ถามใหม่", en: "Tools that already ran are not repeated on resume — only the model call that was in flight is asked again" },
+      { type: "added", th: "ประวัติการทำงานของ AI แสดงข้อความเมื่องานถูกทำต่อหลังรีสตาร์ต", en: "The run transcript notes when a run was resumed after a restart" },
+    ],
+  },
+  {
+    version: "0.7.6",
+    date: "2026-10-18",
+    title: { th: "เชื่อม GitHub / GitLab", en: "GitHub / GitLab remotes" },
+    changes: [
+      { type: "added", th: "เชื่อม repository กับ GitHub / GitLab (หรือ Git host ใดก็ได้ที่เป็น HTTPS) — โค้ดที่คนอนุมัติ merge แล้วถูกส่งขึ้นอัตโนมัติ และกด “ส่งขึ้นตอนนี้” ได้", en: "Connect a repository to GitHub / GitLab (any HTTPS Git host) — approved merges are pushed automatically, or use “Push now”" },
+      { type: "added", th: "สร้าง repository โดยนำเข้าจาก GitHub / GitLab ที่มีอยู่แล้ว", en: "Create a repository by importing an existing GitHub / GitLab one" },
+      { type: "security", th: "ส่งเฉพาะ branch หลัก ไม่เคย force push, branch งานของ AI ไม่ออกนอกเซิร์ฟเวอร์ และเฉพาะคนที่มีสิทธิ์ security.manage เลือกปลายทางได้", en: "Only the main branch is pushed, never forced; AI task branches stay on the server; only security.manage can choose the destination" },
+      { type: "security", th: "Token อ่านจากตัวแปร GIT_REMOTE_* บนเซิร์ฟเวอร์เท่านั้น ไม่อยู่ใน URL, ฐานข้อมูล หรือข้อความ error", en: "Tokens come only from GIT_REMOTE_* server variables — never in URLs, the database or error messages" },
+    ],
+  },
+  {
+    version: "0.7.5",
+    date: "2026-10-18",
+    title: { th: "รองรับ OpenAI และ Google Gemini", en: "OpenAI and Google Gemini support" },
+    changes: [
+      { type: "added", th: "Provider ใหม่: OpenAI (และ endpoint ที่รองรับ API แบบเดียวกัน) และ Google Gemini — เปิดใช้เมื่อใส่ OPENAI_API_KEY / GEMINI_API_KEY", en: "New providers: OpenAI (and compatible endpoints) and Google Gemini — enabled by OPENAI_API_KEY / GEMINI_API_KEY" },
+      { type: "added", th: "ใช้เครื่องมือของพนักงาน AI ได้ครบเหมือน Claude พร้อมนับ token แยกส่วนที่ cache เพื่อคิดราคาให้ถูก", en: "Full tool use like Claude, with cached tokens counted separately so costs are priced correctly" },
+      { type: "security", th: "API key ส่งผ่าน header เท่านั้น ไม่อยู่ใน URL หรือ log และไม่เก็บในฐานข้อมูล", en: "API keys travel only in headers — never in URLs, logs or the database" },
+    ],
+  },
+  {
+    version: "0.7.4",
+    date: "2026-10-18",
+    title: { th: "สมาชิกโปรเจกต์ @mention และการแจ้งเตือน", en: "Project members, @mentions and notifications" },
+    changes: [
+      { type: "security", th: "ช่องแชทโปรเจกต์เห็นได้เฉพาะสมาชิกโปรเจกต์ (เจ้าของ, คนที่ได้รับมอบหมายงาน, คนที่ถูกเพิ่ม) และผู้จัดการ", en: "Project chat channels are visible only to project members (owner, task assignees, people added) and managers" },
+      { type: "added", th: "จัดการสมาชิกโปรเจกต์ได้จากปุ่ม “สมาชิก” ในช่องแชทโปรเจกต์", en: "Manage project members from the “Members” button in a project channel" },
+      { type: "added", th: "พิมพ์ @ ในแชทเพื่อเลือกคนที่จะกล่าวถึง ชื่อที่ถูกกล่าวถึงจะเป็นตัวเน้นสี", en: "Type @ in chat to mention someone; mentions are highlighted" },
+      { type: "added", th: "กระดิ่งแจ้งเตือน: ถูกกล่าวถึง, ถูกเชิญเข้าประชุม, ได้รับสิ่งที่ต้องทำจากการประชุม (อัปเดตทันที เห็นเฉพาะของตัวเอง)", en: "Notification bell: mentions, meeting invites and action items (live, private to each person)" },
+      { type: "fixed", th: "แก้ไขผู้เข้าร่วมหรือวาระของการประชุมที่สร้างแล้วไม่ได้ (ขึ้นว่าข้อมูลถูกแก้ไขโดยคนอื่น)", en: "Editing an existing meeting's participants or agenda failed with “changed by someone else”" },
+    ],
+  },
+  {
+    version: "0.7.3",
+    date: "2026-10-18",
+    title: { th: "เข้ารหัสกุญแจ cookie ในฐานข้อมูล", en: "Cookie keys encrypted at rest" },
+    changes: [
+      { type: "security", th: "กุญแจเข้ารหัส cookie (DataProtection) ถูกเข้ารหัสด้วย certificate ก่อนเก็บลงฐานข้อมูล — บังคับใช้ใน production", en: "Auth-cookie keys (DataProtection) are encrypted with a certificate before they reach the database — required in production" },
+      { type: "added", th: "สคริปต์ scripts/new-dataprotection-cert.sh สร้าง certificate และรองรับการเปลี่ยน certificate โดยกุญแจเดิมยังอ่านได้", en: "scripts/new-dataprotection-cert.sh creates the certificate; rotation keeps older keys readable" },
+      { type: "security", th: "ระบบไม่ยอมเริ่มถ้าไฟล์ certificate หายหรือรหัสผ่านผิด", en: "The API refuses to start when the certificate is missing or the password is wrong" },
+    ],
+  },
+  {
+    version: "0.7.2",
+    date: "2026-10-18",
+    title: { th: "อนุมัติเพิ่มงบ workflow ได้จริง", en: "Budget escalations raise the workflow budget" },
+    changes: [
+      { type: "fixed", th: "อนุมัติคำขอ “งบเต็ม” แล้ว workflow ได้งบเพิ่มและทำงานต่อทันที (เดิมอนุมัติแล้วไม่มีผล)", en: "Approving a “budget reached” request now raises the workflow budget and work continues (before, approving did nothing)" },
+      { type: "added", th: "กรอกงบใหม่ได้ในหน้าการอนุมัติ (ค่าเริ่มต้น = 2 เท่าของงบเดิม) ต้องมากกว่ายอดที่ใช้ไปแล้ว", en: "Enter the new budget on the approval (default: double the current one); it must exceed what is already spent" },
+      { type: "fixed", th: "เมื่อใช้งบใหม่จนเต็มอีกครั้ง ระบบขออนุมัติใหม่ได้ (เดิมขอได้ครั้งเดียว)", en: "Reaching the raised budget asks again (before, it could only ask once)" },
+    ],
+  },
+  {
     version: "0.7.1",
     date: "2026-10-18",
     title: { th: "หน้าบันทึกอัปเดต", en: "Update log page" },
@@ -118,16 +181,9 @@ export const CHANGELOG: Release[] = [
 
 export const TODO: Todo[] = [
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ใส่ ANTHROPIC_API_KEY เพื่อให้ Claude ทำงานจริงครั้งแรก", en: "Set ANTHROPIC_API_KEY for the first real Claude run" },
-  { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "แจ้งว่ามีบัญชี AI provider ใดบ้าง (OpenAI / Gemini)", en: "Confirm which AI provider accounts exist (OpenAI / Gemini)" },
+  { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
-  { status: "planned", area: { th: "AI", en: "AI" }, th: "Adapter สำหรับ OpenAI / Gemini", en: "OpenAI / Gemini adapters" },
-  { status: "planned", area: { th: "โค้ด", en: "Code" }, th: "เชื่อม GitHub / GitLab แทน repository ในเครื่อง", en: "GitHub / GitLab hosting behind the repository interface" },
-  { status: "planned", area: { th: "แชท", en: "Chat" }, th: "จำกัดสมาชิกช่องแชทโปรเจกต์ (ตอนนี้ทุกคนที่ล็อกอินอ่านได้ทุกช่อง)", en: "Per-project channel membership (today every signed-in person can read all channels)" },
-  { status: "planned", area: { th: "แชท", en: "Chat" }, th: "การ @mention และการแจ้งเตือนในแชท", en: "@mentions and chat notifications" },
-  { status: "planned", area: { th: "ความปลอดภัย", en: "Security" }, th: "เข้ารหัส DataProtection keys ด้วย certificate", en: "Encrypt DataProtection keys at rest with a certificate" },
-  { status: "planned", area: { th: "Workflow", en: "Workflow" }, th: "อนุมัติเพิ่มงบแล้วให้ workflow ได้งบเพิ่มอัตโนมัติ", en: "An approved budget escalation should raise the workflow budget by itself" },
-  { status: "planned", area: { th: "AI", en: "AI" }, th: "ทำงาน AI ต่อจากจุดที่ค้างได้เมื่อระบบรีสตาร์ต (ตอนนี้ล้มเหลวแล้วลองใหม่)", en: "Resume interrupted AI runs mid-call (today they fail and are retried)" },
 ];
 
 export const LATEST_VERSION = CHANGELOG[0].version;
