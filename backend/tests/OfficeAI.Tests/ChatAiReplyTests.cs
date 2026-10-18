@@ -241,12 +241,12 @@ public class ChatAiReplyTests(ApiFixture fx)
         var ceo = await fx.CeoAsync();
         Assert.True((await ceo.GetAsync<AssistantDto>("/api/assistant")).ClaudeAvailable);
 
-        var first = await ceo.PostAsync<ClaudeReplyDto>("/api/assistant/claude", new { message = "สรุปวันนี้" });
+        var first = await ceo.PostAsync<ClaudeReplyDto>("/api/assistant/claude", new { message = "สรุปวันนี้", newChat = true });
         Assert.Equal("echo: สรุปวันนี้", first.Reply);
         Assert.False(first.Continued);
         var call = fx.Claude.Calls.Last();
         Assert.Null(call.SessionId);
-        Assert.Contains("You have no tools here", call.System);
+        Assert.Contains("<action>", call.System); // it hands work to AI employees through action blocks
         Assert.Contains("Approvals waiting for a person", call.System); // live company data
 
         var second = await ceo.PostAsync<ClaudeReplyDto>("/api/assistant/claude", new { message = "แล้วพรุ่งนี้ล่ะ" });
@@ -261,6 +261,39 @@ public class ChatAiReplyTests(ApiFixture fx)
 
         var member = await fx.UserWithRolesAsync(SystemRoles.Member);
         Assert.Equal(System.Net.HttpStatusCode.Forbidden, (await member.PostAsJsonAsync("/api/assistant/claude", new { message = "hi" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Claude_hands_work_to_an_AI_employee_which_runs_it_and_reports_in_the_assistant_channel()
+    {
+        var ceo = await fx.CeoAsync();
+        var ai = await AiAsync(ceo, (_, _) => Task.FromResult(ScriptedProvider.Text("ทำหน้า login เสร็จแล้วครับ")));
+        var (project, _) = await ProjectChannelAsync(ceo, ai.Id);
+        var code = (await ceo.GetAsync<ProjectDto>($"/api/projects/{project}")).Code;
+        fx.Claude.Script = _ =>
+            $"ได้เลยครับ ส่งให้ {ai.DisplayName} ทำแล้ว\n<action>{{\"project\":\"{code.ToLower()}\",\"employee\":\"{ai.DisplayName}\",\"title\":\"ทำหน้า login\",\"details\":\"มีช่องอีเมลและรหัสผ่าน\"}}</action>" +
+            "<action>{\"project\":\"NOPE\",\"employee\":\"x\",\"title\":\"ไม่มีโปรเจกต์นี้\"}</action>";
+        try
+        {
+            var reply = await ceo.PostAsync<ClaudeReplyDto>("/api/assistant/claude", new { message = "ให้ทำหน้า login หน่อย", newChat = true });
+            Assert.Equal(1, reply.TasksStarted);
+            Assert.DoesNotContain("<action>", reply.Reply);
+            Assert.Contains("✅ มอบงาน “ทำหน้า login”", reply.Reply);
+            Assert.Contains("ไม่พบโปรเจกต์ “NOPE”", reply.Reply);
+            Assert.Contains("Projects (code: name):", fx.Claude.Calls.Last().System);
+            Assert.Contains(ai.DisplayName, fx.Claude.Calls.Last().System);
+        }
+        finally
+        {
+            fx.Claude.Script = null;
+        }
+
+        var task = Assert.Single(await ceo.GetAsync<List<TaskDto>>($"/api/projects/{project}/tasks"));
+        Assert.Equal(ai.Id, Assert.Single(task.Assignees).EmployeeId);
+        Assert.StartsWith("มีช่องอีเมลและรหัสผ่าน", task.Description);
+        var channel = (await ceo.GetAsync<AssistantDto>("/api/assistant")).ChannelId;
+        var said = await RepliesFromAsync(ceo, channel, ai.Id, 1);
+        Assert.Contains(said, m => m.Body.Contains("✅") && m.Body.Contains("ทำหน้า login เสร็จแล้วครับ"));
     }
 
     [Theory]

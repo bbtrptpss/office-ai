@@ -32,7 +32,7 @@ log อยู่ที่ `%LOCALAPPDATA%\OfficeAI\start.log` · ถ้าแก
 (ทุกวัน 12:00 ถ้าปิดเครื่องอยู่จะทำทันทีที่เปิด เก็บ 14 ชุดล่าสุดใน `backups/` · สำรองเองตอนนี้: `scripts\windowsackup-office-ai.ps1` · กู้คืน: `scripts/restore.sh`)
 
 **คุยกับ Claude จากหน้าภาพรวม (Claude Code บนเครื่องนี้):** ต้องมี `claude` ที่ login แล้ว, Node และ `CLAUDE_BRIDGE_TOKEN` ใน `.env`
-ตัวเชื่อม `scripts/windows/claude-bridge.mjs` เปิดเองเมื่อกดไอคอน Office AI (หรือรัน `node scripts/windows/claude-bridge.mjs`) — Claude คุยได้อย่างเดียว ไม่มีเครื่องมือ ใช้โควตาเดียวกับ Claude Code ของคุณ
+ตัวเชื่อม `scripts/windows/claude-bridge.mjs` เปิดเองเมื่อกดไอคอน Office AI (หรือรัน `node scripts/windows/claude-bridge.mjs`) — Claude รันคำสั่ง/อ่านไฟล์ไม่ได้ แต่สั่งงานพนักงาน AI ได้ (สร้างงาน มอบหมาย และเริ่มทำ ด้วยสิทธิ์ของคนที่คุย) ใช้โควตาเดียวกับ Claude Code ของคุณ
 
 **ให้ทีม AI แก้โค้ดระบบนี้:** โค้ดอยู่ในโปรเจกต์ PLATFORM → repository `office-ai` ภายในระบบ
 `scripts\windows\platform-repo.ps1 push` ส่งโค้ดในเครื่องเข้าไป · `... pull` ดึงงานที่ AI ทำและอนุมัติ merge แล้วมาไว้ที่ branch `ai/main` ให้ตรวจก่อน merge

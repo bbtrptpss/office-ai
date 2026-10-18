@@ -272,6 +272,8 @@ export interface ClaudeReply {
   reply: string;
   continued: boolean;
   equivalentCostUsd: number;
+  /** Tasks Claude handed to AI employees in this reply. */
+  tasksStarted: number;
 }
 
 export interface AgentRun {

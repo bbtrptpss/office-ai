@@ -1,5 +1,5 @@
 // Lets the Office AI API (in Docker) ask the Claude Code CLI that is signed in on this Windows machine.
-// Talk only: Claude runs with every tool and MCP server disabled, in an empty folder, one question at a time.
+// Claude Code runs with every tool and MCP server disabled, in an empty folder, one question at a time; the API carries out the <action> blocks it writes.
 //   node scripts/windows/claude-bridge.mjs        (start-office-ai.ps1 starts it; token from .env CLAUDE_BRIDGE_TOKEN)
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";

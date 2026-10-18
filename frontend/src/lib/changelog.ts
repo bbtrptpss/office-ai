@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.12.1",
+    date: "2026-10-19",
+    title: { th: "สั่งงานผ่าน Claude ได้แล้ว", en: "Claude can hand out work" },
+    changes: [
+      { type: "added", th: "บอก Claude ให้ทำงานได้เลย เช่น “ให้ทำหน้า login ในโปรเจกต์ WEB” — Claude เลือกพนักงาน AI ที่เหมาะ สร้างงานในโปรเจกต์ มอบหมาย และสั่งเริ่มทำทันที (ครั้งละไม่เกิน 3 งาน) ผลการสั่งแสดงใต้คำตอบ และพนักงาน AI รายงานเมื่อเสร็จในห้องแชท “AI Assistant”", en: "Tell Claude to get something done, e.g. “build the login page in project WEB” — Claude picks a fitting AI employee, creates the task in the project, assigns it and starts the work right away (up to 3 tasks at a time); the outcome shows under its reply and the AI employee reports back in the “AI Assistant” chat" },
+      { type: "security", th: "Claude ยังรันคำสั่งหรืออ่านไฟล์บนเครื่องไม่ได้ สั่งงานได้ผ่านระบบเท่านั้น ด้วยสิทธิ์ของคนที่คุย (ต้องมีสิทธิ์สร้างงาน มอบหมายงาน และสั่ง AI ทำงาน) ภายใต้งบและขีดจำกัดของพนักงาน AI เหมือนเดิม", en: "Claude still cannot run commands or read files on the PC; it only hands out work through the system, with the asking person's permissions (task.manage, task.assign, agent.run) and the AI employees' usual budgets and limits" },
+    ],
+  },
+  {
     version: "0.12.0",
     date: "2026-10-19",
     title: { th: "คุยกับ Claude จากหน้าภาพรวม", en: "Chat with Claude from the dashboard" },
