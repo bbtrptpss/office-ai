@@ -23,7 +23,6 @@ public sealed class AgentExecutor(
     TimeProvider clock,
     ILogger<AgentExecutor> log)
 {
-    private const int MaxProviderRetries = 2;
     private int _sequence;
 
     public async Task ExecuteAsync(Guid runId, CancellationToken cancel)
@@ -310,10 +309,10 @@ public sealed class AgentExecutor(
             {
                 return await provider.CompleteAsync(request, ct);
             }
-            catch (AiProviderException ex) when (ex.Retryable && attempt < MaxProviderRetries)
+            catch (AiProviderException ex) when (AiRetry.Delay(ex, attempt) is { } wait)
             {
-                log.LogWarning(ex, "Provider {Provider} call failed (attempt {Attempt}); retrying", provider.Name, attempt + 1);
-                await Task.Delay(TimeSpan.FromSeconds(2 * (attempt + 1)), clock, ct);
+                log.LogWarning(ex, "Provider {Provider} call failed (attempt {Attempt}); retrying in {Wait}", provider.Name, attempt + 1, wait);
+                await Task.Delay(wait, clock, ct);
             }
         }
     }

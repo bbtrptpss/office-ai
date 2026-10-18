@@ -180,7 +180,8 @@ internal static class HttpAi
             if (response.IsSuccessStatusCode) return JsonDocument.Parse(text).RootElement.Clone();
             var detail = ErrorMessage(text) ?? response.ReasonPhrase;
             var status = (int)response.StatusCode;
-            if (response.StatusCode == HttpStatusCode.TooManyRequests) throw new AiProviderException($"{providerLabel} rate limit reached.", retryable: true);
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
+                throw new AiProviderException($"{providerLabel} rate limit reached.", retryable: true, rateLimited: true, retryAfter: RetryAfter(response, text));
             if (status >= 500) throw new AiProviderException($"{providerLabel} service error ({status}).", retryable: true);
             throw new AiProviderException($"{providerLabel} rejected the request ({status}): {detail}", retryable: false);
         }
@@ -198,6 +199,27 @@ internal static class HttpAi
         {
             return ex.Message;
         }
+    }
+
+    /// <summary>The Retry-After header, or Gemini's RetryInfo detail ("retryDelay": "23s").</summary>
+    internal static TimeSpan? RetryAfter(HttpResponseMessage response, string body)
+    {
+        if (response.Headers.RetryAfter?.Delta is { } delta) return delta;
+        if (response.Headers.RetryAfter?.Date is { } date) return date - DateTimeOffset.UtcNow;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("error", out var e) && e.TryGetProperty("details", out var details) && details.ValueKind == JsonValueKind.Array)
+                foreach (var d in details.EnumerateArray())
+                    if (d.TryGetProperty("retryDelay", out var rd) && rd.GetString() is { } s && s.EndsWith('s')
+                        && double.TryParse(s[..^1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var secs))
+                        return TimeSpan.FromSeconds(secs);
+        }
+        catch (JsonException)
+        {
+            // not JSON: no hint
+        }
+        return null;
     }
 
     /// <summary>Both OpenAI and Gemini report errors as {"error": {"message": ...}}.</summary>

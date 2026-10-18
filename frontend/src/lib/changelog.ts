@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.11",
+    date: "2026-10-18",
+    title: { th: "รอโควตา AI อย่างถูกวิธี + Network Engineer", en: "Patient retries on AI rate limits + Network Engineer" },
+    changes: [
+      { type: "fixed", th: "เมื่อชนโควตาของผู้ให้บริการ AI (เช่น Gemini free tier) ระบบรอตามเวลาที่ผู้ให้บริการบอกแล้วลองใหม่ได้สูงสุด 5 ครั้ง แทนการล้มเหลวทันที", en: "On AI provider rate limits (e.g. Gemini free tier) the system waits as long as the provider asks and retries up to 5 times instead of failing" },
+      { type: "added", th: "แผนกออกแบบและการตลาด พร้อมพนักงาน AI 7 ตำแหน่ง และ Network Engineer AI สำหรับดูแล config เซิร์ฟเวอร์ผ่าน repository", en: "Design and Marketing departments with 7 AI roles, and a Network Engineer AI that maintains server configuration through the repository" },
+    ],
+  },
+  {
     version: "0.7.10",
     date: "2026-10-18",
     title: { th: "เลือกโมเดลจากรายการของผู้ให้บริการ", en: "Pick models from the provider's list" },

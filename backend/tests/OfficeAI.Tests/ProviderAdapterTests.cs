@@ -163,4 +163,26 @@ public class ProviderAdapterTests
         Assert.Equal(["gemini-x-flash"], await provider.RemoteModelsAsync(CancellationToken.None));
         Assert.Equal("g-test", handler.Request!.Headers.GetValues("x-goog-api-key").Single());
     }
+
+    [Fact]
+    public async Task Rate_limits_carry_the_providers_wait_time_and_are_retried_patiently()
+    {
+        var (provider, _) = Gemini(HttpStatusCode.TooManyRequests, """
+            {"error":{"code":429,"message":"Quota exceeded","details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"23s"}]}}
+            """);
+        var ex = await Assert.ThrowsAsync<AiProviderException>(() => provider.CompleteAsync(Conversation(), CancellationToken.None));
+        Assert.True(ex.RateLimited);
+        Assert.Equal(TimeSpan.FromSeconds(23), ex.RetryAfter);
+
+        Assert.Equal(TimeSpan.FromSeconds(23), AiRetry.Delay(ex, 0));
+        Assert.Equal(TimeSpan.FromSeconds(23), AiRetry.Delay(ex, AiRetry.MaxRateLimitRetries - 1));
+        Assert.Null(AiRetry.Delay(ex, AiRetry.MaxRateLimitRetries));
+        var noHint = new AiProviderException("slow down", retryable: true, rateLimited: true);
+        Assert.Equal(TimeSpan.FromSeconds(10), AiRetry.Delay(noHint, 0));
+        Assert.Equal(AiRetry.MaxWait, AiRetry.Delay(noHint, 4));
+        var transient = new AiProviderException("503", retryable: true);
+        Assert.NotNull(AiRetry.Delay(transient, 1));
+        Assert.Null(AiRetry.Delay(transient, AiRetry.MaxTransientRetries));
+        Assert.Null(AiRetry.Delay(new AiProviderException("bad request", retryable: false), 0));
+    }
 }

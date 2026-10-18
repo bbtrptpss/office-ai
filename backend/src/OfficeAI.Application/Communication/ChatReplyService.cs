@@ -125,15 +125,15 @@ public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, Re
 
     private static async Task<AiResponse> CallAsync(IAiProvider provider, AiRequest request, CancellationToken ct)
     {
-        for (var attempt = 1; ; attempt++)
+        for (var attempt = 0; ; attempt++)
         {
             try
             {
                 return await provider.CompleteAsync(request, ct);
             }
-            catch (AiProviderException ex) when (ex.Retryable && attempt < 3)
+            catch (AiProviderException ex) when (AiRetry.Delay(ex, attempt) is { } wait)
             {
-                await Task.Delay(TimeSpan.FromSeconds(2 * attempt), ct);
+                await Task.Delay(wait, ct);
             }
         }
     }

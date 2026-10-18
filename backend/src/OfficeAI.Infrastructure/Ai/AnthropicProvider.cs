@@ -86,7 +86,7 @@ public sealed class AnthropicProvider(IOptions<AnthropicOptions> options, IAiCre
         }
         catch (AnthropicRateLimitException ex)
         {
-            throw new AiProviderException("Anthropic rate limit reached.", retryable: true, ex);
+            throw new AiProviderException("Anthropic rate limit reached.", retryable: true, ex, rateLimited: true);
         }
         catch (Anthropic5xxException ex)
         {

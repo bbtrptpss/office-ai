@@ -76,9 +76,37 @@ public interface IAiCredentials
 }
 
 /// <summary>Thrown by adapters for provider failures; <see cref="Retryable"/> marks rate limits, 5xx and network errors.</summary>
-public sealed class AiProviderException(string message, bool retryable, Exception? inner = null) : Exception(message, inner)
+public sealed class AiProviderException(string message, bool retryable, Exception? inner = null, bool rateLimited = false, TimeSpan? retryAfter = null)
+    : Exception(message, inner)
 {
     public bool Retryable { get; } = retryable;
+
+    /// <summary>The provider's quota was exceeded; waiting usually fixes it.</summary>
+    public bool RateLimited { get; } = rateLimited;
+
+    /// <summary>How long the provider asked us to wait, when it said.</summary>
+    public TimeSpan? RetryAfter { get; } = retryAfter;
+}
+
+/// <summary>Shared retry policy: quick retries for transient errors, patient ones for rate limits (per-minute quotas).</summary>
+public static class AiRetry
+{
+    public const int MaxTransientRetries = 2;
+    public const int MaxRateLimitRetries = 5;
+    public static readonly TimeSpan MaxWait = TimeSpan.FromSeconds(60);
+
+    /// <summary>Null when the call should not be retried again; otherwise how long to wait first.</summary>
+    public static TimeSpan? Delay(AiProviderException ex, int attempt)
+    {
+        if (!ex.Retryable) return null;
+        if (ex.RateLimited)
+        {
+            if (attempt >= MaxRateLimitRetries) return null;
+            var wait = ex.RetryAfter ?? TimeSpan.FromSeconds(10 * Math.Pow(2, attempt));
+            return wait > MaxWait ? MaxWait : wait < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : wait;
+        }
+        return attempt < MaxTransientRetries ? TimeSpan.FromSeconds(2 * (attempt + 1)) : null;
+    }
 }
 
 public sealed class AiProviderRegistry(IEnumerable<IAiProvider> providers)
