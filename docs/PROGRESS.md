@@ -126,7 +126,6 @@ Decisions taken without the CEO: new permissions `comms.post` (Member, Manager, 
 
 ## Open items (not built yet)
 
-- Per-project channel membership (today every signed-in person can read all channels); mentions and notifications for chat.
 - OpenAI / Gemini adapters (waiting on which accounts exist); first real Claude run needs ANTHROPIC_API_KEY.
 - Remote Git hosting (GitHub/GitLab) behind the repository interface.
 - Durable mid-call resume of AI runs (interrupted runs are failed and retried by the engine).

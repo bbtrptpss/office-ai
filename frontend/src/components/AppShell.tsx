@@ -38,6 +38,7 @@ import { Announcement, api, Approval, ChatChannel } from "@/lib/api";
 import { useLoad } from "./common";
 import { Avatar, Mascot } from "@/components/cute";
 import { brand } from "@/theme";
+import { NotificationBell } from "@/components/notifications";
 import { LATEST_VERSION, SEEN_KEY } from "@/lib/changelog";
 
 const DRAWER_WIDTH = 264;
@@ -160,6 +161,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </IconButton>
           )}
           <Box sx={{ flex: 1 }} />
+          <NotificationBell />
           <Chip
             label={lang === "th" ? "EN" : "ไทย"}
             onClick={() => setLang(lang === "th" ? "en" : "th")}

@@ -31,6 +31,18 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.4",
+    date: "2026-10-18",
+    title: { th: "สมาชิกโปรเจกต์ @mention และการแจ้งเตือน", en: "Project members, @mentions and notifications" },
+    changes: [
+      { type: "security", th: "ช่องแชทโปรเจกต์เห็นได้เฉพาะสมาชิกโปรเจกต์ (เจ้าของ, คนที่ได้รับมอบหมายงาน, คนที่ถูกเพิ่ม) และผู้จัดการ", en: "Project chat channels are visible only to project members (owner, task assignees, people added) and managers" },
+      { type: "added", th: "จัดการสมาชิกโปรเจกต์ได้จากปุ่ม “สมาชิก” ในช่องแชทโปรเจกต์", en: "Manage project members from the “Members” button in a project channel" },
+      { type: "added", th: "พิมพ์ @ ในแชทเพื่อเลือกคนที่จะกล่าวถึง ชื่อที่ถูกกล่าวถึงจะเป็นตัวเน้นสี", en: "Type @ in chat to mention someone; mentions are highlighted" },
+      { type: "added", th: "กระดิ่งแจ้งเตือน: ถูกกล่าวถึง, ถูกเชิญเข้าประชุม, ได้รับสิ่งที่ต้องทำจากการประชุม (อัปเดตทันที เห็นเฉพาะของตัวเอง)", en: "Notification bell: mentions, meeting invites and action items (live, private to each person)" },
+      { type: "fixed", th: "แก้ไขผู้เข้าร่วมหรือวาระของการประชุมที่สร้างแล้วไม่ได้ (ขึ้นว่าข้อมูลถูกแก้ไขโดยคนอื่น)", en: "Editing an existing meeting's participants or agenda failed with “changed by someone else”" },
+    ],
+  },
+  {
     version: "0.7.3",
     date: "2026-10-18",
     title: { th: "เข้ารหัสกุญแจ cookie ในฐานข้อมูล", en: "Cookie keys encrypted at rest" },
@@ -143,8 +155,6 @@ export const TODO: Todo[] = [
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
   { status: "planned", area: { th: "AI", en: "AI" }, th: "Adapter สำหรับ OpenAI / Gemini", en: "OpenAI / Gemini adapters" },
   { status: "planned", area: { th: "โค้ด", en: "Code" }, th: "เชื่อม GitHub / GitLab แทน repository ในเครื่อง", en: "GitHub / GitLab hosting behind the repository interface" },
-  { status: "planned", area: { th: "แชท", en: "Chat" }, th: "จำกัดสมาชิกช่องแชทโปรเจกต์ (ตอนนี้ทุกคนที่ล็อกอินอ่านได้ทุกช่อง)", en: "Per-project channel membership (today every signed-in person can read all channels)" },
-  { status: "planned", area: { th: "แชท", en: "Chat" }, th: "การ @mention และการแจ้งเตือนในแชท", en: "@mentions and chat notifications" },
   { status: "planned", area: { th: "AI", en: "AI" }, th: "ทำงาน AI ต่อจากจุดที่ค้างได้เมื่อระบบรีสตาร์ต (ตอนนี้ล้มเหลวแล้วลองใหม่)", en: "Resume interrupted AI runs mid-call (today they fail and are retried)" },
 ];
 

@@ -620,6 +620,7 @@ export interface ChatMessage {
   isDeleted: boolean;
   createdAt: string;
   canDelete: boolean;
+  mentions: string[];
 }
 
 export type AnnouncementStatus = "Draft" | "Published" | "Archived";
@@ -714,4 +715,27 @@ export interface Meeting {
   minutesApprovedAt: string | null;
   minutesDocumentId: string | null;
   version: number;
+}
+
+export interface ChannelMember {
+  employeeId: string;
+  displayName: string;
+  kind: EmployeeKind;
+  jobTitle: string;
+  isExplicit: boolean;
+}
+
+export interface AppNotification {
+  id: number;
+  kind: "mention" | "meeting_invite" | "action_item";
+  title: string;
+  body: string | null;
+  link: string | null;
+  createdAt: string;
+  isRead: boolean;
+}
+
+export interface NotificationList {
+  unread: number;
+  items: AppNotification[];
 }
