@@ -12,6 +12,7 @@ import { useRealtime } from "@/lib/realtime";
 import { Loading, useLoad } from "@/components/common";
 import { Avatar } from "@/components/cute";
 import type { OfficeRoom } from "@/components/office3d";
+import { OrderDialog, OrderTarget } from "@/components/officeOrder";
 
 // WebGL only exists in the browser.
 const Office3D = dynamic(() => import("@/components/office3d"), { ssr: false, loading: () => <Loading /> });
@@ -41,6 +42,8 @@ export default function OfficePage() {
   useRealtime("organizationChanged", () => void reload());
   useRealtime("agentRunChanged", () => void reload());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [order, setOrder] = useState<OrderTarget | null>(null);
+  const canOrder = can("task.manage") || can("project.manage");
 
   const rooms = useMemo<OfficeRoom[]>(() => {
     if (!data) return [];
@@ -80,9 +83,13 @@ export default function OfficePage() {
 
       <Card sx={{ position: "relative", height: { xs: "70vh", md: "calc(100vh - 210px)" }, minHeight: 420, overflow: "hidden", p: 0,
         background: "linear-gradient(180deg, #EDE6FA 0%, #F8E4EF 100%)" }}>
-        <Office3D rooms={rooms} selectedId={selectedId} onSelect={setSelectedId} labels={(s) => label(s)} loungeName={t.officeLounge} />
+        <Office3D rooms={rooms} selectedId={selectedId} onSelect={setSelectedId} labels={(s) => label(s)} loungeName={t.officeLounge} roomHint={t.officeRoomHint}
+          onRoomClick={canOrder ? (id) => {
+            const dept = data.departments.find((d) => d.id === id);
+            if (dept) setOrder({ kind: "department", name: dept.name, members: data.employees.filter((e) => e.departmentId === id) });
+          } : undefined} />
         {selected && (
-          <Card sx={{ position: "absolute", top: 12, right: 12, width: 280, maxWidth: "calc(100% - 24px)" }}>
+          <Card sx={{ position: "absolute", top: 12, right: 12, width: 280, maxWidth: "calc(100% - 24px)", zIndex: 30 /* above the 3D name signs */ }}>
             <CardContent>
               <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
                 <Avatar kind={selected.kind} seed={selected.displayName} size={44} />
@@ -94,10 +101,14 @@ export default function OfficePage() {
               </Stack>
               <Chip size="small" label={label(selected.status)} color={selected.status === "Working" ? "primary" : selected.status === "Failed" ? "error" : "default"} sx={{ mt: 1.5 }} />
               {selectedTask && <Typography variant="body2" sx={{ mt: 1 }}>⌨️ {selectedTask}</Typography>}
-              <Button component={Link} href={`/employees/${selected.id}`} size="small" sx={{ mt: 1.5 }}>{t.officeProfile}</Button>
+              <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+                {canOrder && <Button variant="contained" size="small" onClick={() => setOrder({ kind: "person", employee: selected })}>{t.orderButton}</Button>}
+                <Button component={Link} href={`/employees/${selected.id}`} size="small">{t.officeProfile}</Button>
+              </Stack>
             </CardContent>
           </Card>
         )}
+        <OrderDialog target={order} onClose={() => setOrder(null)} />
         <Typography variant="caption" color="text.secondary" sx={{ position: "absolute", left: 16, bottom: 10, pointerEvents: "none" }}>
           {t.officeControls}
         </Typography>

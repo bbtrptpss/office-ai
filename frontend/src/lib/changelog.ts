@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.10.2",
+    date: "2026-10-18",
+    title: { th: "สั่งงานจากออฟฟิศ 3D", en: "Give work from the 3D Office" },
+    changes: [
+      { type: "added", th: "คลิกป้ายชื่อแผนกเพื่อสั่งงานทั้งแผนก: ให้หัวหน้าแผนก (AI) วางแผนแตกงานแล้วรอคุณอนุมัติแผน หรือเลือกมอบให้คนเดียวในแผนก", en: "Click a department's sign to give it work: its AI head plans and splits it (the plan waits for your approval), or hand it to one member" },
+      { type: "added", th: "คลิกตัวละครแล้วกด “สั่งงาน”: เลือกโปรเจกต์ พิมพ์งาน เลือกความสำคัญ แล้ว AI เริ่มทำทันที (ปิดได้ถ้าแค่อยากมอบหมาย)", en: "Click a character and “Give work”: pick a project, describe the task and priority, and an AI starts right away (or just assign it)" },
+      { type: "security", th: "ใช้สิทธิ์เดิมทุกอย่าง: สร้าง/มอบหมายงานต้องมีสิทธิ์จัดการงาน, สั่งให้ AI เริ่มต้องมีสิทธิ์สั่ง AI, สั่งทั้งแผนกต้องมีสิทธิ์จัดการโปรเจกต์ — คนที่ไม่มีสิทธิ์จะไม่เห็นเมนู", en: "Same permissions as elsewhere: creating/assigning needs task rights, starting AI needs agent.run, department plans need project.manage — people without them don't see the menu" },
+    ],
+  },
+  {
     version: "0.10.1",
     date: "2026-10-18",
     title: { th: "ออฟฟิศ 3D: ทางเดินเชื่อมทุกห้อง + โซนนั่งเล่น", en: "3D Office: connected corridors + a lounge" },

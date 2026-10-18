@@ -117,12 +117,15 @@ function route(L: Layout, from: Cell, p: V2, to: Cell, q: V2): V2[] {
 /** Shared between all characters: who sits where in the lounge. */
 interface World { L: Layout; taken: Map<string, string> }
 
-export default function Office3D({ rooms, selectedId, onSelect, labels, loungeName }: {
+export default function Office3D({ rooms, selectedId, onSelect, onRoomClick, labels, loungeName, roomHint }: {
   rooms: OfficeRoom[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  /** Clicking a room's name sign; leave out to keep the signs read-only. */
+  onRoomClick?: (roomId: string) => void;
   labels: (status: EmployeeStatus) => string;
   loungeName: string;
+  roomHint?: string;
 }) {
   const maxPeople = Math.max(1, ...rooms.map((r) => r.people.length));
   const L = useMemo(() => buildLayout(rooms.length, maxPeople), [rooms.length, maxPeople]);
@@ -142,7 +145,8 @@ export default function Office3D({ rooms, selectedId, onSelect, labels, loungeNa
           <meshStandardMaterial color="#FFF8FC" />
         </RoundedBox>
         {rooms.map((room, i) => (
-          <Room key={room.id} room={room} index={i} cell={L.cells[i]} L={L} />
+          <Room key={room.id} room={room} index={i} cell={L.cells[i]} L={L} hint={roomHint}
+            onClick={onRoomClick && (() => onRoomClick(room.id))} />
         ))}
         <Lounge L={L} name={loungeName} />
         {rooms.flatMap((room, i) => room.people.map((p, j) => (
@@ -180,17 +184,25 @@ function Walls({ L, floor }: { L: Layout; floor: string }) {
   );
 }
 
-function Label({ position, text }: { position: [number, number, number]; text: string }) {
+function Label({ position, text, onClick, hint }: { position: [number, number, number]; text: string; onClick?: () => void; hint?: string }) {
+  const [hover, setHover] = useState(false);
   return (
     <Html position={position} center distanceFactor={18} zIndexRange={[10, 0]}>
-      <div style={{ whiteSpace: "nowrap", padding: "4px 12px", borderRadius: 999, background: "rgba(255,255,255,.9)", boxShadow: "0 4px 14px rgba(110,80,170,.18)", fontSize: 14, fontWeight: 600, color: brand.ink, pointerEvents: "none" }}>
-        {text}
+      <div role={onClick ? "button" : undefined} title={hint} onClick={onClick}
+        onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)}
+        style={{
+          whiteSpace: "nowrap", padding: "4px 12px", borderRadius: 999, fontSize: 14, fontWeight: 600, userSelect: "none",
+          background: hover && onClick ? brand.purple : "rgba(255,255,255,.9)", color: hover && onClick ? "#fff" : brand.ink,
+          boxShadow: "0 4px 14px rgba(110,80,170,.18)", cursor: onClick ? "pointer" : "default", pointerEvents: onClick ? "auto" : "none",
+          transition: "background .15s, color .15s",
+        }}>
+        {text}{onClick && hover ? " ✎" : ""}
       </div>
     </Html>
   );
 }
 
-function Room({ room, index, cell, L }: { room: OfficeRoom; index: number; cell: Cell; L: Layout }) {
+function Room({ room, index, cell, L, onClick, hint }: { room: OfficeRoom; index: number; cell: Cell; L: Layout; onClick?: () => void; hint?: string }) {
   const working = room.people.filter((p) => p.status === "Working").length;
   return (
     <group position={[cell.x0, 0, cell.z0]}>
@@ -200,7 +212,7 @@ function Room({ room, index, cell, L }: { room: OfficeRoom; index: number; cell:
         <meshStandardMaterial color="#C7D2FE" emissive="#A5B4FC" emissiveIntensity={0.25} />
       </mesh>
       <Plant position={[L.w - 0.35, 0, 0.4]} />
-      <Label position={[L.w / 2, 2.1, -0.2]} text={`${room.name} · ${working}/${room.people.length}`} />
+      <Label position={[L.w / 2, 2.1, -0.2]} text={`${room.name} · ${working}/${room.people.length}`} onClick={onClick} hint={hint} />
       {room.people.map((p, j) => {
         const [x, z] = deskSpot({ x0: 0, z0: 0 }, j);
         return <Desk key={p.id} position={[x, 0, z]} working={p.status === "Working"} />;
