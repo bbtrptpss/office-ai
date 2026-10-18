@@ -31,6 +31,17 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.9.1",
+    date: "2026-10-18",
+    title: { th: "สำรองข้อมูลอัตโนมัติ + ทีม AI แก้โค้ดระบบได้", en: "Automatic backups + the AI team can work on this system" },
+    changes: [
+      { type: "added", th: "สำรองฐานข้อมูลและ repository อัตโนมัติทุกวันบน Windows (เก็บ 14 ชุดล่าสุด) — ทดสอบกู้คืนแล้วข้อมูลกลับมาครบ", en: "Daily automatic backup of the database and repositories on Windows (keeps 14) — a test restore brought everything back" },
+      { type: "added", th: "โค้ดของระบบนี้อยู่ในโปรเจกต์ PLATFORM เป็น repository “office-ai” แล้ว สั่งทีม AI ทำงานกับโค้ดระบบได้ด้วย /run หรือหน้างาน แล้วดึงงานที่อนุมัติกลับมาตรวจก่อนรวม", en: "This system's code is now the “office-ai” repository in project PLATFORM: give the AI team work on it with /run or from tasks, then pull approved work back for review before merging" },
+      { type: "changed", th: "ข้อความสรุปงานในแชทแสดงสถานะงานและเหตุผลที่หยุดเป็นภาษาไทย", en: "Chat run summaries show the task status and stop reason in Thai" },
+      { type: "security", th: "เปลี่ยนรหัสผ่าน CEO จากค่าเริ่มต้นแล้ว (รหัสใหม่เก็บไว้ใน .env ที่ไม่ขึ้น git)", en: "The CEO password was changed from the default (the new one is in .env, which is not in git)" },
+    ],
+  },
+  {
     version: "0.9.0",
     date: "2026-10-18",
     title: { th: "หน้าตาใหม่: ออฟฟิศเวทมนตร์สีพาสเทล", en: "New look: pastel magic office" },
@@ -254,6 +265,7 @@ export const TODO: Todo[] = [
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
+  { status: "planned", area: { th: "AI", en: "AI" }, th: "1 ม.ค. 2027: แก้ราคา Gemini 3.8 Flash ในหน้าตั้งค่า AI เป็น $1.50 / $7.50 ต่อล้าน token (ราคาโปรหมด)", en: "1 Jan 2027: update Gemini 3.8 Flash prices in AI settings to $1.50 / $7.50 per million tokens (intro pricing ends)" },
 ];
 
 export const LATEST_VERSION = CHANGELOG[0].version;

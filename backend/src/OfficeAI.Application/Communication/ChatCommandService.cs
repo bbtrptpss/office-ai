@@ -85,13 +85,13 @@ public partial class ChatCommandService(IAppDbContext db, WorkService work, Agen
         {
             AgentRunStatus.Succeeded => $"✅ ทำงาน “{task.Title}” เสร็จแล้วครับ",
             AgentRunStatus.Cancelled => $"⏹ งาน “{task.Title}” ถูกยกเลิก",
-            AgentRunStatus.LimitReached => $"⚠️ งาน “{task.Title}” หยุดเพราะถึงขีดจำกัด ({run.StopReason})",
+            AgentRunStatus.LimitReached => $"⚠️ งาน “{task.Title}” หยุดเพราะ{LimitText(run.StopReason)}",
             _ => $"❌ ทำงาน “{task.Title}” ไม่สำเร็จ",
         });
         if (run.Error is { Length: > 0 } error) sb.Append("\nสาเหตุ: ").Append(error.Length > 300 ? error[..300] + "…" : error);
         if (last is { Length: > 0 }) sb.Append("\n\n").Append(last.Length > 1500 ? last[..1500] + "…" : last);
         if (deliverables.Count > 0) sb.Append("\n\nผลงาน: ").Append(string.Join(", ", deliverables.Select(d => $"“{d}”")));
-        sb.Append($"\n\nค่าใช้จ่าย {run.CostUsd:0.####} USD · ดูรายละเอียด ตรวจ และอนุมัติได้ที่หน้าโปรเจกต์ (สถานะงาน: {task.Status})");
+        sb.Append($"\n\nค่าใช้จ่าย {run.CostUsd:0.####} USD · ดูรายละเอียด ตรวจ และอนุมัติได้ที่หน้าโปรเจกต์ (สถานะงาน: {StatusText(task.Status)})");
 
         command.Status = ChatCommandStatus.Finished;
         command.Error = run.Error is { Length: > 1000 } e ? e[..1000] : run.Error;
@@ -101,6 +101,32 @@ public partial class ChatCommandService(IAppDbContext db, WorkService work, Agen
         await db.SaveChangesAsync(CancellationToken.None);
         await notifier.ChatMessageAsync(channel.Id, message.Id, CancellationToken.None);
     }
+
+    /// <summary>Task status in the words the task board uses.</summary>
+    public static string StatusText(Domain.Work.WorkTaskStatus status) => status switch
+    {
+        Domain.Work.WorkTaskStatus.Todo => "รอเริ่ม",
+        Domain.Work.WorkTaskStatus.Assigned => "มอบหมายแล้ว",
+        Domain.Work.WorkTaskStatus.InProgress => "กำลังทำ",
+        Domain.Work.WorkTaskStatus.Blocked => "ติดขัด",
+        Domain.Work.WorkTaskStatus.InReview => "รอตรวจ",
+        Domain.Work.WorkTaskStatus.WaitingApproval => "รออนุมัติ",
+        Domain.Work.WorkTaskStatus.Done => "เสร็จ",
+        Domain.Work.WorkTaskStatus.Failed => "ล้มเหลว",
+        Domain.Work.WorkTaskStatus.Cancelled => "ยกเลิก",
+        _ => status.ToString(),
+    };
+
+    private static string LimitText(string? stopReason) => stopReason switch
+    {
+        "timeout" => "ใช้เวลานานเกินกำหนด",
+        "turns" => "คุยกับ AI ครบจำนวนรอบที่กำหนด",
+        "tool_calls" => "ใช้เครื่องมือครบจำนวนครั้งที่กำหนด",
+        "tokens" => "ใช้ token ครบตามที่กำหนด",
+        "max_tokens" => "คำตอบของ AI ยาวเกินที่กำหนด",
+        "budget" => "งบ AI ไม่พอ",
+        _ => $"ถึงขีดจำกัด ({stopReason})",
+    };
 
     private static string Title(string instruction)
     {

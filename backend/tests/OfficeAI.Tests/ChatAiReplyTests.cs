@@ -173,6 +173,7 @@ public class ChatAiReplyTests(ApiFixture fx)
         Assert.Contains("รับงานแล้ว", said[0].Body);
         Assert.Contains("✅", said[1].Body);
         Assert.Contains("เพิ่มหน้า login เรียบร้อยครับ", said[1].Body);
+        Assert.DoesNotContain("InProgress", said[1].Body); // task status is shown in Thai
 
         var task = Assert.Single(await ceo.GetAsync<List<TaskDto>>($"/api/projects/{project}/tasks"));
         Assert.Equal("เพิ่มหน้า login", task.Title);

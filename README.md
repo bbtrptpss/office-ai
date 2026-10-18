@@ -28,6 +28,12 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\install-shortcuts.ps1
 และ shortcut ใน Startup ที่เริ่มระบบให้เองตอน login (ไม่เปิดเบราว์เซอร์) — ไม่เอา Startup ใส่ `-NoStartup`, ลบทั้งคู่ใส่ `-Remove`
 log อยู่ที่ `%LOCALAPPDATA%\OfficeAI\start.log` · ถ้าแก้โค้ดแล้วยังต้อง `docker compose up -d --build` เอง
 
+**Windows: สำรองข้อมูลอัตโนมัติทุกวัน** — `powershell -ExecutionPolicy Bypass -File scripts\windows\install-backup-task.ps1`
+(ทุกวัน 12:00 ถ้าปิดเครื่องอยู่จะทำทันทีที่เปิด เก็บ 14 ชุดล่าสุดใน `backups/` · สำรองเองตอนนี้: `scripts\windowsackup-office-ai.ps1` · กู้คืน: `scripts/restore.sh`)
+
+**ให้ทีม AI แก้โค้ดระบบนี้:** โค้ดอยู่ในโปรเจกต์ PLATFORM → repository `office-ai` ภายในระบบ
+`scripts\windows\platform-repo.ps1 push` ส่งโค้ดในเครื่องเข้าไป · `... pull` ดึงงานที่ AI ทำและอนุมัติ merge แล้วมาไว้ที่ branch `ai/main` ให้ตรวจก่อน merge
+
 | บริการ | URL |
 | --- | --- |
 | หน้าเว็บ | http://localhost:3000 |
