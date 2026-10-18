@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import {
-  Alert, Card, CardContent, Chip, Grid, Paper, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, TextField, Typography,
+  Alert, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid, MenuItem, Paper, Stack, Switch, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import { api, AiModel, AiProvider } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -20,6 +21,7 @@ export default function AiSettingsPage() {
   const errorMessage = useErrorMessage();
   const canManage = can("agent.manage");
   const [message, setMessage] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const { data, error, reload } = useLoad(async () => {
     const [providers, models] = await Promise.all([api.get<AiProvider[]>("/api/ai/providers"), api.get<AiModel[]>("/api/ai/models")]);
     return { providers, models };
@@ -43,7 +45,7 @@ export default function AiSettingsPage() {
 
   return (
     <>
-      <PageHeader title={t.aiSettings} subtitle="API keys are read from server configuration (.env), never stored in the database." />
+      <PageHeader title={t.aiSettings} subtitle={t.aiKeysSubtitle} />
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {data.providers.map((p, i) => (
           <Grid key={p.name} size={{ xs: 12, sm: 6 }}>
@@ -56,6 +58,7 @@ export default function AiSettingsPage() {
                     <Chip size="small" color={p.isAvailable ? "success" : "default"} label={p.isAvailable ? t.available : t.notConfigured} />
                   </Stack>
                   {p.isSimulated && <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{t.simulatedHint}</Typography>}
+                  {!p.isSimulated && <ProviderKey provider={p} canManage={canManage} onChanged={() => void reload()} />}
                 </CardContent>
               </Card>
             </Rise>
@@ -64,7 +67,10 @@ export default function AiSettingsPage() {
       </Grid>
 
       {message && <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
-      <Typography variant="h6" gutterBottom>{t.prices}</Typography>
+      <Stack direction="row" sx={{ alignItems: "center", mb: 1 }}>
+        <Typography variant="h6" sx={{ flex: 1 }}>{t.prices}</Typography>
+        {canManage && <Button startIcon={<AddIcon />} onClick={() => setAdding(true)}>{t.addModel}</Button>}
+      </Stack>
       <TableContainer component={Paper} variant="outlined">
         <Table size="small">
           <TableHead>
@@ -104,6 +110,110 @@ export default function AiSettingsPage() {
           </TableBody>
         </Table>
       </TableContainer>
+      {adding && <AddModelDialog providers={data.providers.filter((x) => !x.isSimulated).map((x) => x.name)} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); void reload(); }} />}
     </>
+  );
+}
+
+/** Key for one provider: write-only. Shows where the key comes from and its last 4 characters, never the key. */
+function ProviderKey({ provider, canManage, onChanged }: { provider: AiProvider; canManage: boolean; onChanged: () => void }) {
+  const { t } = useI18n();
+  const errorMessage = useErrorMessage();
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function run(fn: () => Promise<void>) {
+    setBusy(true);
+    setResult(null);
+    try { await fn(); } catch (e) { setResult({ ok: false, text: errorMessage(e) }); }
+    setBusy(false);
+    onChanged();
+  }
+
+  const source = provider.keySource === "settings" ? `${t.keyFromSettings} ••••${provider.keyLast4}`
+    : provider.keySource === "environment" ? t.keyFromEnv : t.notConfigured;
+
+  return (
+    <Stack spacing={1} sx={{ mt: 1.5 }}>
+      <Typography variant="body2" color="text.secondary">🔑 {source}</Typography>
+      {canManage && (
+        <>
+          <Stack direction="row" spacing={1}>
+            <TextField size="small" fullWidth type="password" autoComplete="off" label={provider.keySource === "settings" ? t.replaceKey : t.apiKey}
+              value={value} onChange={(e) => setValue(e.target.value)} slotProps={{ htmlInput: { "data-lpignore": "true", spellCheck: false } }} />
+            <Button variant="contained" disabled={busy || value.trim().length < 10} onClick={() => run(async () => {
+              await api.put(`/api/ai/providers/${provider.name}/key`, { apiKey: value.trim() });
+              setValue("");
+              const check = await api.post<{ ok: boolean; problem: string | null }>(`/api/ai/providers/${provider.name}/verify`);
+              setResult(check.ok ? { ok: true, text: t.keyWorks } : { ok: false, text: `${t.keySavedButFailed}: ${check.problem}` });
+            })}>{t.save}</Button>
+          </Stack>
+          <Stack direction="row" spacing={1}>
+            <Button size="small" disabled={busy || !provider.isAvailable} onClick={() => run(async () => {
+              const check = await api.post<{ ok: boolean; problem: string | null }>(`/api/ai/providers/${provider.name}/verify`);
+              setResult(check.ok ? { ok: true, text: t.keyWorks } : { ok: false, text: check.problem ?? "" });
+            })}>{t.testKey}</Button>
+            {provider.keySource === "settings" && (
+              <Button size="small" color="error" disabled={busy} onClick={() => run(async () => { await api.del(`/api/ai/providers/${provider.name}/key`); })}>
+                {t.removeKey}
+              </Button>
+            )}
+          </Stack>
+        </>
+      )}
+      {result && <Alert severity={result.ok ? "success" : "warning"} sx={{ py: 0 }}>{result.text}</Alert>}
+    </Stack>
+  );
+}
+
+const TIERS = ["Routine", "Standard", "Advanced"] as const;
+
+/** Add a model with its list prices (USD per million tokens). */
+function AddModelDialog({ providers, onClose, onSaved }: { providers: string[]; onClose: () => void; onSaved: () => void }) {
+  const { t, label } = useI18n();
+  const errorMessage = useErrorMessage();
+  const [form, setForm] = useState({ provider: providers[0] ?? "", modelId: "", displayName: "", tier: "Standard", input: "", output: "", cacheRead: "", cacheWrite: "" });
+  const [problem, setProblem] = useState<string | null>(null);
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{t.addModel}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {problem && <Alert severity="warning">{problem}</Alert>}
+          <Stack direction="row" spacing={2}>
+            <TextField select fullWidth label="Provider" value={form.provider} onChange={set("provider")}>
+              {providers.map((p) => <MenuItem key={p} value={p}>{p}</MenuItem>)}
+            </TextField>
+            <TextField select fullWidth label={t.tier} value={form.tier} onChange={set("tier")}>
+              {TIERS.map((x) => <MenuItem key={x} value={x}>{label(x)}</MenuItem>)}
+            </TextField>
+          </Stack>
+          <TextField label="Model ID" placeholder="gpt-5.1 / gemini-3-pro" value={form.modelId} onChange={set("modelId")} />
+          <TextField label={t.displayName} value={form.displayName} onChange={set("displayName")} />
+          <Typography variant="caption" color="text.secondary">{t.pricesHint}</Typography>
+          <Stack direction="row" spacing={1}>
+            <TextField type="number" label={t.input} value={form.input} onChange={set("input")} />
+            <TextField type="number" label={t.output} value={form.output} onChange={set("output")} />
+            <TextField type="number" label={t.cacheRead} value={form.cacheRead} onChange={set("cacheRead")} />
+            <TextField type="number" label={t.cacheWrite} value={form.cacheWrite} onChange={set("cacheWrite")} />
+          </Stack>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t.cancel}</Button>
+        <Button variant="contained" disabled={!form.modelId.trim() || !form.displayName.trim() || !form.input || !form.output} onClick={async () => {
+          try {
+            await api.post("/api/ai/models", {
+              provider: form.provider, modelId: form.modelId.trim(), displayName: form.displayName.trim(), tier: form.tier,
+              inputUsdPerMTok: Number(form.input), outputUsdPerMTok: Number(form.output),
+              cacheReadUsdPerMTok: Number(form.cacheRead || 0), cacheWriteUsdPerMTok: Number(form.cacheWrite || 0),
+            });
+            onSaved();
+          } catch (e) { setProblem(errorMessage(e)); }
+        }}>{t.create}</Button>
+      </DialogActions>
+    </Dialog>
   );
 }

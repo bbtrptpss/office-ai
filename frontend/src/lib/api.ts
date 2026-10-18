@@ -204,6 +204,9 @@ export interface AiProvider {
   name: string;
   isAvailable: boolean;
   isSimulated: boolean;
+  /** "settings" (saved on the AI settings page), "environment" (server .env) or null. */
+  keySource: "settings" | "environment" | null;
+  keyLast4: string | null;
 }
 
 export interface AiModel {

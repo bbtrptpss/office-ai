@@ -22,23 +22,33 @@ public class OpenAiOptions
 /// OpenAI (or a compatible endpoint) via the Chat Completions API over plain HTTP. Disabled until an API key is configured.
 /// Models and prices are added by the CEO in AI settings.
 /// </summary>
-public sealed class OpenAiProvider(IHttpClientFactory http, IOptions<OpenAiOptions> options) : IAiProvider
+public sealed class OpenAiProvider(IHttpClientFactory http, IOptions<OpenAiOptions> options, IAiCredentials? credentials = null) : IAiProvider
 {
     public const string ProviderName = "openai";
     public const string HttpClientName = "ai-openai";
 
-    private readonly string? _key = Key(options.Value.ApiKey, "OPENAI_API_KEY");
+    private readonly string? _envKey = Key(options.Value.ApiKey, "OPENAI_API_KEY");
+    private string? CurrentKey => credentials?.GetKey(ProviderName) ?? _envKey;
 
+    /// <summary>Server configuration, then the environment variable. A key saved on the AI settings page takes precedence over both.</summary>
     internal static string? Key(string? configured, string envVar) =>
         !string.IsNullOrWhiteSpace(configured) ? configured : Environment.GetEnvironmentVariable(envVar) is { Length: > 0 } env ? env : null;
 
     public string Name => ProviderName;
     public bool IsSimulated => false;
-    public bool IsAvailable => _key is not null;
+    public bool IsAvailable => CurrentKey is not null;
+
+    public async Task<string?> VerifyAsync(CancellationToken ct)
+    {
+        if (CurrentKey is not { } key) return "No API key.";
+        using var message = new HttpRequestMessage(HttpMethod.Get, options.Value.BaseUrl.TrimEnd('/') + "/models");
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+        return await HttpAi.CheckAsync(http, HttpClientName, message, "OpenAI", ct);
+    }
 
     public async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct)
     {
-        if (_key is null) throw new AiProviderException("OpenAI API key is not configured.", retryable: false);
+        if (CurrentKey is not { } _key) throw new AiProviderException("OpenAI API key is not configured.", retryable: false);
 
         var body = BuildRequest(request);
         using var message = new HttpRequestMessage(HttpMethod.Post, options.Value.BaseUrl.TrimEnd('/') + "/chat/completions")
@@ -164,6 +174,20 @@ internal static class HttpAi
             if (response.StatusCode == HttpStatusCode.TooManyRequests) throw new AiProviderException($"{providerLabel} rate limit reached.", retryable: true);
             if (status >= 500) throw new AiProviderException($"{providerLabel} service error ({status}).", retryable: true);
             throw new AiProviderException($"{providerLabel} rejected the request ({status}): {detail}", retryable: false);
+        }
+    }
+
+    /// <summary>A free "list models" call used to check a key: null when it works, otherwise a short explanation.</summary>
+    public static async Task<string?> CheckAsync(IHttpClientFactory http, string clientName, HttpRequestMessage message, string providerLabel, CancellationToken ct)
+    {
+        try
+        {
+            await SendAsync(http, clientName, message, TimeSpan.FromSeconds(15), providerLabel, ct);
+            return null;
+        }
+        catch (AiProviderException ex)
+        {
+            return ex.Message;
         }
     }
 

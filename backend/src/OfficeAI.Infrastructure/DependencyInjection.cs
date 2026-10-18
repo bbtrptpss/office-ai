@@ -73,6 +73,8 @@ public static class DependencyInjection
         services.Configure<GeminiOptions>(config.GetSection("AiProviders:Gemini"));
         services.AddHttpClient(OpenAiProvider.HttpClientName, c => c.Timeout = Timeout.InfiniteTimeSpan); // per-call timeout in the adapter
         services.AddHttpClient(GeminiProvider.HttpClientName, c => c.Timeout = Timeout.InfiniteTimeSpan);
+        services.AddSingleton<IAiCredentials, AiCredentialStore>();
+        services.AddHttpClient(AnthropicProvider.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
         services.AddSingleton<IAiProvider, OpenAiProvider>();
         services.AddSingleton<IAiProvider, GeminiProvider>();
         services.AddSingleton<AiProviderRegistry>();

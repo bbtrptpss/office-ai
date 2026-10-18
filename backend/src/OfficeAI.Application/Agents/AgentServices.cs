@@ -7,7 +7,12 @@ using OfficeAI.Domain.Work;
 
 namespace OfficeAI.Application.Agents;
 
-public record ProviderDto(string Name, bool IsAvailable, bool IsSimulated);
+/// <param name="KeySource">"settings" (saved on the AI settings page), "environment" (server .env) or null.</param>
+public record ProviderDto(string Name, bool IsAvailable, bool IsSimulated, string? KeySource = null, string? KeyLast4 = null);
+public record SetProviderKeyRequest(string ApiKey);
+public record VerifyProviderDto(bool Ok, string? Problem);
+public record CreateAiModelRequest(string Provider, string ModelId, string DisplayName, ModelTier Tier, decimal InputUsdPerMTok, decimal OutputUsdPerMTok,
+    decimal CacheReadUsdPerMTok = 0, decimal CacheWriteUsdPerMTok = 0);
 public record AiModelDto(Guid Id, string Provider, string ModelId, string DisplayName, ModelTier Tier, decimal InputUsdPerMTok,
     decimal OutputUsdPerMTok, decimal CacheReadUsdPerMTok, decimal CacheWriteUsdPerMTok, bool IsEnabled, uint Version);
 public record UpdateAiModelRequest(decimal InputUsdPerMTok, decimal OutputUsdPerMTok, decimal CacheReadUsdPerMTok, decimal CacheWriteUsdPerMTok, bool IsEnabled, uint? Version = null);
@@ -35,10 +40,72 @@ public record UsageSummaryDto(decimal ThisMonthUsd, decimal ThisMonthSimulatedUs
 public record EmployeeUsageDto(Guid EmployeeId, string DisplayName, decimal CostUsd, long Tokens, int Runs, decimal BudgetUsd);
 
 /// <summary>Configuration of AI employees, models and prices. Callers need agent.manage (human only).</summary>
-public class AgentAdminService(IAppDbContext db, AiProviderRegistry providers, ToolRegistry tools, TimeProvider clock)
+public class AgentAdminService(IAppDbContext db, AiProviderRegistry providers, ToolRegistry tools, TimeProvider clock, ICurrentUser current, IAiCredentials credentials)
 {
     public List<ProviderDto> ListProviders() =>
-        providers.All.OrderBy(p => p.IsSimulated).ThenBy(p => p.Name).Select(p => new ProviderDto(p.Name, p.IsAvailable, p.IsSimulated)).ToList();
+        providers.All.OrderBy(p => p.IsSimulated).ThenBy(p => p.Name).Select(p =>
+        {
+            var last4 = p.IsSimulated ? null : credentials.Last4(p.Name);
+            var source = p.IsSimulated ? null : last4 is not null ? "settings" : p.IsAvailable ? "environment" : null;
+            return new ProviderDto(p.Name, p.IsAvailable, p.IsSimulated, source, last4);
+        }).ToList();
+
+    private IAiProvider RealProvider(string name)
+    {
+        var p = providers.Find(name) ?? throw new DomainException("validation", $"Unknown provider '{name}'.");
+        if (p.IsSimulated) throw new DomainException("validation", "The simulated provider has no key.");
+        return p;
+    }
+
+    /// <summary>Saves a provider key (encrypted). Write-only: it is never shown again, only its last 4 characters.</summary>
+    public async Task<ProviderDto> SetKeyAsync(string provider, SetProviderKeyRequest req, CancellationToken ct)
+    {
+        if (current.IsAgent) throw new ForbiddenException("Only a person can set provider keys.");
+        var p = RealProvider(provider);
+        var key = (req.ApiKey ?? "").Trim();
+        if (key.Length is < 10 or > 500 || key.Any(char.IsWhiteSpace)) throw new DomainException("validation", "The key looks invalid (10–500 characters, no spaces).");
+        await credentials.SetAsync(p.Name, key, ct);
+        return ListProviders().First(x => x.Name == p.Name);
+    }
+
+    /// <summary>Removes a saved key; the server environment key (if any) applies again.</summary>
+    public async Task<ProviderDto> RemoveKeyAsync(string provider, CancellationToken ct)
+    {
+        if (current.IsAgent) throw new ForbiddenException("Only a person can remove provider keys.");
+        var p = RealProvider(provider);
+        await credentials.SetAsync(p.Name, null, ct);
+        return ListProviders().First(x => x.Name == p.Name);
+    }
+
+    public async Task<VerifyProviderDto> VerifyAsync(string provider, CancellationToken ct)
+    {
+        var problem = await RealProvider(provider).VerifyAsync(ct);
+        return new VerifyProviderDto(problem is null, problem);
+    }
+
+    /// <summary>People add models (e.g. for OpenAI or Gemini) with their list prices; nothing is assumed free.</summary>
+    public async Task<AiModelDto> CreateModelAsync(CreateAiModelRequest req, CancellationToken ct)
+    {
+        RealProvider(req.Provider);
+        Validate.Required(req.ModelId, "modelId");
+        Validate.Required(req.DisplayName, "displayName");
+        var modelId = req.ModelId.Trim();
+        if (modelId.Length > 100 || modelId.Any(char.IsWhiteSpace)) throw new DomainException("validation", "modelId is invalid.");
+        if (!Enum.IsDefined(req.Tier)) throw new DomainException("validation", "tier is invalid.");
+        if (new[] { req.InputUsdPerMTok, req.OutputUsdPerMTok, req.CacheReadUsdPerMTok, req.CacheWriteUsdPerMTok }.Any(x => x < 0))
+            throw new DomainException("validation", "Prices cannot be negative.");
+        if (req.InputUsdPerMTok == 0 && req.OutputUsdPerMTok == 0) throw new DomainException("validation", "Enter the model's prices; real models are never free.");
+        if (await db.AiModels.AnyAsync(m => m.Provider == req.Provider && m.ModelId == modelId, ct))
+            throw new DomainException("validation", "This model is already listed.");
+        var model = new AiModel
+        {
+            Provider = req.Provider, ModelId = modelId, DisplayName = req.DisplayName.Trim(), Tier = req.Tier,
+            InputUsdPerMTok = req.InputUsdPerMTok, OutputUsdPerMTok = req.OutputUsdPerMTok, CacheReadUsdPerMTok = req.CacheReadUsdPerMTok, CacheWriteUsdPerMTok = req.CacheWriteUsdPerMTok,
+        };
+        db.AiModels.Add(model);
+        await db.SaveChangesAsync(ct);
+        return (await ListModelsAsync(ct)).First(m => m.Id == model.Id);
+    }
 
     public List<ToolDto> ListTools() =>
         tools.All.OrderBy(t => t.Descriptor.Id).Select(t => new ToolDto(t.Descriptor.Id, t.Descriptor.Version, t.Descriptor.Description,

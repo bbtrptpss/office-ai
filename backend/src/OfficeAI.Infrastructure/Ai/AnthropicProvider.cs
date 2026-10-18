@@ -15,26 +15,49 @@ public class AnthropicOptions
     public int TimeoutSeconds { get; set; } = 300;
 }
 
-/// <summary>Claude via the official Anthropic SDK. Disabled until an API key is configured.</summary>
-public sealed class AnthropicProvider : IAiProvider
+/// <summary>
+/// Claude via the official Anthropic SDK. Disabled until an API key is configured, either on the AI settings page
+/// (takes precedence, no restart needed) or in the server environment.
+/// </summary>
+public sealed class AnthropicProvider(IOptions<AnthropicOptions> options, IAiCredentials? credentials = null, IHttpClientFactory? http = null) : IAiProvider
 {
-    private readonly AnthropicClient? _client;
+    public const string HttpClientName = "ai-anthropic-check";
 
-    public AnthropicProvider(IOptions<AnthropicOptions> options)
+    private readonly string? _envKey = OpenAiProvider.Key(options.Value.ApiKey, "ANTHROPIC_API_KEY");
+    private readonly Lock _lock = new();
+    private (string Key, AnthropicClient Client)? _current;
+
+    private string? CurrentKey => credentials?.GetKey(Name) ?? _envKey;
+
+    /// <summary>One client per key; a new key (saved in settings) gets a new client.</summary>
+    private AnthropicClient? Client()
     {
-        var key = options.Value.ApiKey;
-        if (string.IsNullOrWhiteSpace(key)) key = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
-        if (!string.IsNullOrWhiteSpace(key))
-            _client = new AnthropicClient { ApiKey = key, Timeout = TimeSpan.FromSeconds(options.Value.TimeoutSeconds) };
+        if (CurrentKey is not { } key) return null;
+        lock (_lock)
+        {
+            if (_current is not { } c || c.Key != key)
+                _current = (key, new AnthropicClient { ApiKey = key, Timeout = TimeSpan.FromSeconds(options.Value.TimeoutSeconds) });
+            return _current.Value.Client;
+        }
     }
 
     public string Name => AgentDefaults.AnthropicProvider;
     public bool IsSimulated => false;
-    public bool IsAvailable => _client is not null;
+    public bool IsAvailable => CurrentKey is not null;
+
+    public async Task<string?> VerifyAsync(CancellationToken ct)
+    {
+        if (CurrentKey is not { } key) return "No API key.";
+        if (http is null) return null;
+        using var message = new HttpRequestMessage(HttpMethod.Get, "https://api.anthropic.com/v1/models?limit=1");
+        message.Headers.Add("x-api-key", key);
+        message.Headers.Add("anthropic-version", "2023-06-01");
+        return await HttpAi.CheckAsync(http, HttpClientName, message, "Anthropic", ct);
+    }
 
     public async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct)
     {
-        if (_client is null) throw new AiProviderException("Anthropic API key is not configured.", retryable: false);
+        var _client = Client() ?? throw new AiProviderException("Anthropic API key is not configured.", retryable: false);
 
         var parameters = new MessageCreateParams
         {

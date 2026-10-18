@@ -18,20 +18,29 @@ public class GeminiOptions
 /// Google Gemini via the generateContent REST API. Disabled until an API key is configured.
 /// Gemini function calls may carry a thought signature that must be sent back with the call; it travels as an opaque block.
 /// </summary>
-public sealed class GeminiProvider(IHttpClientFactory http, IOptions<GeminiOptions> options) : IAiProvider
+public sealed class GeminiProvider(IHttpClientFactory http, IOptions<GeminiOptions> options, IAiCredentials? credentials = null) : IAiProvider
 {
     public const string ProviderName = "gemini";
     public const string HttpClientName = "ai-gemini";
 
-    private readonly string? _key = OpenAiProvider.Key(options.Value.ApiKey, "GEMINI_API_KEY");
+    private readonly string? _envKey = OpenAiProvider.Key(options.Value.ApiKey, "GEMINI_API_KEY");
+    private string? CurrentKey => credentials?.GetKey(ProviderName) ?? _envKey;
 
     public string Name => ProviderName;
     public bool IsSimulated => false;
-    public bool IsAvailable => _key is not null;
+    public bool IsAvailable => CurrentKey is not null;
+
+    public async Task<string?> VerifyAsync(CancellationToken ct)
+    {
+        if (CurrentKey is not { } key) return "No API key.";
+        using var message = new HttpRequestMessage(HttpMethod.Get, $"{options.Value.BaseUrl.TrimEnd('/')}/models?pageSize=1");
+        message.Headers.Add("x-goog-api-key", key);
+        return await HttpAi.CheckAsync(http, HttpClientName, message, "Gemini", ct);
+    }
 
     public async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct)
     {
-        if (_key is null) throw new AiProviderException("Gemini API key is not configured.", retryable: false);
+        if (CurrentKey is not { } _key) throw new AiProviderException("Gemini API key is not configured.", retryable: false);
         var url = $"{options.Value.BaseUrl.TrimEnd('/')}/models/{Uri.EscapeDataString(request.ModelId)}:generateContent";
         using var message = new HttpRequestMessage(HttpMethod.Post, url)
         {

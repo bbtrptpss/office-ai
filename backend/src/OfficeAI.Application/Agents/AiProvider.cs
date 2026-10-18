@@ -57,6 +57,19 @@ public interface IAiProvider
     bool IsAvailable { get; }
 
     Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct);
+
+    /// <summary>Checks the configured key with a free call (no tokens). Returns null when it works, otherwise the problem.</summary>
+    Task<string?> VerifyAsync(CancellationToken ct) => Task.FromResult<string?>(IsAvailable ? null : "Not configured.");
+}
+
+/// <summary>Provider keys entered by people on the AI settings page (encrypted at rest). Take precedence over the server environment.</summary>
+public interface IAiCredentials
+{
+    string? GetKey(string provider);
+    string? Last4(string provider);
+
+    /// <summary>Stores (or with null removes) a key. Takes effect without a restart.</summary>
+    Task SetAsync(string provider, string? key, CancellationToken ct);
 }
 
 /// <summary>Thrown by adapters for provider failures; <see cref="Retryable"/> marks rate limits, 5xx and network errors.</summary>

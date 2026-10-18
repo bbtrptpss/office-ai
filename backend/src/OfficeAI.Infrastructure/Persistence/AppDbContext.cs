@@ -34,6 +34,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<TaskAssignment> TaskAssignments => Set<TaskAssignment>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<AiModel> AiModels => Set<AiModel>();
+    public DbSet<AiProviderCredential> AiProviderCredentials => Set<AiProviderCredential>();
     public DbSet<AgentConfiguration> AgentConfigurations => Set<AgentConfiguration>();
     public DbSet<AgentToolPermission> AgentToolPermissions => Set<AgentToolPermission>();
     public DbSet<AgentRun> AgentRuns => Set<AgentRun>();
@@ -145,7 +146,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     }
 
     private static readonly HashSet<string> SkippedProperties =
-        [nameof(Entity.Version), nameof(Entity.CreatedAt), nameof(Entity.CreatedBy), nameof(Entity.UpdatedAt), nameof(Entity.UpdatedBy)];
+        [nameof(Entity.Version), nameof(Entity.CreatedAt), nameof(Entity.CreatedBy), nameof(Entity.UpdatedAt), nameof(Entity.UpdatedBy),
+            nameof(AiProviderCredential.EncryptedSecret)];
 
     private List<AuditLog> BuildAuditEntries(DateTimeOffset now)
     {

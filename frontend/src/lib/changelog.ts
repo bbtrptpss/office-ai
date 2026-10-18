@@ -31,6 +31,17 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.8",
+    date: "2026-10-18",
+    title: { th: "ใส่ API key ได้ที่หน้าตั้งค่า AI", en: "API keys on the AI settings page" },
+    changes: [
+      { type: "added", th: "ใส่ API key ของ Claude / OpenAI / Gemini ได้ที่หน้าตั้งค่า AI มีผลทันทีโดยไม่ต้องแก้ .env หรือรีสตาร์ต (ถ้าไม่ได้ใส่ ระบบใช้ค่าใน .env เหมือนเดิม)", en: "Enter Claude / OpenAI / Gemini API keys on the AI settings page — effective immediately, no .env edit or restart (.env still works as a fallback)" },
+      { type: "added", th: "ปุ่มทดสอบการเชื่อมต่อ ตรวจ key กับผู้ให้บริการโดยไม่เสียค่าใช้จ่าย", en: "“Test connection” checks a key with the provider at no cost" },
+      { type: "security", th: "Key ถูกเข้ารหัสก่อนเก็บ แสดงแค่ 4 ตัวท้าย ไม่ถูกส่งกลับทาง API และไม่ลง Audit log — เฉพาะคนที่มีสิทธิ์ agent.manage (ไม่ใช่ AI) ตั้งค่าได้", en: "Keys are encrypted at rest, shown only as the last 4 characters, never returned by the API or written to the audit log — only people with agent.manage (never AI) can set them" },
+      { type: "fixed", th: "เพิ่มโมเดลใหม่พร้อมราคาได้แล้วที่หน้าตั้งค่า AI (เวอร์ชัน 0.7.5 บอกว่าทำได้ แต่ยังไม่มีปุ่มจริง)", en: "Models can now be added with their prices on the AI settings page (v0.7.5 said so, but the button did not exist)" },
+    ],
+  },
+  {
     version: "0.7.7",
     date: "2026-10-18",
     title: { th: "งาน AI ทำต่อได้หลังเซิร์ฟเวอร์รีสตาร์ต", en: "AI runs resume after a server restart" },
@@ -180,7 +191,7 @@ export const CHANGELOG: Release[] = [
 ];
 
 export const TODO: Todo[] = [
-  { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ใส่ ANTHROPIC_API_KEY เพื่อให้ Claude ทำงานจริงครั้งแรก", en: "Set ANTHROPIC_API_KEY for the first real Claude run" },
+  { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "สั่งงาน AI จริงครั้งแรก (Claude เชื่อมต่อแล้ว)", en: "Start the first real AI run (Claude is connected)" },
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },

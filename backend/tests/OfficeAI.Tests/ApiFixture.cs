@@ -39,6 +39,7 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("RateLimits:LoginPerMinute", "1000");
             b.UseSetting("AiProviders:Simulated:Enabled", "true");
             b.UseSetting("AiProviders:Anthropic:ApiKey", "");
+            b.UseSetting("AiProviders:OpenAI:BaseUrl", "http://127.0.0.1:9/v1"); // key checks fail fast, never reach the internet
             b.UseSetting("Workflow:AutoTick", "false"); // tests drive the engine explicitly
             b.UseSetting("Repositories:Root", RepoRoot);
             b.UseSetting("Repositories:AllowLocalRemotes", "true"); // tests use local bare repositories as "GitHub"

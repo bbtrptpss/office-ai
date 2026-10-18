@@ -151,7 +151,11 @@ public static class Endpoints
     {
         // Configuration (human only: agent.manage is never usable by AI identities)
         api.MapGet("/ai/providers", (AgentAdminService s) => s.ListProviders()).RequirePermission(Permissions.AgentRead);
+        api.MapPut("/ai/providers/{name}/key", (string name, SetProviderKeyRequest r, AgentAdminService s, CancellationToken ct) => s.SetKeyAsync(name, r, ct)).RequirePermission(Permissions.AgentManage);
+        api.MapDelete("/ai/providers/{name}/key", (string name, AgentAdminService s, CancellationToken ct) => s.RemoveKeyAsync(name, ct)).RequirePermission(Permissions.AgentManage);
+        api.MapPost("/ai/providers/{name}/verify", (string name, AgentAdminService s, CancellationToken ct) => s.VerifyAsync(name, ct)).RequirePermission(Permissions.AgentManage);
         api.MapGet("/ai/models", (AgentAdminService s, CancellationToken ct) => s.ListModelsAsync(ct)).RequirePermission(Permissions.AgentRead);
+        api.MapPost("/ai/models", (CreateAiModelRequest r, AgentAdminService s, CancellationToken ct) => s.CreateModelAsync(r, ct)).RequirePermission(Permissions.AgentManage);
         api.MapPut("/ai/models/{id:guid}", (Guid id, UpdateAiModelRequest r, AgentAdminService s, CancellationToken ct) => s.UpdateModelAsync(id, r, ct)).RequirePermission(Permissions.AgentManage);
         api.MapGet("/ai/tools", (AgentAdminService s) => s.ListTools()).RequirePermission(Permissions.AgentRead);
         api.MapGet("/agents/{employeeId:guid}/config", (Guid employeeId, AgentAdminService s, CancellationToken ct) => s.GetConfigAsync(employeeId, ct)).RequirePermission(Permissions.AgentRead);

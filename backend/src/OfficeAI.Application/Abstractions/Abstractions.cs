@@ -25,6 +25,7 @@ public interface IAppDbContext
     DbSet<TaskAssignment> TaskAssignments { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<AiModel> AiModels { get; }
+    DbSet<AiProviderCredential> AiProviderCredentials { get; }
     DbSet<AgentConfiguration> AgentConfigurations { get; }
     DbSet<AgentToolPermission> AgentToolPermissions { get; }
     DbSet<AgentRun> AgentRuns { get; }

@@ -23,6 +23,16 @@ public class AiModel : Entity, IAuditable
     public bool IsEnabled { get; set; } = true;
 }
 
+/// <summary>An AI provider key entered on the AI settings page. Only the encrypted value and its last 4 characters are stored.</summary>
+public class AiProviderCredential : Entity, IAuditable
+{
+    public required string Provider { get; set; }
+
+    /// <summary>DataProtection-encrypted key. Never audited, never returned by the API.</summary>
+    public required string EncryptedSecret { get; set; }
+    public required string Last4 { get; set; }
+}
+
 public enum Effort
 {
     Low = 1,

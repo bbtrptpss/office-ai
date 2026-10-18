@@ -6,6 +6,18 @@ using OfficeAI.Domain.Work;
 
 namespace OfficeAI.Infrastructure.Persistence;
 
+internal class AiProviderCredentialConfig : IEntityTypeConfiguration<AiProviderCredential>
+{
+    public void Configure(EntityTypeBuilder<AiProviderCredential> b)
+    {
+        EntityConfig.Base(b);
+        b.ToTable("AiProviderCredentials");
+        b.Property(c => c.Provider).HasMaxLength(40);
+        b.Property(c => c.Last4).HasMaxLength(4);
+        b.HasIndex(c => c.Provider).IsUnique();
+    }
+}
+
 internal class AiModelConfig : IEntityTypeConfiguration<AiModel>
 {
     public void Configure(EntityTypeBuilder<AiModel> b)
