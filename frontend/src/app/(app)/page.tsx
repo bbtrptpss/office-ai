@@ -57,7 +57,7 @@ export default function DashboardPage() {
 
 function TaskListCard({ dashboard }: { dashboard: Dashboard }) {
   const { t, label } = useI18n();
-  const { data, reload } = useLoad(() => api.get<RecentTask[]>("/api/tasks/recent?take=6"));
+  const { data, reload } = useLoad(() => api.get<RecentTask[]>("/api/tasks/recent?take=3"));
   useRealtime("taskChanged", () => void reload());
   const pct = dashboard.totalTasks ? (dashboard.completedTasks / dashboard.totalTasks) * 100 : 0;
   return (
