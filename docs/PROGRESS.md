@@ -111,7 +111,7 @@ Security testing, reliability/concurrency testing, observability, backup/restore
 | M5 | Deployment guide + production compose override (HTTPS proxy, no simulated AI, secrets) | done (docs/DEPLOYMENT.md, docker-compose.prod.yml + Caddy; config validated; change-password endpoint + UI added) |
 | M6 | Quality & Security overview page (tests, merge requests, failed runs, security events) | done (135 tests; verified in browser) |
 
-## Phase 7 — Company communication ✅ (branch phase-7)
+## Phase 7 — Company communication ✅ (merged to master)
 
 Company chat, internal announcements, meeting agendas/minutes (Master Prompt §8 and the "Company Chat" navigation item).
 
