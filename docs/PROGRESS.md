@@ -2,6 +2,8 @@
 
 Resume here. Each phase is built on its own branch and committed per milestone.
 
+**Update log rule:** every change adds an entry (and updates the remaining-work list) in `frontend/src/lib/changelog.ts`, in the same commit. It is shown in the app at `/updates` (เมนู “บันทึกอัปเดต”).
+
 ## Phase 1 — Company foundation ✅ (master, 1fbcb9f)
 
 ## Phase 2 — AI employee execution ✅ (merged to master)

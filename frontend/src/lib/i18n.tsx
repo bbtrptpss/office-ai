@@ -321,6 +321,19 @@ const th = {
   cancelMeeting: "ยกเลิกการประชุม",
   organizer: "ผู้จัด",
   minutesBy: "เขียนโดย",
+  navUpdates: "บันทึกอัปเดต",
+  updateLog: "สิ่งที่เพิ่ม / แก้ไข",
+  remainingWork: "งานที่เหลือ",
+  currentVersion: "เวอร์ชันปัจจุบัน",
+  latest: "ล่าสุด",
+  newBadge: "ใหม่",
+  changeAdded: "เพิ่ม",
+  changeChanged: "ปรับปรุง",
+  changeFixed: "แก้ไข",
+  changeSecurity: "ความปลอดภัย",
+  todoPlanned: "แผนงานถัดไป",
+  todoWaitingCeo: "รอการตัดสินใจจาก CEO",
+  todoWaitingHint: "ทำต่อได้ทันทีเมื่อได้รับคำตอบ",
 };
 
 type Dict = typeof th;
@@ -626,6 +639,19 @@ const en: Dict = {
   cancelMeeting: "Cancel meeting",
   organizer: "Organizer",
   minutesBy: "Written by",
+  navUpdates: "Update log",
+  updateLog: "Added / fixed",
+  remainingWork: "Remaining work",
+  currentVersion: "Current version",
+  latest: "Latest",
+  newBadge: "New",
+  changeAdded: "Added",
+  changeChanged: "Changed",
+  changeFixed: "Fixed",
+  changeSecurity: "Security",
+  todoPlanned: "Planned next",
+  todoWaitingCeo: "Waiting for the CEO",
+  todoWaitingHint: "work continues as soon as there is an answer",
 };
 
 const statusTh: Record<string, string> = {

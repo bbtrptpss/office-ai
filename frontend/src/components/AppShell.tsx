@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -19,6 +19,7 @@ import TaskAltIcon from "@mui/icons-material/TaskAltOutlined";
 import ForumIcon from "@mui/icons-material/ForumOutlined";
 import CampaignIcon from "@mui/icons-material/CampaignOutlined";
 import EventIcon from "@mui/icons-material/EventOutlined";
+import NewReleasesIcon from "@mui/icons-material/NewReleasesOutlined";
 import MenuBookIcon from "@mui/icons-material/MenuBookOutlined";
 import PaymentsIcon from "@mui/icons-material/PaymentsOutlined";
 import VerifiedUserIcon from "@mui/icons-material/VerifiedUserOutlined";
@@ -37,13 +38,14 @@ import { Announcement, api, Approval, ChatChannel } from "@/lib/api";
 import { useLoad } from "./common";
 import { Avatar, Mascot } from "@/components/cute";
 import { brand } from "@/theme";
+import { LATEST_VERSION, SEEN_KEY } from "@/lib/changelog";
 
 const DRAWER_WIDTH = 264;
 
 type NavKey =
   | "navDashboard" | "navOrganization" | "navEmployees" | "navDepartments" | "navProjects" | "navActivity"
   | "navApprovals" | "navChat" | "navAnnouncements" | "navMeetings" | "navKnowledge" | "navFinance" | "navQuality" | "navIntegrations"
-  | "navSecurity" | "navAudit" | "aiSettings" | "companySettings";
+  | "navSecurity" | "navAudit" | "aiSettings" | "companySettings" | "navUpdates";
 
 interface NavItem {
   key: NavKey;
@@ -73,6 +75,7 @@ const NAV: NavItem[] = [
   { key: "aiSettings", href: "/ai-settings", icon: <SmartToyIcon />, permission: "agent.read" },
   { key: "navSecurity", href: "/security", icon: <AdminPanelSettingsIcon />, permission: "security.manage" },
   { key: "navAudit", href: "/audit", icon: <HistoryIcon />, permission: "audit.read" },
+  { key: "navUpdates", href: "/updates", icon: <NewReleasesIcon /> },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -92,6 +95,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const unreadChat = useUnreadChat(can("org.read"));
   const unreadNews = useUnreadAnnouncements(can("org.read"));
   const badges: Partial<Record<NavKey, number>> = { navApprovals: pending, navChat: unreadChat, navAnnouncements: unreadNews };
+  const updatesUnseen = useUpdatesUnseen();
 
   const drawer = (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -119,6 +123,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
               <ListItemText primary={t[item.key]} />
               {(badges[item.key] ?? 0) > 0 && <Chip size="small" color="secondary" label={badges[item.key]! > 99 ? "99+" : badges[item.key]} sx={{ height: 20, fontWeight: 700 }} />}
+              {item.key === "navUpdates" && updatesUnseen && <Chip size="small" color="secondary" label={t.newBadge} sx={{ height: 20, fontWeight: 700 }} />}
               {item.phase && <Chip size="small" variant="outlined" label={`${t.comingInPhase} ${item.phase}`} sx={{ height: 20, fontSize: 11 }} />}
             </ListItemButton>
           );
@@ -205,6 +210,24 @@ function usePendingApprovals(enabled: boolean) {
   const { data, reload } = useLoad(async () => (enabled ? (await api.get<Approval[]>("/api/approvals?status=Pending")).length : 0), String(enabled));
   useRealtime("approvalsChanged", () => void reload());
   return data ?? 0;
+}
+
+/** True while this browser has not opened /updates since the latest release. */
+function useUpdatesUnseen() {
+  return useSyncExternalStore(
+    (notify) => {
+      window.addEventListener("officeai:updatesSeen", notify);
+      window.addEventListener("storage", notify);
+      return () => {
+        window.removeEventListener("officeai:updatesSeen", notify);
+        window.removeEventListener("storage", notify);
+      };
+    },
+    () => {
+      try { return localStorage.getItem(SEEN_KEY) !== LATEST_VERSION; } catch { return false; }
+    },
+    () => false,
+  );
 }
 
 /** Unread chat messages across channels, refreshed on every new message. */
