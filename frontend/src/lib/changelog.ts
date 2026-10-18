@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.10.1",
+    date: "2026-10-18",
+    title: { th: "ออฟฟิศ 3D: ทางเดินเชื่อมทุกห้อง + โซนนั่งเล่น", en: "3D Office: connected corridors + a lounge" },
+    changes: [
+      { type: "added", th: "ทุกห้องเชื่อมกันด้วยทางเดิน พนักงานที่ว่างจะเดินออกจากโต๊ะไปแวะห้องอื่น (💬) หรือไปนั่งพักที่โซนนั่งเล่น (☕) แล้วเดินกลับมา โดยเดินตามทางเดิน ไม่ทะลุกำแพง", en: "Rooms are joined by corridors: free employees walk to other rooms (💬) or take a break in the lounge (☕) and come back, following the corridors rather than through walls" },
+      { type: "added", th: "โซนนั่งเล่น: โซฟา 2 ตัว โต๊ะกาแฟ บีนแบ็ก บาร์กาแฟ และชั้นหนังสือ — ที่นั่งไม่ซ้อนกัน", en: "Lounge with two sofas, a coffee table, bean bags, a coffee bar and a bookshelf — no two people share a seat" },
+      { type: "changed", th: "ถ้าสถานะจริงเปลี่ยน (เช่นได้รับงาน) ระหว่างเดินเล่นหรือนั่งพัก ตัวละครจะรีบเดินกลับโต๊ะทันทีแล้วเริ่มทำงาน", en: "If the live status changes (e.g. work arrives) during a stroll or a break, the character hurries back to the desk and starts working" },
+    ],
+  },
+  {
     version: "0.10.0",
     date: "2026-10-18",
     title: { th: "ออฟฟิศ 3D", en: "3D Office" },
