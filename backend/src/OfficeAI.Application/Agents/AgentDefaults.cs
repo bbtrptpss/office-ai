@@ -37,6 +37,9 @@ public static class AgentDefaults
         foreach (var id in ToolRegistry.DefaultGrants) yield return id;
         yield return Delivery.ReadRequirementsTool.ToolId;
         yield return Knowledge.SearchKnowledgeTool.ToolId;
+        foreach (var id in CommsTools) yield return id;
+        if (Writers.Contains(roleCode ?? "") || level is OrgLevel.Executive or OrgLevel.Head) yield return Communication.DraftMinutesTool.ToolId;
+        if (level is OrgLevel.Executive) yield return Communication.DraftAnnouncementTool.ToolId;
         if (level is OrgLevel.Executive or OrgLevel.Head or OrgLevel.Senior || Writers.Contains(roleCode ?? "")) yield return Knowledge.ProposeKnowledgeTool.ToolId;
         if (Writers.Contains(roleCode ?? "")) yield return Knowledge.WriteDocumentTool.ToolId;
         if (level is OrgLevel.Executive or OrgLevel.Head) yield return Workflows.PlanSubmitTool.ToolId;
@@ -62,6 +65,10 @@ public static class AgentDefaults
     private static readonly HashSet<string> Engineers = new(StringComparer.OrdinalIgnoreCase) { "ARCH", "BACKEND", "FRONTEND", "MOBILE", "DBENG", "DEVOPS", "INTEG" };
     private static readonly HashSet<string> Writers = new(StringComparer.OrdinalIgnoreCase) { "DOCS", "PM", "PROPOSAL", "SOLCON", "RELEASE", "BA", "BREQ", "ACCMGR" };
     private static readonly HashSet<string> Quality = new(StringComparer.OrdinalIgnoreCase) { "QAENG", "AUTOTEST", "REVIEWER", "SECENG", "RELEASE" };
+
+    /// <summary>Every AI employee can follow and post in its project's channel and see the project's meetings.</summary>
+    public static readonly string[] CommsTools =
+        [Communication.ReadChatTool.ToolId, Communication.PostChatTool.ToolId, Communication.ListMeetingsTool.ToolId];
 
     public static readonly string[] CodeReadTools =
         [Code.ListFilesTool.ToolId, Code.ReadFileTool.ToolId, Code.SearchCodeTool.ToolId, Code.DiffTool.ToolId, Code.RunTestsTool.ToolId];

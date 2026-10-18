@@ -123,4 +123,13 @@ public class SignalRNotifier(IHubContext<EventsHub> hub) : IRealtimeNotifier
 
     public Task ApprovalsChangedAsync(CancellationToken ct = default) =>
         hub.Clients.All.SendAsync("approvalsChanged", ct);
+
+    public Task ChatMessageAsync(Guid channelId, Guid messageId, CancellationToken ct = default) =>
+        hub.Clients.All.SendAsync("chatMessage", new { channelId, messageId }, ct);
+
+    public Task AnnouncementsChangedAsync(CancellationToken ct = default) =>
+        hub.Clients.All.SendAsync("announcementsChanged", ct);
+
+    public Task MeetingChangedAsync(Guid meetingId, CancellationToken ct = default) =>
+        hub.Clients.All.SendAsync("meetingChanged", new { meetingId }, ct);
 }

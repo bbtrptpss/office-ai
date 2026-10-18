@@ -26,6 +26,13 @@ async function ensureStarted() {
   await starting;
 }
 
+const LOCAL_PREFIX = "officeai:";
+
+/** Raise an event inside this tab only (e.g. "I just read this channel"), delivered to the same useRealtime subscribers. */
+export function emitLocal<T>(event: string, payload?: T) {
+  window.dispatchEvent(new CustomEvent(LOCAL_PREFIX + event, { detail: payload }));
+}
+
 export async function stopRealtime() {
   if (connection) await connection.stop();
 }
@@ -48,7 +55,12 @@ export function useRealtime<T = unknown>(event: string, handler: (payload: T) =>
     c.onreconnecting(update);
     c.onclose(update);
     ensureStarted().then(update).catch(update);
-    return () => c.off(event, listener);
+    const local = (e: Event) => handlerRef.current((e as CustomEvent<T>).detail);
+    window.addEventListener(LOCAL_PREFIX + event, local);
+    return () => {
+      c.off(event, listener);
+      window.removeEventListener(LOCAL_PREFIX + event, local);
+    };
   }, [event]);
 
   return connected;

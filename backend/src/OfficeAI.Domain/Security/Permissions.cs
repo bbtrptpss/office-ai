@@ -20,6 +20,8 @@ public static class Permissions
     public const string FinanceRead = "finance.read";
     public const string FinanceManage = "finance.manage";
     public const string KnowledgeManage = "knowledge.manage";
+    public const string CommsPost = "comms.post";
+    public const string CommsManage = "comms.manage";
 
     public static readonly IReadOnlyDictionary<string, string> All = new Dictionary<string, string>
     {
@@ -40,10 +42,12 @@ public static class Permissions
         [FinanceRead] = "View finance and performance reports",
         [FinanceManage] = "Set company, department and project budgets",
         [KnowledgeManage] = "Validate, write and archive company knowledge; finalize documents",
+        [CommsPost] = "Post in company chat and record meeting notes",
+        [CommsManage] = "Publish announcements, schedule meetings, approve minutes and moderate chat",
     };
 
     /// <summary>Permissions an AI identity can never use, whatever roles it holds.</summary>
-    public static readonly IReadOnlySet<string> HumanOnly = new HashSet<string> { SecurityManage, TaskApprove, AgentManage, FinanceManage, KnowledgeManage };
+    public static readonly IReadOnlySet<string> HumanOnly = new HashSet<string> { SecurityManage, TaskApprove, AgentManage, FinanceManage, KnowledgeManage, CommsManage };
 }
 
 public static class SystemRoles
@@ -62,9 +66,10 @@ public static class SystemRoles
             Permissions.OrgRead, Permissions.ProjectRead, Permissions.ProjectManage, Permissions.TaskRead,
             Permissions.TaskManage, Permissions.TaskAssign, Permissions.TaskUpdateStatus, Permissions.TaskApprove,
             Permissions.AgentRead, Permissions.AgentRun, Permissions.FinanceRead, Permissions.KnowledgeManage,
+            Permissions.CommsPost, Permissions.CommsManage,
         ],
-        [Member] = [Permissions.OrgRead, Permissions.ProjectRead, Permissions.TaskRead, Permissions.TaskUpdateStatus, Permissions.AgentRead],
+        [Member] = [Permissions.OrgRead, Permissions.ProjectRead, Permissions.TaskRead, Permissions.TaskUpdateStatus, Permissions.AgentRead, Permissions.CommsPost],
         [Auditor] = [Permissions.OrgRead, Permissions.ProjectRead, Permissions.TaskRead, Permissions.AuditRead, Permissions.AgentRead, Permissions.FinanceRead],
-        [AiAgent] = [Permissions.OrgRead, Permissions.ProjectRead, Permissions.TaskRead, Permissions.TaskUpdateStatus],
+        [AiAgent] = [Permissions.OrgRead, Permissions.ProjectRead, Permissions.TaskRead, Permissions.TaskUpdateStatus, Permissions.CommsPost],
     };
 }

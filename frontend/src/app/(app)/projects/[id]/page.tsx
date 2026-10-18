@@ -6,7 +6,9 @@ import {
   Divider, FormControlLabel, MenuItem, Stack, Switch, Tab, Tabs, TextField, Typography,
 } from "@mui/material";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react";
+import Link from "next/link";
 import AddIcon from "@mui/icons-material/Add";
+import ForumIcon from "@mui/icons-material/ForumOutlined";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { AgentRun, api, Deliverable, Employee, Milestone, Project, Review, Task, TaskPriority, TaskStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -114,6 +116,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
         }
         actions={
           <>
+            {can("org.read") && <Button component={Link} href={`/chat?project=${id}`} startIcon={<ForumIcon />}>{t.openProjectChat}</Button>}
             {can("project.manage") && <Button onClick={() => setMilestoneName("")}>{t.newMilestone}</Button>}
             {can("task.manage") && (
               <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setMessage(null); setNewTask(emptyForm); }}>

@@ -80,6 +80,7 @@ const STATUS_COLORS: Record<string, ChipProps["color"]> = {
   Merged: "success", Passed: "success", Open: "info", Conflict: "error", Proposed: "info", Must: "error", Should: "warning",
   Ok: "success", Warning: "warning", Exceeded: "error", Validated: "success", Final: "success", Sent: "success", Archived: "default",
   Denied: "error", TimedOut: "warning", InvalidInput: "warning", Submitted: "info", Accepted: "success", Rejected: "error",
+  Published: "success", Important: "error", Scheduled: "info", Held: "success", Attended: "success", Absent: "warning",
 };
 
 export function StatusChip({ value }: { value: string }) {
