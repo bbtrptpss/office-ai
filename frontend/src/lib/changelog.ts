@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.10.0",
+    date: "2026-10-18",
+    title: { th: "ออฟฟิศ 3D", en: "3D Office" },
+    changes: [
+      { type: "added", th: "เมนูใหม่ “ออฟฟิศ 3D”: ทุกแผนกเป็นห้อง มีโต๊ะ จอ และพนักงานทุกคนเป็นตัวละคร 3D หมุน ซูม และเลื่อนดูได้", en: "New “3D Office” page: each department is a room with desks, screens and every employee as a 3D character; rotate, zoom and pan" },
+      { type: "added", th: "ตัวละครขยับตามสถานะจริงทันที: กำลังทำงาน = นั่งพิมพ์และจอเรือง, ว่าง = เดินเล่นรอบโต๊ะ, รออนุมัติ = ยกมือ, ติดขัด/ล้มเหลว/ปิดใช้งาน = มีป้ายบอก", en: "Characters follow live status: working = typing with a glowing screen, available = strolling by the desk, waiting approval = hand raised, blocked/failed/inactive = a status bubble" },
+      { type: "added", th: "คลิกตัวละครเพื่อดูชื่อ ตำแหน่ง สถานะ และงานที่กำลังทำ พร้อมลิงก์ไปโปรไฟล์", en: "Click a character for name, role, status and current task, with a link to the profile" },
+    ],
+  },
+  {
     version: "0.9.1",
     date: "2026-10-18",
     title: { th: "สำรองข้อมูลอัตโนมัติ + ทีม AI แก้โค้ดระบบได้", en: "Automatic backups + the AI team can work on this system" },

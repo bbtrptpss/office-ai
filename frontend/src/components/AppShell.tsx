@@ -10,6 +10,7 @@ import {
 import { useColorScheme } from "@mui/material/styles";
 import MenuIcon from "@mui/icons-material/Menu";
 import DashboardIcon from "@mui/icons-material/SpaceDashboardOutlined";
+import ViewInArIcon from "@mui/icons-material/ViewInArOutlined";
 import AccountTreeIcon from "@mui/icons-material/AccountTreeOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleAltOutlined";
 import ApartmentIcon from "@mui/icons-material/ApartmentOutlined";
@@ -44,7 +45,7 @@ import { LATEST_VERSION, SEEN_KEY } from "@/lib/changelog";
 const DRAWER_WIDTH = 272;
 
 /** Pages also offered as pill tabs in the top bar, like the reference design's Dashboard / Widgets / Recent. */
-const TOP_TABS: NavKey[] = ["navDashboard", "navProjects", "navChat", "navApprovals"];
+const TOP_TABS: NavKey[] = ["navDashboard", "navOffice", "navProjects", "navChat", "navApprovals"];
 
 /** A frosted-glass panel floating over the starry background. */
 const glassPanel = (th: import("@mui/material/styles").Theme) => ({
@@ -56,7 +57,7 @@ const glassPanel = (th: import("@mui/material/styles").Theme) => ({
 });
 
 type NavKey =
-  | "navDashboard" | "navOrganization" | "navEmployees" | "navDepartments" | "navProjects" | "navActivity"
+  | "navDashboard" | "navOffice" | "navOrganization" | "navEmployees" | "navDepartments" | "navProjects" | "navActivity"
   | "navApprovals" | "navChat" | "navAnnouncements" | "navMeetings" | "navKnowledge" | "navFinance" | "navQuality" | "navIntegrations"
   | "navSecurity" | "navAudit" | "aiSettings" | "companySettings" | "navUpdates";
 
@@ -71,6 +72,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { key: "navDashboard", href: "/", icon: <DashboardIcon />, permission: "project.read" },
+  { key: "navOffice", href: "/office", icon: <ViewInArIcon />, permission: "org.read" },
   { key: "navOrganization", href: "/organization", icon: <AccountTreeIcon />, permission: "org.read" },
   { key: "navEmployees", href: "/employees", icon: <PeopleIcon />, permission: "org.read" },
   { key: "navDepartments", href: "/departments", icon: <ApartmentIcon />, permission: "org.read" },

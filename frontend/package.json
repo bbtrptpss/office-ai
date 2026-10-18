@@ -16,16 +16,20 @@
     "@mui/icons-material": "^7.3.4",
     "@mui/material": "^7.3.4",
     "@mui/material-nextjs": "^9.5.0",
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
     "motion": "^12.43.0",
     "next": "^16.4.2",
     "react": "19.2",
-    "react-dom": "19.2"
+    "react-dom": "19.2",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@types/node": "^20",
     "@types/react": "19.2",
     "@types/react-dom": "19.2",
+    "@types/three": "^0.186.0",
     "eslint": "^9",
     "eslint-config-next": "^16.4.2",
     "typescript": "^5"

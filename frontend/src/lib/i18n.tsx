@@ -30,6 +30,10 @@ const th = {
 
   // navigation
   navDashboard: "Executive Dashboard",
+  navOffice: "ออฟฟิศ 3D",
+  officeHint: "ทุกแผนกเป็นห้อง พนักงานขยับตามสถานะจริงของระบบ — คลิกที่ตัวละครเพื่อดูรายละเอียด",
+  officeControls: "ลากเพื่อหมุน · เลื่อนลูกกลิ้งเพื่อซูม · คลิกขวาลากเพื่อเลื่อน",
+  officeProfile: "ดูโปรไฟล์",
   navOrganization: "ผังองค์กร",
   navEmployees: "พนักงาน",
   navDepartments: "แผนกและตำแหน่ง",
@@ -409,6 +413,10 @@ const en: Dict = {
   forbidden: "You don't have permission to do this",
   comingInPhase: "Phase",
   navDashboard: "Executive Dashboard",
+  navOffice: "3D Office",
+  officeHint: "Each department is a room; everyone moves with their live status — click a character for details",
+  officeControls: "Drag to rotate · scroll to zoom · right-drag to pan",
+  officeProfile: "Open profile",
   navOrganization: "Organization",
   navEmployees: "Employees",
   navDepartments: "Departments & positions",
