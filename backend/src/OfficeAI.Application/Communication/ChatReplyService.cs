@@ -67,7 +67,10 @@ public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, Re
         {
             log.LogWarning(ex, "Chat reply {ReplyId} failed", reply.Id);
             var reason = ex is AiProviderException ? ex.Message : "Unexpected error.";
-            await FinishAsync(reply, employee, channel, ChatReplyStatus.Failed, $"ขอโทษครับ ตอนนี้ตอบไม่ได้ {Explain(reason)}", reason, false);
+            var explain = ex is AiProviderException { RateLimited: true } p && AiRetry.IsLongTermQuota(p)
+                ? "เพราะโควตาของ AI หมดแล้ว (เช่นโควตารายวันของ free tier) ลองใหม่ภายหลัง หรือเปลี่ยนโมเดล/ใช้แบบเสียเงิน"
+                : Explain(reason);
+            await FinishAsync(reply, employee, channel, ChatReplyStatus.Failed, $"ขอโทษครับ ตอนนี้ตอบไม่ได้ {explain}", reason, false);
         }
         finally
         {
@@ -78,6 +81,9 @@ public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, Re
     /// <summary>A plain-language reason people can act on; the full provider message stays on the reply record.</summary>
     private static string Explain(string reason) =>
         reason.Contains("credit balance", StringComparison.OrdinalIgnoreCase) ? "เพราะเครดิตของบัญชี AI หมด (ต้องเติมเครดิตที่ผู้ให้บริการ)"
+        : reason.Contains("rate limit", StringComparison.OrdinalIgnoreCase)
+          && (reason.Contains("per day", StringComparison.OrdinalIgnoreCase) || reason.Contains("PerDay", StringComparison.Ordinal) || reason.Contains("daily", StringComparison.OrdinalIgnoreCase))
+            ? "เพราะโควตารายวันของ AI (free tier) หมดแล้ว ลองใหม่พรุ่งนี้ หรือเปลี่ยนไปใช้แบบเสียเงิน"
         : reason.Contains("rate limit", StringComparison.OrdinalIgnoreCase) ? "เพราะมีการใช้งาน AI มากเกินไปชั่วคราว ลองใหม่อีกสักครู่"
         : reason.Contains("authentication", StringComparison.OrdinalIgnoreCase) || reason.Contains("api key", StringComparison.OrdinalIgnoreCase)
             ? "เพราะ API key ใช้ไม่ได้ (ตรวจที่หน้าตั้งค่า AI)"
@@ -123,16 +129,22 @@ public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, Re
         return sb.ToString();
     }
 
-    private static async Task<AiResponse> CallAsync(IAiProvider provider, AiRequest request, CancellationToken ct)
+    /// <summary>A person is waiting in chat: sit out a short rate limit, then explain instead of making them wait minutes.</summary>
+    public static readonly TimeSpan MaxTotalWait = TimeSpan.FromSeconds(45);
+
+    private async Task<AiResponse> CallAsync(IAiProvider provider, AiRequest request, CancellationToken ct)
     {
+        var waited = TimeSpan.Zero;
         for (var attempt = 0; ; attempt++)
         {
             try
             {
                 return await provider.CompleteAsync(request, ct);
             }
-            catch (AiProviderException ex) when (AiRetry.Delay(ex, attempt) is { } wait)
+            catch (AiProviderException ex) when (AiRetry.Delay(ex, attempt) is { } wait && waited + wait <= MaxTotalWait)
             {
+                log.LogWarning("Chat reply: {Provider} call failed ({Error}); retrying in {Wait}", provider.Name, ex.Message, wait);
+                waited += wait;
                 await Task.Delay(wait, ct);
             }
         }

@@ -184,5 +184,9 @@ public class ProviderAdapterTests
         Assert.NotNull(AiRetry.Delay(transient, 1));
         Assert.Null(AiRetry.Delay(transient, AiRetry.MaxTransientRetries));
         Assert.Null(AiRetry.Delay(new AiProviderException("bad request", retryable: false), 0));
+        // Waiting cannot fix a daily quota or a provider asking for hours: stop at once.
+        Assert.Null(AiRetry.Delay(new AiProviderException("Gemini rate limit reached: Quota exceeded for metric generate_content_free_tier_requests, limit: 20 per day",
+            retryable: true, rateLimited: true), 0));
+        Assert.Null(AiRetry.Delay(new AiProviderException("slow", retryable: true, rateLimited: true, retryAfter: TimeSpan.FromHours(3)), 0));
     }
 }

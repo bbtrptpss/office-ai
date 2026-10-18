@@ -181,7 +181,7 @@ internal static class HttpAi
             var detail = ErrorMessage(text) ?? response.ReasonPhrase;
             var status = (int)response.StatusCode;
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
-                throw new AiProviderException($"{providerLabel} rate limit reached.", retryable: true, rateLimited: true, retryAfter: RetryAfter(response, text));
+                throw new AiProviderException($"{providerLabel} rate limit reached: {detail}", retryable: true, rateLimited: true, retryAfter: RetryAfter(response, text));
             if (status >= 500) throw new AiProviderException($"{providerLabel} service error ({status}).", retryable: true);
             throw new AiProviderException($"{providerLabel} rejected the request ({status}): {detail}", retryable: false);
         }

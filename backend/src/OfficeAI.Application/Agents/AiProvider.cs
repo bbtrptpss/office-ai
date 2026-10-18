@@ -95,13 +95,19 @@ public static class AiRetry
     public const int MaxRateLimitRetries = 5;
     public static readonly TimeSpan MaxWait = TimeSpan.FromSeconds(60);
 
+    /// <summary>A quota that resets daily (or a wait longer than we are willing to sit out): retrying now cannot help.</summary>
+    public static bool IsLongTermQuota(AiProviderException ex) =>
+        ex.RateLimited && (ex.RetryAfter > MaxWait
+            || ex.Message.Contains("per day", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("PerDay", StringComparison.Ordinal)
+            || ex.Message.Contains("daily", StringComparison.OrdinalIgnoreCase));
+
     /// <summary>Null when the call should not be retried again; otherwise how long to wait first.</summary>
     public static TimeSpan? Delay(AiProviderException ex, int attempt)
     {
         if (!ex.Retryable) return null;
         if (ex.RateLimited)
         {
-            if (attempt >= MaxRateLimitRetries) return null;
+            if (attempt >= MaxRateLimitRetries || IsLongTermQuota(ex)) return null;
             var wait = ex.RetryAfter ?? TimeSpan.FromSeconds(10 * Math.Pow(2, attempt));
             return wait > MaxWait ? MaxWait : wait < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : wait;
         }

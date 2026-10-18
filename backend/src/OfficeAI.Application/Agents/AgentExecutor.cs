@@ -311,7 +311,7 @@ public sealed class AgentExecutor(
             }
             catch (AiProviderException ex) when (AiRetry.Delay(ex, attempt) is { } wait)
             {
-                log.LogWarning(ex, "Provider {Provider} call failed (attempt {Attempt}); retrying in {Wait}", provider.Name, attempt + 1, wait);
+                log.LogWarning("Provider {Provider} call failed (attempt {Attempt}: {Error}); retrying in {Wait}", provider.Name, attempt + 1, ex.Message, wait);
                 await Task.Delay(wait, clock, ct);
             }
         }

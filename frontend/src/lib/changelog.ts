@@ -36,6 +36,8 @@ export const CHANGELOG: Release[] = [
     title: { th: "รอโควตา AI อย่างถูกวิธี + Network Engineer", en: "Patient retries on AI rate limits + Network Engineer" },
     changes: [
       { type: "fixed", th: "เมื่อชนโควตาของผู้ให้บริการ AI (เช่น Gemini free tier) ระบบรอตามเวลาที่ผู้ให้บริการบอกแล้วลองใหม่ได้สูงสุด 5 ครั้ง แทนการล้มเหลวทันที", en: "On AI provider rate limits (e.g. Gemini free tier) the system waits as long as the provider asks and retries up to 5 times instead of failing" },
+      { type: "fixed", th: "ถ้าโควตาหมดแบบรอนานเกิน 1 นาที (เช่นโควตารายวัน) ระบบหยุดทันทีและบอกเหตุผลจริง แทนการรอจนหมดเวลา และในแชท AI รอไม่เกิน 45 วินาทีแล้วอธิบายเหตุผล", en: "When a quota needs more than a minute (e.g. a daily quota) the system stops at once with the real reason instead of waiting out the time limit; chat replies wait at most 45 seconds, then explain" },
+      { type: "changed", th: "บันทึกข้อความ error จริงจากผู้ให้บริการ AI ไว้ใน log และประวัติงาน เพื่อให้รู้สาเหตุ", en: "The provider's actual error message is kept in logs and run history" },
       { type: "added", th: "แผนกออกแบบและการตลาด พร้อมพนักงาน AI 7 ตำแหน่ง และ Network Engineer AI สำหรับดูแล config เซิร์ฟเวอร์ผ่าน repository", en: "Design and Marketing departments with 7 AI roles, and a Network Engineer AI that maintains server configuration through the repository" },
     ],
   },
@@ -219,7 +221,7 @@ export const CHANGELOG: Release[] = [
 ];
 
 export const TODO: Todo[] = [
-  { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้าจะกลับไปใช้ Claude: เติมเครดิต Anthropic (ต้องผูกบัตร) — ตอนนี้ AI ทั้ง 30 ตัวใช้ Gemini 3.8 Flash (free tier)", en: "To go back to Claude: add Anthropic credit (needs a card) — all 30 AI employees use Gemini 3.8 Flash (free tier) for now" },
+  { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "เลือกแผนแบบเสียเงิน: Gemini free tier ใช้ได้แค่ 20 ครั้ง/วัน ไม่พอทำงานจริง — เติมเครดิต Anthropic หรือเปิด billing ของ Gemini (ทั้งคู่ต้องผูกบัตร)", en: "Choose a paid plan: the Gemini free tier allows only 20 requests/day — add Anthropic credit or enable Gemini billing (both need a card)" },
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
