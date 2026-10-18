@@ -464,6 +464,12 @@ export interface Repository {
   isDefault: boolean;
   createdAt: string;
   version: number;
+  remoteUrl: string | null;
+  remoteTokenEnvVar: string | null;
+  remoteTokenPresent: boolean;
+  remotePushedAt: string | null;
+  remotePushedSha: string | null;
+  remoteError: string | null;
 }
 
 export interface TestRun {

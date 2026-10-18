@@ -31,6 +31,17 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.6",
+    date: "2026-10-18",
+    title: { th: "เชื่อม GitHub / GitLab", en: "GitHub / GitLab remotes" },
+    changes: [
+      { type: "added", th: "เชื่อม repository กับ GitHub / GitLab (หรือ Git host ใดก็ได้ที่เป็น HTTPS) — โค้ดที่คนอนุมัติ merge แล้วถูกส่งขึ้นอัตโนมัติ และกด “ส่งขึ้นตอนนี้” ได้", en: "Connect a repository to GitHub / GitLab (any HTTPS Git host) — approved merges are pushed automatically, or use “Push now”" },
+      { type: "added", th: "สร้าง repository โดยนำเข้าจาก GitHub / GitLab ที่มีอยู่แล้ว", en: "Create a repository by importing an existing GitHub / GitLab one" },
+      { type: "security", th: "ส่งเฉพาะ branch หลัก ไม่เคย force push, branch งานของ AI ไม่ออกนอกเซิร์ฟเวอร์ และเฉพาะคนที่มีสิทธิ์ security.manage เลือกปลายทางได้", en: "Only the main branch is pushed, never forced; AI task branches stay on the server; only security.manage can choose the destination" },
+      { type: "security", th: "Token อ่านจากตัวแปร GIT_REMOTE_* บนเซิร์ฟเวอร์เท่านั้น ไม่อยู่ใน URL, ฐานข้อมูล หรือข้อความ error", en: "Tokens come only from GIT_REMOTE_* server variables — never in URLs, the database or error messages" },
+    ],
+  },
+  {
     version: "0.7.5",
     date: "2026-10-18",
     title: { th: "รองรับ OpenAI และ Google Gemini", en: "OpenAI and Google Gemini support" },
@@ -163,7 +174,6 @@ export const TODO: Todo[] = [
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
-  { status: "planned", area: { th: "โค้ด", en: "Code" }, th: "เชื่อม GitHub / GitLab แทน repository ในเครื่อง", en: "GitHub / GitLab hosting behind the repository interface" },
   { status: "planned", area: { th: "AI", en: "AI" }, th: "ทำงาน AI ต่อจากจุดที่ค้างได้เมื่อระบบรีสตาร์ต (ตอนนี้ล้มเหลวแล้วลองใหม่)", en: "Resume interrupted AI runs mid-call (today they fail and are retried)" },
 ];
 

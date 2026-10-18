@@ -762,6 +762,25 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("RemoteError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("RemotePushedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RemotePushedSha")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("RemoteTokenEnvVar")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("RemoteUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("SandboxImage")
                         .IsRequired()
                         .HasMaxLength(200)

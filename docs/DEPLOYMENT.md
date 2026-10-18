@@ -20,6 +20,7 @@
 | `SANDBOX_RUNNER_TOKEN` | รหัสลับระหว่าง API กับ sandbox runner (สุ่มยาว) |
 | `DATAPROTECTION_CERT_PASSWORD` | รหัสผ่านของ certificate ที่เข้ารหัสกุญแจ cookie (ดูด้านล่าง) |
 | `ANTHROPIC_API_KEY` | (ไม่บังคับ) เปิดใช้ Claude; ไม่ใส่ = ปิด AI จริง |
+| `GIT_REMOTE_GITHUB`, `GIT_REMOTE_GITLAB` | (ไม่บังคับ) token สำหรับส่งโค้ดที่อนุมัติแล้วขึ้น GitHub / GitLab — ใช้ token ที่จำกัดสิทธิ์เฉพาะ repository นั้น (contents: write) แล้วตั้งชื่อตัวแปรที่หน้า repository ของโปรเจกต์ |
 | `OPENAI_API_KEY`, `GEMINI_API_KEY` | (ไม่บังคับ) เปิดใช้ OpenAI / Google Gemini — จากนั้นเพิ่มโมเดลและราคาที่หน้า “ตั้งค่า AI” ก่อนกำหนดให้พนักงาน AI |
 | `INTEGRATION_*` | (ไม่บังคับ) URL ของ webhook เช่น `INTEGRATION_SLACK_URL=https://hooks.slack.com/...` |
 

@@ -12,6 +12,9 @@ public class RepositoryOptions
     /// <summary>Directory holding bare repositories and task workspaces.</summary>
     public string Root { get; set; } = "data/repos";
     public int GitTimeoutSeconds { get; set; } = 60;
+
+    /// <summary>Allow file:// and local paths as remotes. Tests only; production remotes must be HTTPS.</summary>
+    public bool AllowLocalRemotes { get; set; }
 }
 
 /// <summary>
@@ -27,7 +30,11 @@ public sealed class GitStore(IOptions<RepositoryOptions> options, ILogger<GitSto
     private string Origin(CodeRepository repo) => Path.Combine(RepoDir(repo), "origin.git");
     public string OriginPath(CodeRepository repo) => Origin(repo);
 
-    public async Task<GitResult> GitAsync(string workdir, IReadOnlyList<string> args, CancellationToken ct, (string Name, string Email)? author = null)
+    public Task<GitResult> GitAsync(string workdir, IReadOnlyList<string> args, CancellationToken ct, (string Name, string Email)? author = null) =>
+        RunGitAsync(workdir, args, ct, author, null, null);
+
+    private async Task<GitResult> RunGitAsync(string workdir, IReadOnlyList<string> args, CancellationToken ct, (string Name, string Email)? author,
+        IReadOnlyDictionary<string, string>? env, IReadOnlyList<string>? extraConfig)
     {
         var psi = new ProcessStartInfo("git")
         {
@@ -45,6 +52,11 @@ public sealed class GitStore(IOptions<RepositoryOptions> options, ILogger<GitSto
             psi.ArgumentList.Add("-c");
             psi.ArgumentList.Add(c);
         }
+        foreach (var c in extraConfig ?? [])
+        {
+            psi.ArgumentList.Add("-c");
+            psi.ArgumentList.Add(c);
+        }
         if (author is { } a)
         {
             psi.ArgumentList.Add("-c"); psi.ArgumentList.Add($"user.name={a.Name}");
@@ -55,6 +67,7 @@ public sealed class GitStore(IOptions<RepositoryOptions> options, ILogger<GitSto
         psi.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
         psi.Environment["GIT_PAGER"] = "cat";
         psi.Environment["LC_ALL"] = "C.UTF-8";
+        foreach (var (k, v) in env ?? new Dictionary<string, string>()) psi.Environment[k] = v;
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(options.Value.GitTimeoutSeconds));
@@ -173,6 +186,74 @@ public sealed class GitStore(IOptions<RepositoryOptions> options, ILogger<GitSto
         if (path.Contains("..")) return null;
         var r = await GitAsync(Origin(repo), ["show", $"{branch}:{path}"], ct);
         return r.Ok ? r.Output : null;
+    }
+
+    // ---------------- remotes (GitHub / GitLab / any HTTPS host) ----------------
+
+    public string? CheckRemoteUrl(string url)
+    {
+        if (options.Value.AllowLocalRemotes && (url.StartsWith("file://", StringComparison.Ordinal) || Path.IsPathRooted(url))) return null;
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps) return "The remote must be an https:// URL.";
+        if (!string.IsNullOrEmpty(uri.UserInfo)) return "Put the token in a GIT_REMOTE_* environment variable, not in the URL.";
+        if (!string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment)) return "The remote URL must not have a query or fragment.";
+        return null;
+    }
+
+    /// <summary>
+    /// The token goes in an HTTP header passed through environment variables (GIT_CONFIG_*), so it never shows up in the process
+    /// list, the URL or git's own config. Only HTTPS (or local paths in tests) may be contacted.
+    /// </summary>
+    private (Dictionary<string, string> Env, string[] Config) RemoteAccess(string? token)
+    {
+        var env = new Dictionary<string, string>();
+        if (!string.IsNullOrEmpty(token))
+        {
+            var basic = Convert.ToBase64String(Encoding.UTF8.GetBytes($"x-access-token:{token}"));
+            env["GIT_CONFIG_COUNT"] = "1";
+            env["GIT_CONFIG_KEY_0"] = "http.extraHeader";
+            env["GIT_CONFIG_VALUE_0"] = $"Authorization: Basic {basic}";
+        }
+        string[] config = options.Value.AllowLocalRemotes
+            ? ["protocol.allow=never", "protocol.https.allow=always", "protocol.file.allow=always"]
+            : ["protocol.allow=never", "protocol.https.allow=always", "protocol.file.allow=never"];
+        return (env, config);
+    }
+
+    private static string Scrub(string text, string? token)
+    {
+        if (string.IsNullOrEmpty(token)) return text;
+        return text.Replace(token, "***").Replace(Convert.ToBase64String(Encoding.UTF8.GetBytes($"x-access-token:{token}")), "***");
+    }
+
+    public async Task ImportAsync(CodeRepository repo, string url, string? token, CancellationToken ct)
+    {
+        if (CheckRemoteUrl(url) is { } problem) throw new InvalidOperationException(problem);
+        var dir = RepoDir(repo);
+        if (Directory.Exists(Origin(repo))) throw new InvalidOperationException("The repository already exists on disk.");
+        Directory.CreateDirectory(dir);
+        var (env, config) = RemoteAccess(token);
+        var clone = await RunGitAsync(dir, ["clone", "--bare", "--no-hardlinks", url, Origin(repo)], ct, null, env, config);
+        if (!clone.Ok)
+        {
+            DeleteDirectory(Origin(repo));
+            throw new InvalidOperationException($"Import failed: {Scrub(clone.Error.Trim(), token)}");
+        }
+        // A bare clone keeps the URL as "origin"; the local repository is the source of truth, so drop it.
+        await GitAsync(Origin(repo), ["remote", "remove", "origin"], ct);
+        if (!(await BranchesAsync(repo, ct)).Contains(repo.DefaultBranch))
+        {
+            DeleteDirectory(Origin(repo));
+            throw new InvalidOperationException($"The remote has no '{repo.DefaultBranch}' branch.");
+        }
+    }
+
+    public async Task<(string? Sha, string? Error)> PushToRemoteAsync(CodeRepository repo, string url, string? token, string branch, CancellationToken ct)
+    {
+        if (CheckRemoteUrl(url) is { } problem) return (null, problem);
+        var sha = (await GitAsync(Origin(repo), ["rev-parse", $"refs/heads/{branch}"], ct)).Output.Trim();
+        var (env, config) = RemoteAccess(token);
+        var push = await RunGitAsync(Origin(repo), ["push", "--porcelain", url, $"refs/heads/{branch}:refs/heads/{branch}"], ct, null, env, config);
+        return push.Ok ? (sha, null) : (null, Scrub((push.Error + "\n" + push.Output).Trim(), token));
     }
 
     /// <summary>Git marks pack files read-only; clear that before deleting.</summary>

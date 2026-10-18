@@ -204,7 +204,16 @@ public static class Endpoints
     {
         api.MapGet("/sandbox", (CodeService s) => s.SandboxInfo()).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/projects/{id:guid}/repositories", (Guid id, CodeService s, CancellationToken ct) => s.ListAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
-        api.MapPost("/projects/{id:guid}/repositories", (Guid id, CreateRepositoryRequest r, CodeService s, CancellationToken ct) => s.CreateAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/projects/{id:guid}/repositories", async (Guid id, CreateRepositoryRequest r, CodeService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+        {
+            // Importing also sets where approved code is pushed, so it needs the same right as setting a remote.
+            if (!string.IsNullOrWhiteSpace(r.ImportUrl) && !await HasAsync(perms, me, Permissions.SecurityManage, ct))
+                throw new OfficeAI.Domain.Common.ForbiddenException("Importing from a remote needs the security.manage permission.");
+            return await s.CreateAsync(id, r, ct);
+        }).RequirePermission(Permissions.ProjectManage);
+        // Where company code may be sent: only people who manage security choose that.
+        api.MapPut("/repositories/{id:guid}/remote", (Guid id, SetRemoteRequest r, CodeService s, CancellationToken ct) => s.SetRemoteAsync(id, r, ct)).RequirePermission(Permissions.SecurityManage);
+        api.MapPost("/repositories/{id:guid}/push", (Guid id, CodeService s, CancellationToken ct) => s.PushAsync(id, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapPut("/repositories/{id:guid}", (Guid id, UpdateRepositoryRequest r, CodeService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapGet("/repositories/{id:guid}/branches", (Guid id, CodeService s, CancellationToken ct) => s.BranchesAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/repositories/{id:guid}/files", (Guid id, string? branch, CodeService s, CancellationToken ct) => s.FilesAsync(id, branch, ct)).RequirePermission(Permissions.ProjectRead);

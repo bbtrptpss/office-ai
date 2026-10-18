@@ -249,6 +249,12 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
             mr.Status = Domain.Code.MergeRequestStatus.Merged;
             mr.MergedSha = outcome.Sha;
             mr.MergedAt = now;
+            // Approved code goes to GitHub/GitLab too (best effort; failures are shown on the repository).
+            if (repo.RemoteUrl is not null && mr.TargetBranch == repo.DefaultBranch)
+            {
+                var tracked = await db.CodeRepositories.FirstAsync(r => r.Id == repo.Id, ct);
+                await Code.CodeService.PushDefaultBranchAsync(code, tracked, clock, ct);
+            }
         }
         else
         {

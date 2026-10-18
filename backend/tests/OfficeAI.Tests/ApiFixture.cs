@@ -41,6 +41,7 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("AiProviders:Anthropic:ApiKey", "");
             b.UseSetting("Workflow:AutoTick", "false"); // tests drive the engine explicitly
             b.UseSetting("Repositories:Root", RepoRoot);
+            b.UseSetting("Repositories:AllowLocalRemotes", "true"); // tests use local bare repositories as "GitHub"
             b.UseSetting("Sandbox:UseLocalDocker", "true");
             b.UseSetting("Sandbox:TestTimeoutSeconds", "8");
             b.UseSetting("Integrations:AutoDispatch", "false");

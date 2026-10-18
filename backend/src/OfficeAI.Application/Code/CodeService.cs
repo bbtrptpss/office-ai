@@ -6,8 +6,14 @@ using OfficeAI.Domain.Common;
 
 namespace OfficeAI.Application.Code;
 
-public record RepositoryDto(Guid Id, Guid ProjectId, string Name, string DefaultBranch, string SandboxImage, string TestCommand, bool IsDefault, DateTimeOffset CreatedAt, uint Version);
-public record CreateRepositoryRequest(string Name, string SandboxImage, string TestCommand, string DefaultBranch = "main");
+public record RepositoryDto(Guid Id, Guid ProjectId, string Name, string DefaultBranch, string SandboxImage, string TestCommand, bool IsDefault, DateTimeOffset CreatedAt, uint Version,
+    string? RemoteUrl = null, string? RemoteTokenEnvVar = null, bool RemoteTokenPresent = false, DateTimeOffset? RemotePushedAt = null, string? RemotePushedSha = null,
+    string? RemoteError = null);
+/// <param name="ImportUrl">Start from a copy of this remote (GitHub/GitLab) instead of an empty repository; it also becomes the push remote.</param>
+public record CreateRepositoryRequest(string Name, string SandboxImage, string TestCommand, string DefaultBranch = "main", string? ImportUrl = null,
+    string? RemoteTokenEnvVar = null);
+/// <summary>Null RemoteUrl removes the remote.</summary>
+public record SetRemoteRequest(string? RemoteUrl, string? RemoteTokenEnvVar, uint? Version = null);
 public record UpdateRepositoryRequest(string SandboxImage, string TestCommand, uint? Version = null);
 public record TestRunDto(Guid Id, Guid RepositoryId, Guid? TaskId, Guid? RunId, string Branch, string? CommitSha, string Image, string Command,
     TestRunStatus Status, int? ExitCode, string? Output, int DurationMs, DateTimeOffset StartedAt);
@@ -18,17 +24,48 @@ public record MergeRequestDetailDto(MergeRequestDto MergeRequest, string Diff);
 public record RunBranchTestsRequest(string? Branch);
 public record SandboxInfoDto(bool IsAvailable, IReadOnlyCollection<string> AllowedImages);
 
-public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, ISandbox sandbox)
+public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, ISandbox sandbox, TimeProvider clock)
 {
     [GeneratedRegex("^[a-z0-9][a-z0-9._-]{0,62}$")]
     private static partial Regex RepoName();
 
+    /// <summary>Only variables named GIT_REMOTE_* can be read as tokens, so a remote can never be pointed at other server secrets.</summary>
+    [GeneratedRegex("^GIT_REMOTE_[A-Z0-9_]{2,60}$")]
+    private static partial Regex TokenVar();
+
+    internal static string? ReadToken(string? envVar) =>
+        envVar is not null && TokenVar().IsMatch(envVar) ? Environment.GetEnvironmentVariable(envVar) : null;
+
+    private void ValidateRemote(string url, string? tokenVar)
+    {
+        if (store.CheckRemoteUrl(url) is { } problem) throw new DomainException("validation", problem);
+        if (tokenVar is not null && !TokenVar().IsMatch(tokenVar))
+            throw new DomainException("validation", "The token variable must be named GIT_REMOTE_<NAME> (letters, digits, '_').");
+    }
+
+    /// <summary>
+    /// Pushes the default branch of <paramref name="repo"/> (a tracked entity) to its remote and records the outcome on it.
+    /// Never throws for remote problems: the local repository stays the source of truth.
+    /// </summary>
+    public static async Task PushDefaultBranchAsync(ICodeRepositoryStore store, CodeRepository repo, TimeProvider clock, CancellationToken ct)
+    {
+        if (repo.RemoteUrl is null) return;
+        var (sha, error) = await store.PushToRemoteAsync(repo, repo.RemoteUrl, ReadToken(repo.RemoteTokenEnvVar), repo.DefaultBranch, ct);
+        repo.RemoteError = error is null ? null : error.Length > 2000 ? error[..2000] : error;
+        if (sha is not null)
+        {
+            repo.RemotePushedSha = sha;
+            repo.RemotePushedAt = clock.GetUtcNow();
+        }
+    }
+
     public SandboxInfoDto SandboxInfo() => new(sandbox.IsAvailable, sandbox.AllowedImages);
 
     public async Task<List<RepositoryDto>> ListAsync(Guid projectId, CancellationToken ct) =>
-        await db.CodeRepositories.AsNoTracking().Where(r => r.ProjectId == projectId).OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name)
-            .Select(r => new RepositoryDto(r.Id, r.ProjectId, r.Name, r.DefaultBranch, r.SandboxImage, r.TestCommand, r.IsDefault, r.CreatedAt, r.Version))
-            .ToListAsync(ct);
+        (await db.CodeRepositories.AsNoTracking().Where(r => r.ProjectId == projectId).OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name).ToListAsync(ct))
+            .Select(r => new RepositoryDto(r.Id, r.ProjectId, r.Name, r.DefaultBranch, r.SandboxImage, r.TestCommand, r.IsDefault, r.CreatedAt, r.Version,
+                r.RemoteUrl, r.RemoteTokenEnvVar, !string.IsNullOrEmpty(ReadToken(r.RemoteTokenEnvVar)), r.RemotePushedAt, r.RemotePushedSha, r.RemoteError))
+            .ToList();
 
     private void ValidateSandbox(string image, string command)
     {
@@ -51,7 +88,25 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
             ProjectId = projectId, Name = name, DefaultBranch = req.DefaultBranch, SandboxImage = req.SandboxImage, TestCommand = req.TestCommand.Trim(),
             IsDefault = !await db.CodeRepositories.AnyAsync(r => r.ProjectId == projectId, ct),
         };
-        await store.InitAsync(repo, ct);
+        if (string.IsNullOrWhiteSpace(req.ImportUrl))
+        {
+            await store.InitAsync(repo, ct);
+        }
+        else
+        {
+            var url = req.ImportUrl.Trim();
+            ValidateRemote(url, req.RemoteTokenEnvVar);
+            try
+            {
+                await store.ImportAsync(repo, url, ReadToken(req.RemoteTokenEnvVar), ct);
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new DomainException("code.import_failed", ex.Message);
+            }
+            repo.RemoteUrl = url;
+            repo.RemoteTokenEnvVar = req.RemoteTokenEnvVar;
+        }
         db.CodeRepositories.Add(repo);
         await db.SaveChangesAsync(ct);
         return (await ListAsync(projectId, ct)).First(r => r.Id == repo.Id);
@@ -64,6 +119,30 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
         ValidateSandbox(req.SandboxImage, req.TestCommand);
         repo.SandboxImage = req.SandboxImage;
         repo.TestCommand = req.TestCommand.Trim();
+        await db.SaveChangesAsync(ct);
+        return (await ListAsync(repo.ProjectId, ct)).First(r => r.Id == id);
+    }
+
+    public async Task<RepositoryDto> SetRemoteAsync(Guid id, SetRemoteRequest req, CancellationToken ct)
+    {
+        var repo = await db.CodeRepositories.FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw new NotFoundException("Repository", id);
+        if (req.Version is { } v) db.ExpectVersion(repo, v);
+        var url = string.IsNullOrWhiteSpace(req.RemoteUrl) ? null : req.RemoteUrl.Trim();
+        var tokenVar = string.IsNullOrWhiteSpace(req.RemoteTokenEnvVar) ? null : req.RemoteTokenEnvVar.Trim();
+        if (url is not null) ValidateRemote(url, tokenVar);
+        if (url != repo.RemoteUrl) (repo.RemotePushedAt, repo.RemotePushedSha, repo.RemoteError) = (null, null, null);
+        repo.RemoteUrl = url;
+        repo.RemoteTokenEnvVar = url is null ? null : tokenVar;
+        await db.SaveChangesAsync(ct);
+        return (await ListAsync(repo.ProjectId, ct)).First(r => r.Id == id);
+    }
+
+    /// <summary>A person pushes the default branch to the remote now (it is also pushed after every approved merge).</summary>
+    public async Task<RepositoryDto> PushAsync(Guid id, CancellationToken ct)
+    {
+        var repo = await db.CodeRepositories.FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw new NotFoundException("Repository", id);
+        if (repo.RemoteUrl is null) throw new DomainException("validation", "This repository has no remote.");
+        await PushDefaultBranchAsync(store, repo, clock, ct);
         await db.SaveChangesAsync(ct);
         return (await ListAsync(repo.ProjectId, ct)).First(r => r.Id == id);
     }

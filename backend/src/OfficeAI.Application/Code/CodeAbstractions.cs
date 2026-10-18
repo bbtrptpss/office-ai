@@ -31,6 +31,15 @@ public interface ICodeRepositoryStore
     /// <summary>Read-only listing / file read straight from a branch of the bare repository.</summary>
     Task<IReadOnlyList<string>> ListFilesAsync(CodeRepository repo, string branch, CancellationToken ct);
     Task<string?> ReadFileAsync(CodeRepository repo, string branch, string path, CancellationToken ct);
+
+    /// <summary>Null when the URL may be used as a remote; otherwise why not (HTTPS only, no credentials in the URL).</summary>
+    string? CheckRemoteUrl(string url);
+
+    /// <summary>Creates the local repository as a copy of a remote one (all branches). Fails if <see cref="CodeRepository.DefaultBranch"/> is missing.</summary>
+    Task ImportAsync(CodeRepository repo, string url, string? token, CancellationToken ct);
+
+    /// <summary>Pushes one branch to the remote (never forced). Returns the pushed commit, or the error with the token removed.</summary>
+    Task<(string? Sha, string? Error)> PushToRemoteAsync(CodeRepository repo, string url, string? token, string branch, CancellationToken ct);
 }
 
 public sealed record SandboxRequest(string Image, string WorkspacePath, string Command, TimeSpan Timeout, double Cpus, int MemoryMb);

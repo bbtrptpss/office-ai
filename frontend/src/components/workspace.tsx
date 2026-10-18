@@ -231,8 +231,10 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
   }, projectId);
   useRealtime("approvalsChanged", () => void reload());
   useRealtime("agentRunChanged", () => void reload());
-  const [form, setForm] = useState<{ name: string; sandboxImage: string; testCommand: string } | null>(null);
+  const [form, setForm] = useState<{ name: string; sandboxImage: string; testCommand: string; importUrl: string; remoteTokenEnvVar: string } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [remoteForm, setRemoteForm] = useState<{ remoteUrl: string; remoteTokenEnvVar: string } | null>(null);
+  const [pushing, setPushing] = useState(false);
 
   if (!data) return <Loading error={error} />;
   const repo = data.repos[0];
@@ -246,7 +248,7 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
           <Typography color="text.secondary">{t.noRepository}</Typography>
           {can("project.manage") && (
             <Button variant="contained" startIcon={<AddIcon />}
-              onClick={() => setForm({ name: "app", sandboxImage: data.sandbox.allowedImages[0] ?? "", testCommand: "dotnet test" })}>
+              onClick={() => setForm({ name: "app", sandboxImage: data.sandbox.allowedImages[0] ?? "", testCommand: "dotnet test", importUrl: "", remoteTokenEnvVar: "" })}>
               {t.newRepository}
             </Button>
           )}
@@ -260,6 +262,31 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
                 <Chip size="small" label={`${t.image}: ${repo.sandboxImage}`} />
                 <Chip size="small" label={`${t.testCommand}: ${repo.testCommand}`} sx={{ fontFamily: "monospace" }} />
               </Stack>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5, alignItems: { sm: "center" } }}>
+                <Typography variant="body2" sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
+                  🌐 {t.remote}: {repo.remoteUrl ?? t.remoteNone}
+                  {repo.remoteUrl && (
+                    <Typography component="span" variant="caption" color="text.secondary">
+                      {" · "}{repo.remotePushedAt ? `${t.lastPushed} ${new Date(repo.remotePushedAt).toLocaleString()} (${repo.remotePushedSha?.slice(0, 7)})` : t.notPushedYet}
+                    </Typography>
+                  )}
+                </Typography>
+                {repo.remoteUrl && can("project.manage") && (
+                  <Button size="small" variant="outlined" disabled={pushing} onClick={async () => {
+                    setPushing(true);
+                    try { await api.post(`/api/repositories/${repo.id}/push`); } catch (e) { setMessage(errorMessage(e)); }
+                    setPushing(false);
+                    await reload();
+                  }}>{t.pushNow}</Button>
+                )}
+                {can("security.manage") && (
+                  <Button size="small" onClick={() => setRemoteForm({ remoteUrl: repo.remoteUrl ?? "", remoteTokenEnvVar: repo.remoteTokenEnvVar ?? "" })}>{t.edit}</Button>
+                )}
+              </Stack>
+              {repo.remoteUrl && repo.remoteTokenEnvVar && !repo.remoteTokenPresent && (
+                <Alert severity="warning" sx={{ mt: 1 }}>{repo.remoteTokenEnvVar}: {t.secretMissing}</Alert>
+              )}
+              {repo.remoteError && <Alert severity="error" sx={{ mt: 1, whiteSpace: "pre-wrap" }}>{t.pushFailed}: {repo.remoteError}</Alert>}
             </CardContent>
           </Card>
           <FileBrowser repo={repo} />
@@ -281,15 +308,55 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
               </TextField>
               <TextField label={t.testCommand} value={form.testCommand} onChange={(e) => setForm({ ...form, testCommand: e.target.value })}
                 slotProps={{ htmlInput: { style: { fontFamily: "monospace" } } }} />
+              {can("security.manage") && (
+                <>
+                  <TextField label={t.importFrom} placeholder="https://github.com/acme/app.git" value={form.importUrl}
+                    onChange={(e) => setForm({ ...form, importUrl: e.target.value })} helperText={t.importHint} />
+                  {form.importUrl && (
+                    <TextField label={t.tokenEnvVar} placeholder="GIT_REMOTE_GITHUB" value={form.remoteTokenEnvVar}
+                      onChange={(e) => setForm({ ...form, remoteTokenEnvVar: e.target.value.toUpperCase() })} helperText={t.tokenEnvHint} />
+                  )}
+                </>
+              )}
             </Stack>
           </DialogContent>
         )}
         <DialogActions>
           <Button onClick={() => setForm(null)}>{t.cancel}</Button>
           <Button variant="contained" onClick={async () => {
-            try { await api.post(`/api/projects/${projectId}/repositories`, form); setForm(null); } catch (e) { setMessage(errorMessage(e)); }
+            const { importUrl, remoteTokenEnvVar, ...rest } = form!;
+            try {
+              await api.post(`/api/projects/${projectId}/repositories`, { ...rest, importUrl: importUrl || null, remoteTokenEnvVar: importUrl && remoteTokenEnvVar ? remoteTokenEnvVar : null });
+              setForm(null);
+            } catch (e) { setMessage(errorMessage(e)); }
             await reload();
           }}>{t.create}</Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={!!remoteForm} onClose={() => setRemoteForm(null)} fullWidth maxWidth="sm">
+        <DialogTitle>{t.remote}</DialogTitle>
+        {remoteForm && (
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Alert severity="info">{t.remoteHint}</Alert>
+              <TextField label="URL" placeholder="https://github.com/acme/app.git" value={remoteForm.remoteUrl}
+                onChange={(e) => setRemoteForm({ ...remoteForm, remoteUrl: e.target.value })} />
+              <TextField label={t.tokenEnvVar} placeholder="GIT_REMOTE_GITHUB" value={remoteForm.remoteTokenEnvVar}
+                onChange={(e) => setRemoteForm({ ...remoteForm, remoteTokenEnvVar: e.target.value.toUpperCase() })} helperText={t.tokenEnvHint} />
+            </Stack>
+          </DialogContent>
+        )}
+        <DialogActions>
+          <Button onClick={() => setRemoteForm(null)}>{t.cancel}</Button>
+          <Button variant="contained" onClick={async () => {
+            try {
+              await api.put(`/api/repositories/${repo!.id}/remote`, {
+                remoteUrl: remoteForm!.remoteUrl.trim() || null, remoteTokenEnvVar: remoteForm!.remoteTokenEnvVar.trim() || null, version: repo!.version,
+              });
+              setRemoteForm(null);
+            } catch (e) { setMessage(errorMessage(e)); }
+            await reload();
+          }}>{t.save}</Button>
         </DialogActions>
       </Dialog>
     </>

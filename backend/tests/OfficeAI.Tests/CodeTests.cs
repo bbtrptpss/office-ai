@@ -219,4 +219,105 @@ public class CodeTests(ApiFixture fx)
         var res = await ceo.PostAsJsonAsync($"/api/projects/{project.Id}/repositories", new { name = "other", sandboxImage = "ubuntu:latest", testCommand = "true" });
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
     }
+
+    // ---------------- remotes (GitHub / GitLab) ----------------
+
+    /// <summary>A bare repository standing in for GitHub/GitLab.</summary>
+    private static async Task<string> FakeRemoteAsync(bool withMain = false)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "officeai-remote-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        await GitAsync(dir, "init", "--bare", "--initial-branch", "main", "remote.git");
+        var remote = Path.Combine(dir, "remote.git");
+        if (withMain)
+        {
+            var seed = Path.Combine(dir, "seed");
+            await GitAsync(dir, "clone", remote, seed);
+            await File.WriteAllTextAsync(Path.Combine(seed, "imported.txt"), "from github\n");
+            await GitAsync(seed, "add", "-A");
+            await GitAsync(seed, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "upstream");
+            await GitAsync(seed, "push", "origin", "HEAD:main");
+        }
+        return remote;
+    }
+
+    private static async Task<string> GitAsync(string dir, params string[] args)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo("git") { WorkingDirectory = dir, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        using var p = System.Diagnostics.Process.Start(psi)!;
+        var output = await p.StandardOutput.ReadToEndAsync();
+        var error = await p.StandardError.ReadToEndAsync();
+        await p.WaitForExitAsync();
+        Assert.True(p.ExitCode == 0, $"git {string.Join(' ', args)}: {error}");
+        return output.Trim();
+    }
+
+    [Fact]
+    public async Task Approved_merges_are_pushed_to_the_remote_and_only_security_managers_choose_it()
+    {
+        var (ceo, _, task, _, repo) = await SetupAsync("BACKEND",
+            [Write("app.txt", "hello\n"), Write("test.sh", "grep -q hello app.txt"), Commit("Add greeting"), Test(), OpenMr("Greeting")]);
+        var remote = await FakeRemoteAsync();
+
+        // Validation and permissions.
+        Assert.Equal(HttpStatusCode.BadRequest, (await ceo.PutAsJsonAsync($"/api/repositories/{repo.Id}/remote", new { remoteUrl = "http://github.com/acme/app.git" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await ceo.PutAsJsonAsync($"/api/repositories/{repo.Id}/remote", new { remoteUrl = "https://user:pw@github.com/acme/app.git" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await ceo.PutAsJsonAsync($"/api/repositories/{repo.Id}/remote",
+            new { remoteUrl = "https://github.com/acme/app.git", remoteTokenEnvVar = "POSTGRES_PASSWORD" })).StatusCode);
+        var manager = await fx.UserWithRolesAsync(OfficeAI.Domain.Security.SystemRoles.Manager);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.PutAsJsonAsync($"/api/repositories/{repo.Id}/remote", new { remoteUrl = remote })).StatusCode);
+
+        Environment.SetEnvironmentVariable("GIT_REMOTE_TESTS", "tok-123");
+        var configured = await ceo.PutAsync<RepositoryDto>($"/api/repositories/{repo.Id}/remote", new { remoteUrl = remote, remoteTokenEnvVar = "GIT_REMOTE_TESTS" });
+        Assert.True(configured.RemoteTokenPresent);
+        Assert.Null(configured.RemotePushedAt);
+
+        await RunAsync(ceo, task.Id);
+        var approval = Assert.Single(await ceo.GetAsync<List<ApprovalDto>>($"/api/approvals?status=Pending&taskId={task.Id}"));
+        (await ceo.PostAsJsonAsync($"/api/approvals/{approval.Id}/decision", new { approve = true, payloadHash = approval.PayloadHash })).EnsureSuccessStatusCode();
+
+        var after = (await ceo.GetAsync<List<RepositoryDto>>($"/api/projects/{repo.ProjectId}/repositories")).Single(r => r.Id == repo.Id);
+        Assert.Null(after.RemoteError);
+        Assert.NotNull(after.RemotePushedAt);
+        Assert.Equal(after.RemotePushedSha, await GitAsync(remote, "rev-parse", "refs/heads/main"));
+        Assert.Contains("app.txt", await GitAsync(remote, "ls-tree", "-r", "--name-only", "main"));
+        // Task branches stay private.
+        Assert.DoesNotContain("task/", await GitAsync(remote, "for-each-ref", "--format=%(refname)"));
+
+        // Someone changed GitHub directly: pushing never forces, the problem is recorded instead.
+        var clone = Path.Combine(Path.GetDirectoryName(remote)!, "other");
+        await GitAsync(Path.GetDirectoryName(remote)!, "clone", remote, clone);
+        await File.WriteAllTextAsync(Path.Combine(clone, "upstream.txt"), "x");
+        await GitAsync(clone, "add", "-A");
+        await GitAsync(clone, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "direct change");
+        await GitAsync(clone, "push", "origin", "HEAD:main");
+        var upstreamSha = await GitAsync(remote, "rev-parse", "refs/heads/main");
+        var pushed = await manager.PostAsync<RepositoryDto>($"/api/repositories/{repo.Id}/push", new { }); // nothing new locally: up to date or rejected
+        var rejected = await ceo.GetAsync<List<RepositoryDto>>($"/api/projects/{repo.ProjectId}/repositories");
+        Assert.Equal(upstreamSha, await GitAsync(remote, "rev-parse", "refs/heads/main")); // GitHub's commit was not overwritten
+        Assert.NotNull(rejected.Single(r => r.Id == repo.Id).RemoteError);
+        Assert.DoesNotContain("tok-123", pushed.RemoteError ?? "");
+    }
+
+    [Fact]
+    public async Task A_repository_can_start_from_an_existing_remote()
+    {
+        var ceo = await fx.CeoAsync();
+        var project = await ceo.PostAsync<ProjectDto>("/api/projects", new { code = $"IM-{Guid.NewGuid():N}"[..14], name = "Import project", status = "Active" });
+        var remote = await FakeRemoteAsync(withMain: true);
+
+        var manager = await fx.UserWithRolesAsync(OfficeAI.Domain.Security.SystemRoles.Manager);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.PostAsJsonAsync($"/api/projects/{project.Id}/repositories",
+            new { name = "imported", sandboxImage = Image, testCommand = "true", importUrl = remote })).StatusCode);
+
+        var repo = await ceo.PostAsync<RepositoryDto>($"/api/projects/{project.Id}/repositories",
+            new { name = "imported", sandboxImage = Image, testCommand = "true", importUrl = remote });
+        Assert.Equal(remote, repo.RemoteUrl);
+        Assert.Contains("imported.txt", await ceo.GetAsync<List<string>>($"/api/repositories/{repo.Id}/files"));
+
+        var empty = await FakeRemoteAsync();
+        var res = await ceo.PostAsJsonAsync($"/api/projects/{project.Id}/repositories", new { name = "nothing", sandboxImage = Image, testCommand = "true", importUrl = empty });
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode); // no main branch to start from
+    }
 }

@@ -127,5 +127,4 @@ Decisions taken without the CEO: new permissions `comms.post` (Member, Manager, 
 ## Open items (not built yet)
 
 - First real run with any provider needs its key (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY); OpenAI/Gemini models and prices are added by the CEO in AI settings.
-- Remote Git hosting (GitHub/GitLab) behind the repository interface.
 - Durable mid-call resume of AI runs (interrupted runs are failed and retried by the engine).

@@ -15,6 +15,15 @@ public class CodeRepository : Entity, IAuditable
     /// <summary>Command run inside the sandbox to test the code. Set by people, never by agents.</summary>
     public required string TestCommand { get; set; }
     public bool IsDefault { get; set; } = true;
+
+    /// <summary>Optional GitHub/GitLab (or any HTTPS Git host) mirror. Only the default branch is pushed, after people approve merges.</summary>
+    public string? RemoteUrl { get; set; }
+
+    /// <summary>Name of the server environment variable holding the access token (GIT_REMOTE_*). The token itself is never stored.</summary>
+    public string? RemoteTokenEnvVar { get; set; }
+    public DateTimeOffset? RemotePushedAt { get; set; }
+    public string? RemotePushedSha { get; set; }
+    public string? RemoteError { get; set; }
 }
 
 public enum TestRunStatus
