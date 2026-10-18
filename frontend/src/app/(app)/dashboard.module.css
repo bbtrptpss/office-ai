@@ -35,7 +35,7 @@
 
 /* Layout */
 .grid { display: grid; grid-template-columns: 300px 1fr 300px; gap: 22px; }
-.col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .card {
   background: var(--glass); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow); padding: 18px; backdrop-filter: blur(10px);
@@ -75,7 +75,8 @@
 
 /* Center stage */
 .stage {
-  position: relative; aspect-ratio: 494 / 502; max-height: 760px; border-radius: 28px; overflow: hidden;
+  /* fills the screen height left after the top bar and the ask box, so the dashboard needs no scrolling */
+  position: relative; height: calc(100vh - 268px); min-height: 360px; border-radius: 28px; overflow: hidden;
   background: linear-gradient(170deg, #f9dceb 0%, #f4d0e4 55%, #e5d3f7 100%) center / cover no-repeat;
   border: 1px solid var(--border); box-shadow: var(--shadow);
 }
@@ -109,7 +110,7 @@
 .friend2 { background: rgba(227,240,255,.92); }
 .friend3 { background: rgba(255,243,214,.92); }
 
-.composer { margin-top: 16px; }
+.composer { margin-top: 14px; }
 .ask { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 18px; background: var(--glass-strong); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); }
 .ask input { flex: 1; border: 0; outline: 0; background: transparent; font-size: 15px; padding: 10px 0; min-width: 0; }
 .ask input::placeholder { color: var(--muted); }
@@ -132,7 +133,7 @@
 .day.has::after { content: ""; position: absolute; bottom: 3px; width: 4px; height: 4px; border-radius: 50%; background: var(--pink); }
 .day.today { color: var(--purple-deep); }
 .day.sel { background: var(--purple); color: #fff; box-shadow: 0 6px 14px rgba(124,92,224,.35); }
-.events { list-style: none; padding: 0; margin: 16px 0 0; display: flex; flex-direction: column; gap: 10px; min-height: 90px; }
+.events { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
 .events li { display: flex; align-items: center; gap: 12px; font-size: 13px; }
 .events li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--purple); flex-shrink: 0; }
 .events time { color: var(--muted); width: 42px; flex-shrink: 0; }
@@ -141,7 +142,7 @@
 
 /* AI summary */
 .newBadge { margin-left: auto; background: var(--purple); color: #fff; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 10px; }
-.sum { display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 16px; background: rgba(255,255,255,.6); margin-bottom: 10px; width: 100%; text-align: left; transition: background .2s; }
+.sum { display: flex; gap: 12px; align-items: center; padding: 8px 10px; border-radius: 16px; background: rgba(255,255,255,.6); margin-bottom: 8px; width: 100%; text-align: left; transition: background .2s; }
 :global(html.dark) .sum { background: rgba(255,255,255,.06); }
 .sum:hover { background: #fff; }
 :global(html.dark) .sum:hover { background: rgba(255,255,255,.1); }
@@ -156,7 +157,7 @@
 .cheer {
   position: relative; overflow: hidden; color: #3b2f5c;
   background: linear-gradient(135deg, #ffeef6, #fff7df);
-  border: 1px solid rgba(255,255,255,.9); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); min-height: 120px;
+  border: 1px solid rgba(255,255,255,.9); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); min-height: 104px;
 }
 .cheer p { margin: 0; font-weight: 700; font-size: 15px; line-height: 1.35; position: relative; z-index: 1; max-width: 62%; }
 .cheer small { display: block; margin-top: 10px; color: #8b80a8; position: relative; z-index: 1; }
@@ -176,4 +177,8 @@
   .colRight { grid-template-columns: 1fr; display: flex; }
   .friends { display: none; }
   .bubble { width: 70%; font-size: 13px; padding: 10px 12px; }
+}
+/* Short screens (e.g. 768px laptops): drop the decorative cheer card so the right column still fits without scrolling. */
+@media (max-height: 820px) and (min-width: 1281px) {
+  .cheer { display: none; }
 }

@@ -39,6 +39,7 @@ export const CHANGELOG: Release[] = [
       { type: "added", th: "มีจุดสีชมพูข้าง • • • เมื่อมีงานรออนุมัติ แชทหรือประกาศที่ยังไม่อ่าน", en: "A pink dot next to • • • shows when approvals, chat or announcements are waiting" },
       { type: "changed", th: "ปุ่มเปิดเมนูเป็นโลโก้ (ชุดรูปตัวละคร หรือมาสคอต Puni) แทน • • •", en: "The menu button is the logo (character pack or the Puni mascot) instead of • • •" },
       { type: "changed", th: "รายการงานในหน้าภาพรวมแสดง 3 งานล่าสุด พร้อมปุ่ม “ดูทั้งหมด” ไปหน้าโปรเจกต์และ Task Board", en: "The dashboard task list shows the 3 most recent tasks, with a “See all” link to Projects & Task Board" },
+      { type: "changed", th: "หน้าภาพรวมพอดีหนึ่งหน้าจอ ไม่มีแถบเลื่อน: รูปกลางปรับขนาดตามความสูงจอ", en: "The dashboard fits one screen with no scrollbar: the center picture sizes to the screen height" },
       { type: "changed", th: "การ์ด “AI กำลังทำงาน” เอาปุ่มเครื่องเล่นเพลงออก แสดงรายการงานที่กำลังรันได้สูงสุด 3 งาน พร้อมเวลาที่ใช้และค่าใช้จ่าย", en: "The “AI at work” card drops the music-player controls and lists up to 3 running jobs with time and cost" },
     ],
   },
