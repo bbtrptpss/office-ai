@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.5",
+    date: "2026-10-18",
+    title: { th: "รองรับ OpenAI และ Google Gemini", en: "OpenAI and Google Gemini support" },
+    changes: [
+      { type: "added", th: "Provider ใหม่: OpenAI (และ endpoint ที่รองรับ API แบบเดียวกัน) และ Google Gemini — เปิดใช้เมื่อใส่ OPENAI_API_KEY / GEMINI_API_KEY", en: "New providers: OpenAI (and compatible endpoints) and Google Gemini — enabled by OPENAI_API_KEY / GEMINI_API_KEY" },
+      { type: "added", th: "ใช้เครื่องมือของพนักงาน AI ได้ครบเหมือน Claude พร้อมนับ token แยกส่วนที่ cache เพื่อคิดราคาให้ถูก", en: "Full tool use like Claude, with cached tokens counted separately so costs are priced correctly" },
+      { type: "security", th: "API key ส่งผ่าน header เท่านั้น ไม่อยู่ใน URL หรือ log และไม่เก็บในฐานข้อมูล", en: "API keys travel only in headers — never in URLs, logs or the database" },
+    ],
+  },
+  {
     version: "0.7.4",
     date: "2026-10-18",
     title: { th: "สมาชิกโปรเจกต์ @mention และการแจ้งเตือน", en: "Project members, @mentions and notifications" },
@@ -150,10 +160,9 @@ export const CHANGELOG: Release[] = [
 
 export const TODO: Todo[] = [
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ใส่ ANTHROPIC_API_KEY เพื่อให้ Claude ทำงานจริงครั้งแรก", en: "Set ANTHROPIC_API_KEY for the first real Claude run" },
-  { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "แจ้งว่ามีบัญชี AI provider ใดบ้าง (OpenAI / Gemini)", en: "Confirm which AI provider accounts exist (OpenAI / Gemini)" },
+  { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
-  { status: "planned", area: { th: "AI", en: "AI" }, th: "Adapter สำหรับ OpenAI / Gemini", en: "OpenAI / Gemini adapters" },
   { status: "planned", area: { th: "โค้ด", en: "Code" }, th: "เชื่อม GitHub / GitLab แทน repository ในเครื่อง", en: "GitHub / GitLab hosting behind the repository interface" },
   { status: "planned", area: { th: "AI", en: "AI" }, th: "ทำงาน AI ต่อจากจุดที่ค้างได้เมื่อระบบรีสตาร์ต (ตอนนี้ล้มเหลวแล้วลองใหม่)", en: "Resume interrupted AI runs mid-call (today they fail and are retried)" },
 ];

@@ -69,6 +69,12 @@ public static class DependencyInjection
         services.Configure<SimulatedOptions>(config.GetSection("AiProviders:Simulated"));
         services.AddSingleton<IAiProvider, AnthropicProvider>();
         services.AddSingleton<IAiProvider, SimulatedProvider>();
+        services.Configure<OpenAiOptions>(config.GetSection("AiProviders:OpenAI"));
+        services.Configure<GeminiOptions>(config.GetSection("AiProviders:Gemini"));
+        services.AddHttpClient(OpenAiProvider.HttpClientName, c => c.Timeout = Timeout.InfiniteTimeSpan); // per-call timeout in the adapter
+        services.AddHttpClient(GeminiProvider.HttpClientName, c => c.Timeout = Timeout.InfiniteTimeSpan);
+        services.AddSingleton<IAiProvider, OpenAiProvider>();
+        services.AddSingleton<IAiProvider, GeminiProvider>();
         services.AddSingleton<AiProviderRegistry>();
 
         services.AddSingleton<IAgentTool, TaskContextTool>();
