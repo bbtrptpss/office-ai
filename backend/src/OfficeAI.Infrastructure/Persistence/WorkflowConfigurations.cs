@@ -51,6 +51,7 @@ internal class WorkflowExecutionConfig : IEntityTypeConfiguration<WorkflowExecut
         b.HasOne<WorkflowDefinition>().WithMany().HasForeignKey(w => w.DefinitionId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Project>().WithMany().HasForeignKey(w => w.ProjectId).OnDelete(DeleteBehavior.Cascade);
         b.HasOne<EmployeeProfile>().WithMany().HasForeignKey(w => w.PlannerEmployeeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<Department>().WithMany().HasForeignKey(w => w.DepartmentId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

@@ -3094,6 +3094,9 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("DefinitionId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("DepartmentId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Error")
                         .HasColumnType("text");
 
@@ -3136,6 +3139,8 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DefinitionId");
+
+                    b.HasIndex("DepartmentId");
 
                     b.HasIndex("PlannerEmployeeId");
 
@@ -3816,6 +3821,11 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                         .HasForeignKey("DefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("OfficeAI.Domain.Organization.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("OfficeAI.Domain.Organization.EmployeeProfile", null)
                         .WithMany()

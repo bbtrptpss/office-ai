@@ -13,7 +13,7 @@ import { useLoad } from "@/components/common";
 /** Who the order is for: one person, or a department (planned by an AI there, or handed to one member). */
 export type OrderTarget =
   | { kind: "person"; employee: Employee }
-  | { kind: "department"; name: string; members: Employee[] };
+  | { kind: "department"; id: string; name: string; members: Employee[] };
 
 const PRIORITIES: TaskPriority[] = ["Low", "Medium", "High", "Critical"];
 
@@ -64,7 +64,7 @@ export function OrderDialog({ target, onClose }: { target: OrderTarget | null; o
     setResult(null);
     try {
       if (planning) {
-        await api.post(`/api/projects/${project}/objectives`, { objective: text.trim(), plannerEmployeeId: plannerId });
+        await api.post(`/api/projects/${project}/objectives`, { objective: text.trim(), plannerEmployeeId: plannerId, departmentId: target?.kind === "department" ? target.id : undefined });
         setResult({ ok: true, text: t.orderPlanned, projectId: project, approvals: true });
       } else if (person) {
         const lines = text.trim().split("\n");

@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.10.3",
+    date: "2026-10-18",
+    title: { th: "งานของแผนกใช้เฉพาะคนในแผนก", en: "Department work stays in the department" },
+    changes: [
+      { type: "changed", th: "สั่งงานทั้งแผนกจากออฟฟิศ 3D แล้ว ทุกชิ้นงานในแผนจะมอบหมายและตรวจงานโดยพนักงาน AI ของแผนกนั้นเท่านั้น และหัวหน้าได้รับรายชื่อทีมพร้อมทักษะไปใช้วางแผน", en: "Department orders from the 3D Office are done and reviewed only by that department's AI employees; the head plans with the team's names and skills" },
+      { type: "changed", th: "ถ้าแผนกไม่มีใครทำชิ้นงานได้ (งบหมด/ยังไม่ตั้ง AI) ระบบแจ้งให้คนตัดสินใจ แทนการส่งให้แผนกอื่น และถ้าไม่มีผู้ตรวจในแผนก งานจะส่งให้คนอนุมัติโดยตรง", en: "If nobody in the department can take a task (budget/AI not set up), people are asked to decide instead of handing it to another department; with no reviewer in the department, work goes straight to human approval" },
+      { type: "fixed", th: "เลือกผู้วางแผนที่ไม่มีสิทธิ์วางแผนจะถูกปฏิเสธพร้อมบอกเหตุผลทันที แทนการค้างอยู่ที่สถานะ “วางแผน”", en: "Choosing a planner who may not plan is refused with the reason at once, instead of the objective getting stuck in Planning" },
+    ],
+  },
+  {
     version: "0.10.2",
     date: "2026-10-18",
     title: { th: "สั่งงานจากออฟฟิศ 3D", en: "Give work from the 3D Office" },

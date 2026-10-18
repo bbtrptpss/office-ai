@@ -17,10 +17,11 @@ public record ApprovalDto(Guid Id, ApprovalKind Kind, ApprovalStatus Status, str
 /// <param name="NewBudgetUsd">Only for a workflow budget escalation: the new workflow budget. Defaults to twice the current one.</param>
 public record DecideApprovalRequest(bool Approve, string PayloadHash, string? Note, decimal? NewBudgetUsd = null);
 
-public record StartObjectiveRequest(string Objective, Guid? PlannerEmployeeId = null, decimal? BudgetUsd = null, int? MaxParallelRuns = null);
+/// <param name="DepartmentId">Keep the work inside one department: its AI employees plan, do and review every task.</param>
+public record StartObjectiveRequest(string Objective, Guid? PlannerEmployeeId = null, decimal? BudgetUsd = null, int? MaxParallelRuns = null, Guid? DepartmentId = null);
 public record WorkflowDto(Guid Id, Guid ProjectId, string Objective, WorkflowStatus Status, Guid PlannerEmployeeId, string PlannerName,
     Guid? PlanningTaskId, decimal BudgetUsd, decimal SpentUsd, int MaxParallelRuns, int TaskCount, int DoneCount, DateTimeOffset CreatedAt,
-    DateTimeOffset? CompletedAt, string? Error);
+    DateTimeOffset? CompletedAt, string? Error, Guid? DepartmentId = null, string? DepartmentName = null);
 public record WorkflowEventDto(long Id, Guid? TaskId, string Kind, string Message, DateTimeOffset CreatedAt);
 public record ReviewDto(Guid Id, Guid TaskId, Guid? DeliverableId, string? ReviewerName, ReviewOutcome Outcome, string Comments, bool IsSimulated, DateTimeOffset CreatedAt);
 
@@ -293,24 +294,44 @@ public class ObjectiveService(IAppDbContext db, AgentRunService runs, ICurrentUs
         var definition = await db.WorkflowDefinitions.AsNoTracking().FirstOrDefaultAsync(d => d.Code == DefaultDefinition && d.IsActive, ct)
             ?? throw new DomainException("workflow.no_definition", "No active workflow definition.");
 
+        Department? department = null;
+        if (req.DepartmentId is { } departmentId)
+        {
+            department = await db.Departments.AsNoTracking().FirstOrDefaultAsync(d => d.Id == departmentId, ct) ?? throw new NotFoundException("Department", departmentId);
+            if (!department.IsActive) throw new DomainException("validation", $"{department.Name} is not active.");
+        }
+        // Without a planner: the COO, or for a department its most senior AI employee who may plan.
         var plannerId = req.PlannerEmployeeId
-            ?? await db.Employees.Where(e => e.Kind == EmployeeKind.AI && e.RoleDefinition!.Code == "COO").Select(e => (Guid?)e.Id).FirstOrDefaultAsync(ct)
-            ?? throw new DomainException("workflow.no_planner", "Choose an AI employee to plan this objective.");
+            ?? (department is null
+                ? await db.Employees.Where(e => e.Kind == EmployeeKind.AI && e.RoleDefinition!.Code == "COO").Select(e => (Guid?)e.Id).FirstOrDefaultAsync(ct)
+                : (await db.Employees.AsNoTracking()
+                    .Where(e => e.Kind == EmployeeKind.AI && e.DepartmentId == department.Id && e.Status != EmployeeStatus.Inactive &&
+                                db.AgentToolPermissions.Any(p => p.EmployeeId == e.Id && p.ToolId == PlanSubmitTool.ToolId))
+                    .Select(e => new { e.Id, e.DisplayName, e.RoleDefinition!.Level }).ToListAsync(ct))
+                    .OrderBy(e => e.Level).ThenBy(e => e.DisplayName, StringComparer.Ordinal).Select(e => (Guid?)e.Id).FirstOrDefault())
+            ?? throw new DomainException("workflow.no_planner", department is null
+                ? "Choose an AI employee to plan this objective."
+                : $"No AI employee in {department.Name} may plan objectives (needs the plan.submit tool).");
         var planner = await db.Employees.AsNoTracking().FirstOrDefaultAsync(e => e.Id == plannerId, ct) ?? throw new NotFoundException("Employee", plannerId);
         if (planner.Kind != EmployeeKind.AI) throw new DomainException("validation", "The planner must be an AI employee.");
+        if (department is not null && planner.DepartmentId != department.Id)
+            throw new DomainException("validation", $"The planner must belong to {department.Name}.");
+        if (!await db.AgentToolPermissions.AnyAsync(p => p.EmployeeId == plannerId && p.ToolId == PlanSubmitTool.ToolId, ct))
+            throw new DomainException("workflow.planner_cannot_plan", $"{planner.DisplayName} may not plan objectives (grant the plan.submit tool on the AI profile).");
         if (req.BudgetUsd is < 0 or > 100_000) throw new DomainException("validation", "budgetUsd must be between 0 and 100000.");
         if (req.MaxParallelRuns is < 1 or > 20) throw new DomainException("validation", "maxParallelRuns must be between 1 and 20.");
 
         var now = clock.GetUtcNow();
         var workflow = new WorkflowExecution
         {
-            DefinitionId = definition.Id, ProjectId = projectId, Objective = req.Objective.Trim(), PlannerEmployeeId = plannerId,
+            DefinitionId = definition.Id, ProjectId = projectId, Objective = req.Objective.Trim(), PlannerEmployeeId = plannerId, DepartmentId = department?.Id,
             BudgetUsd = req.BudgetUsd ?? definition.DefaultBudgetUsd, MaxParallelRuns = req.MaxParallelRuns ?? definition.MaxParallelRuns,
         };
         var title = workflow.Objective.Length > 120 ? workflow.Objective[..120] + "…" : workflow.Objective;
         var planningTask = new WorkTask
         {
-            ProjectId = projectId, WorkflowExecutionId = workflow.Id, Title = $"Plan: {title}", Description = workflow.Objective,
+            ProjectId = projectId, WorkflowExecutionId = workflow.Id, Title = $"Plan: {title}",
+            Description = department is null ? workflow.Objective : workflow.Objective + await TeamNoteAsync(department, ct),
             AcceptanceCriteria = "A plan of concrete, checkable tasks with skills and dependencies, approved by the CEO.", Priority = TaskPriority.High,
             Status = WorkTaskStatus.Assigned, PlanKey = "plan",
         };
@@ -334,14 +355,26 @@ public class ObjectiveService(IAppDbContext db, AgentRunService runs, ICurrentUs
         return list;
     }
 
+    /// <summary>Tells the planner who can do the work when it must stay inside one department.</summary>
+    private async Task<string> TeamNoteAsync(Department department, CancellationToken ct)
+    {
+        var team = await db.Employees.AsNoTracking()
+            .Where(e => e.DepartmentId == department.Id && e.Kind == EmployeeKind.AI && e.Status != EmployeeStatus.Inactive)
+            .OrderBy(e => e.DisplayName).Select(e => new { e.DisplayName, Skills = e.RoleDefinition!.Skills }).ToListAsync(ct);
+        var lines = team.Select(m => $"- {m.DisplayName}: {string.Join(", ", m.Skills)}");
+        return $"\n\nThis objective belongs to the {department.Name} department. Only its AI employees will do and review the tasks, " +
+               $"so plan work they can do and use their skills in requiredSkills:\n{string.Join("\n", lines)}";
+    }
+
     public async Task<WorkflowDto> GetAsync(Guid id, CancellationToken ct)
     {
         var w = await db.WorkflowExecutions.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Workflow", id);
         var planner = await db.Employees.AsNoTracking().Where(e => e.Id == w.PlannerEmployeeId).Select(e => e.DisplayName).FirstAsync(ct);
+        var departmentName = w.DepartmentId is { } d ? await db.Departments.AsNoTracking().Where(x => x.Id == d).Select(x => x.Name).FirstOrDefaultAsync(ct) : null;
         var tasks = await db.Tasks.AsNoTracking().Where(t => t.WorkflowExecutionId == id && t.Id != w.PlanningTaskId).Select(t => t.Status).ToListAsync(ct);
         var spent = await WorkflowEngine.SpentAsync(db, id, ct);
         return new WorkflowDto(w.Id, w.ProjectId, w.Objective, w.Status, w.PlannerEmployeeId, planner, w.PlanningTaskId, w.BudgetUsd, spent, w.MaxParallelRuns,
-            tasks.Count(s => s != WorkTaskStatus.Cancelled), tasks.Count(s => s == WorkTaskStatus.Done), w.CreatedAt, w.CompletedAt, w.Error);
+            tasks.Count(s => s != WorkTaskStatus.Cancelled), tasks.Count(s => s == WorkTaskStatus.Done), w.CreatedAt, w.CompletedAt, w.Error, w.DepartmentId, departmentName);
     }
 
     public async Task<List<WorkflowEventDto>> ListEventsAsync(Guid id, CancellationToken ct) =>

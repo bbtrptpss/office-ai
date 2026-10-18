@@ -351,6 +351,8 @@ export interface Workflow {
   status: WorkflowStatus;
   plannerEmployeeId: string;
   plannerName: string;
+  departmentId: string | null;
+  departmentName: string | null;
   planningTaskId: string | null;
   budgetUsd: number;
   spentUsd: number;

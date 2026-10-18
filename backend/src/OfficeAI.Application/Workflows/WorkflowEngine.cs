@@ -152,10 +152,12 @@ public sealed class WorkflowEngine(
 
         if (task.Status == WorkTaskStatus.Todo)
         {
-            var choice = await selector.ChooseWorkerAsync(task, ct);
+            var choice = await selector.ChooseWorkerAsync(task, w.DepartmentId, ct);
             if (choice is null)
             {
-                await EscalateOnceAsync(w, task, "No AI employee can take this task (skills, budget or provider).", "NoAgent", ct);
+                await EscalateOnceAsync(w, task, w.DepartmentId is null
+                    ? "No AI employee can take this task (skills, budget or provider)."
+                    : "No AI employee in this department can take this task (budget or provider).", "NoAgent", ct);
                 return;
             }
             await work.AssignAsync(task.Id, new AssignRequest(choice.EmployeeId), ct);
@@ -170,7 +172,7 @@ public sealed class WorkflowEngine(
         {
             if (task.ReviewerEmployeeId is null)
             {
-                var reviewer = def.RequireAiReview ? await selector.ChooseReviewerAsync(task, assignees, ct) : null;
+                var reviewer = def.RequireAiReview ? await selector.ChooseReviewerAsync(task, assignees, w.DepartmentId, ct) : null;
                 if (reviewer is null)
                 {
                     // No AI reviewer: a human reviews and approves directly.

@@ -86,7 +86,7 @@ export default function OfficePage() {
         <Office3D rooms={rooms} selectedId={selectedId} onSelect={setSelectedId} labels={(s) => label(s)} loungeName={t.officeLounge} roomHint={t.officeRoomHint}
           onRoomClick={canOrder ? (id) => {
             const dept = data.departments.find((d) => d.id === id);
-            if (dept) setOrder({ kind: "department", name: dept.name, members: data.employees.filter((e) => e.departmentId === id) });
+            if (dept) setOrder({ kind: "department", id: dept.id, name: dept.name, members: data.employees.filter((e) => e.departmentId === id) });
           } : undefined} />
         {selected && (
           <Card sx={{ position: "absolute", top: 12, right: 12, width: 280, maxWidth: "calc(100% - 24px)", zIndex: 30 /* above the 3D name signs */ }}>

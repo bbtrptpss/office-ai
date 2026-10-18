@@ -38,6 +38,9 @@ public class WorkflowExecution : Entity, IAuditable
     public WorkflowStatus Status { get; set; } = WorkflowStatus.Planning;
     public Guid PlannerEmployeeId { get; set; }
 
+    /// <summary>When set, every task of this objective (and every review) goes only to AI employees of this department.</summary>
+    public Guid? DepartmentId { get; set; }
+
     /// <summary>The task the planner works on; Done once the plan is approved.</summary>
     public Guid? PlanningTaskId { get; set; }
 

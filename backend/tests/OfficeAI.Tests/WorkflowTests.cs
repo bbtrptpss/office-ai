@@ -136,6 +136,59 @@ public class WorkflowTests(ApiFixture fx)
             Assert.Contains(events, e => e.Kind == kind);
     }
 
+    [Fact]
+    public async Task A_department_objective_is_planned_done_and_reviewed_only_inside_that_department()
+    {
+        var (ceo, project) = await ProjectAsync();
+        var planner = await NewAgentAsync(ceo, "ARCH");    // head of the engineering department: may plan
+        var developer = await NewAgentAsync(ceo, "BACKEND");
+        var analyst = await NewAgentAsync(ceo, "BA");      // better skills for "Clarify requirements", other department
+        var qa = await NewAgentAsync(ceo, "QAENG");        // the usual reviewer, other department
+        Assert.NotEqual(planner.DepartmentId, analyst.DepartmentId);
+        Assert.NotEqual(planner.DepartmentId, qa.DepartmentId);
+        await OnlyTheseAgentsAsync(planner.Id, developer.Id, analyst.Id, qa.Id);
+
+        // The planner must belong to the department.
+        var wrong = await ceo.PostAsJsonAsync($"/api/projects/{project.Id}/objectives",
+            new { objective = "x", plannerEmployeeId = analyst.Id, departmentId = planner.DepartmentId });
+        Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
+        // ...and be allowed to plan (a staff developer is not), instead of leaving the objective stuck in planning.
+        var cannotPlan = await ceo.PostAsJsonAsync($"/api/projects/{project.Id}/objectives",
+            new { objective = "x", plannerEmployeeId = developer.Id, departmentId = planner.DepartmentId });
+        Assert.Equal(HttpStatusCode.Conflict, cannotPlan.StatusCode);
+        Assert.Contains("plan.submit", await cannotPlan.Content.ReadAsStringAsync());
+
+        var workflow = await ceo.PostAsync<WorkflowDto>($"/api/projects/{project.Id}/objectives",
+            new { objective = "Build a meeting-room booking API", plannerEmployeeId = planner.Id, departmentId = planner.DepartmentId });
+        Assert.Equal(planner.DepartmentId, workflow.DepartmentId);
+        await using (var scope = fx.Factory.Services.CreateAsyncScope())
+        {
+            var plan = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Tasks.AsNoTracking().SingleAsync(t => t.Id == workflow.PlanningTaskId);
+            Assert.Contains(developer.DisplayName, plan.Description); // the planner is told who is in the team
+            Assert.DoesNotContain(analyst.DisplayName, plan.Description);
+        }
+
+        for (var round = 0; round < 40; round++)
+        {
+            await TickAsync();
+            await WaitForIdleAsync();
+            foreach (var a in await PendingAsync(ceo, workflow.Id)) await ApproveAsync(ceo, a);
+            workflow = await ceo.GetAsync<WorkflowDto>($"/api/workflows/{workflow.Id}");
+            if (workflow.Status is not (WorkflowStatus.Executing or WorkflowStatus.Planning or WorkflowStatus.AwaitingPlanApproval)) break;
+        }
+
+        Assert.Equal(WorkflowStatus.Completed, workflow.Status);
+        var team = new[] { planner.Id, developer.Id };
+        var tasks = await ceo.GetAsync<List<TaskDto>>($"/api/projects/{project.Id}/tasks");
+        Assert.All(tasks, t => Assert.All(t.Assignees, a => Assert.Contains(a.EmployeeId, team)));
+        await using (var scope = fx.Factory.Services.CreateAsyncScope())
+        {
+            var reviewers = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Tasks.AsNoTracking()
+                .Where(t => t.WorkflowExecutionId == workflow.Id && t.ReviewerEmployeeId != null).Select(t => t.ReviewerEmployeeId!.Value).ToListAsync();
+            Assert.All(reviewers, r => Assert.Contains(r, team));
+        }
+    }
+
     // ---------------- approvals ----------------
 
     [Fact]

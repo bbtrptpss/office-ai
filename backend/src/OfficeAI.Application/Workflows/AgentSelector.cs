@@ -19,11 +19,12 @@ public sealed class AgentSelector(IAppDbContext db, AiProviderRegistry providers
 
     private sealed record Candidate(Guid Id, string Name, OrgLevel Level, Guid DepartmentId, string DeptCode, List<string> Skills, int OpenTasks);
 
-    private async Task<List<Candidate>> CandidatesAsync(CancellationToken ct)
+    /// <param name="departmentId">Only this department's employees, for objectives kept inside one department.</param>
+    private async Task<List<Candidate>> CandidatesAsync(Guid? departmentId, CancellationToken ct)
     {
         var monthStart = AgentAdminService.MonthStart(clock);
         var rows = await db.Employees.AsNoTracking()
-            .Where(e => e.Kind == EmployeeKind.AI && e.Status != EmployeeStatus.Inactive)
+            .Where(e => e.Kind == EmployeeKind.AI && e.Status != EmployeeStatus.Inactive && (departmentId == null || e.DepartmentId == departmentId))
             .Join(db.AgentConfigurations.Where(c => c.IsEnabled), e => e.Id, c => c.EmployeeId, (e, c) => new
             {
                 e.Id, e.DisplayName, e.RoleDefinition!.Level, e.DepartmentId, DeptCode = e.Department!.Code, e.RoleDefinition.Skills, c.Provider, c.MonthlyBudgetUsd,
@@ -41,13 +42,13 @@ public sealed class AgentSelector(IAppDbContext db, AiProviderRegistry providers
     private static int SkillScore(Candidate c, IReadOnlyCollection<string> wanted) =>
         wanted.Count(w => c.Skills.Any(s => s.Equals(w, StringComparison.OrdinalIgnoreCase) || s.Contains(w, StringComparison.OrdinalIgnoreCase) || w.Contains(s, StringComparison.OrdinalIgnoreCase)));
 
-    public async Task<AgentChoice?> ChooseWorkerAsync(WorkTask task, CancellationToken ct)
+    public async Task<AgentChoice?> ChooseWorkerAsync(WorkTask task, Guid? departmentId, CancellationToken ct)
     {
         var wanted = task.RequiredSkills.Count > 0
             ? task.RequiredSkills
             : $"{task.Title} {task.Description}".ToLowerInvariant().Split([' ', ',', '.', '/', '(', ')'], StringSplitOptions.RemoveEmptyEntries).Where(w => w.Length > 2).Distinct().ToList();
 
-        var best = (await CandidatesAsync(ct))
+        var best = (await CandidatesAsync(departmentId, ct))
             .Where(c => c.Level != OrgLevel.Executive)
             .Select(c => new { c, score = SkillScore(c, wanted) })
             .OrderByDescending(x => x.score).ThenBy(x => x.c.OpenTasks).ThenBy(x => x.c.Name, StringComparer.Ordinal)
@@ -57,9 +58,9 @@ public sealed class AgentSelector(IAppDbContext db, AiProviderRegistry providers
     }
 
     /// <summary>A reviewer is never the assignee; QA specialists first, then a senior colleague from the same department.</summary>
-    public async Task<AgentChoice?> ChooseReviewerAsync(WorkTask task, IReadOnlyCollection<Guid> assignees, CancellationToken ct)
+    public async Task<AgentChoice?> ChooseReviewerAsync(WorkTask task, IReadOnlyCollection<Guid> assignees, Guid? departmentId, CancellationToken ct)
     {
-        var candidates = (await CandidatesAsync(ct)).Where(c => !assignees.Contains(c.Id) && c.Level != OrgLevel.Executive).ToList();
+        var candidates = (await CandidatesAsync(departmentId, ct)).Where(c => !assignees.Contains(c.Id) && c.Level != OrgLevel.Executive).ToList();
         var assigneeDept = await db.Employees.AsNoTracking().Where(e => assignees.Contains(e.Id)).Select(e => (Guid?)e.DepartmentId).FirstOrDefaultAsync(ct);
 
         var best = candidates
