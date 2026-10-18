@@ -152,4 +152,15 @@ public class ProviderAdapterTests
         Assert.Equal(AiStopReason.Refusal, response.StopReason);
         Assert.Empty(response.Content);
     }
+
+    [Fact]
+    public async Task Gemini_lists_only_models_that_can_generate()
+    {
+        var (provider, handler) = Gemini(HttpStatusCode.OK, """
+            {"models":[{"name":"models/gemini-x-flash","supportedGenerationMethods":["generateContent","countTokens"]},
+                       {"name":"models/text-embedding-x","supportedGenerationMethods":["embedContent"]}]}
+            """);
+        Assert.Equal(["gemini-x-flash"], await provider.RemoteModelsAsync(CancellationToken.None));
+        Assert.Equal("g-test", handler.Request!.Headers.GetValues("x-goog-api-key").Single());
+    }
 }

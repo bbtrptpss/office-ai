@@ -60,6 +60,9 @@ public interface IAiProvider
 
     /// <summary>Checks the configured key with a free call (no tokens). Returns null when it works, otherwise the problem.</summary>
     Task<string?> VerifyAsync(CancellationToken ct) => Task.FromResult<string?>(IsAvailable ? null : "Not configured.");
+
+    /// <summary>Model ids the configured key can use for chat/generation (a free listing call). Empty when not supported.</summary>
+    Task<IReadOnlyList<string>> RemoteModelsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<string>>([]);
 }
 
 /// <summary>Provider keys entered by people on the AI settings page (encrypted at rest). Take precedence over the server environment.</summary>

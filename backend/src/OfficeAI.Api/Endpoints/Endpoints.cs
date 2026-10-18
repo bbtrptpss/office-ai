@@ -153,6 +153,7 @@ public static class Endpoints
         api.MapGet("/ai/providers", (AgentAdminService s) => s.ListProviders()).RequirePermission(Permissions.AgentRead);
         api.MapPut("/ai/providers/{name}/key", (string name, SetProviderKeyRequest r, AgentAdminService s, CancellationToken ct) => s.SetKeyAsync(name, r, ct)).RequirePermission(Permissions.AgentManage);
         api.MapDelete("/ai/providers/{name}/key", (string name, AgentAdminService s, CancellationToken ct) => s.RemoveKeyAsync(name, ct)).RequirePermission(Permissions.AgentManage);
+        api.MapGet("/ai/providers/{name}/models", (string name, AgentAdminService s, CancellationToken ct) => s.RemoteModelsAsync(name, ct)).RequirePermission(Permissions.AgentManage);
         api.MapPost("/ai/providers/{name}/verify", (string name, AgentAdminService s, CancellationToken ct) => s.VerifyAsync(name, ct)).RequirePermission(Permissions.AgentManage);
         api.MapGet("/ai/models", (AgentAdminService s, CancellationToken ct) => s.ListModelsAsync(ct)).RequirePermission(Permissions.AgentRead);
         api.MapPost("/ai/models", (CreateAiModelRequest r, AgentAdminService s, CancellationToken ct) => s.CreateModelAsync(r, ct)).RequirePermission(Permissions.AgentManage);

@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.10",
+    date: "2026-10-18",
+    title: { th: "เลือกโมเดลจากรายการของผู้ให้บริการ", en: "Pick models from the provider's list" },
+    changes: [
+      { type: "added", th: "ช่อง Model ID ตอนเพิ่มโมเดลแนะนำรายชื่อโมเดลที่ key ใช้ได้จริง (ดึงจากผู้ให้บริการ ไม่เสียค่าใช้จ่าย) ไม่ต้องเดาชื่อ", en: "The Model ID field suggests the models the key can actually use (fetched from the provider at no cost)" },
+      { type: "added", th: "ใช้งาน Google Gemini 3.8 Flash (free tier) กับ HR AI, Backend Developer AI และ Documentation AI — ตอบในแชทได้จริงแล้ว", en: "Google Gemini 3.8 Flash (free tier) is in use for HR AI, Backend Developer AI and Documentation AI — real chat answers work" },
+    ],
+  },
+  {
     version: "0.7.9",
     date: "2026-10-18",
     title: { th: "AI ตอบในแชทเมื่อถูก @mention", en: "AI answers in chat when @mentioned" },
@@ -201,7 +210,7 @@ export const CHANGELOG: Release[] = [
 ];
 
 export const TODO: Todo[] = [
-  { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "สั่งงาน AI จริงครั้งแรก (Claude เชื่อมต่อแล้ว)", en: "Start the first real AI run (Claude is connected)" },
+  { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "เติมเครดิต Anthropic (ต้องผูกบัตร) เพื่อให้ AI ที่ใช้ Claude ทำงานได้ — ตอนนี้ 3 ตัวใช้ Gemini ฟรีแทน", en: "Add Anthropic credit (needs a card) so Claude-based AI can work — 3 employees use free Gemini meanwhile" },
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },

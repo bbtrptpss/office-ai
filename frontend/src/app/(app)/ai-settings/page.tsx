@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  Alert, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid, MenuItem, Paper, Stack, Switch, Table, TableBody,
+  Alert, Autocomplete, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid, MenuItem, Paper, Stack, Switch, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -175,6 +175,8 @@ function AddModelDialog({ providers, onClose, onSaved }: { providers: string[]; 
   const errorMessage = useErrorMessage();
   const [form, setForm] = useState({ provider: providers[0] ?? "", modelId: "", displayName: "", tier: "Standard", input: "", output: "", cacheRead: "", cacheWrite: "" });
   const [problem, setProblem] = useState<string | null>(null);
+  // What the provider offers this key (free listing call); empty when its key is not set.
+  const { data: remote } = useLoad(() => (form.provider ? api.get<string[]>(`/api/ai/providers/${form.provider}/models`).catch(() => []) : Promise.resolve([])), form.provider);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
@@ -190,7 +192,9 @@ function AddModelDialog({ providers, onClose, onSaved }: { providers: string[]; 
               {TIERS.map((x) => <MenuItem key={x} value={x}>{label(x)}</MenuItem>)}
             </TextField>
           </Stack>
-          <TextField label="Model ID" placeholder="gpt-5.1 / gemini-3-pro" value={form.modelId} onChange={set("modelId")} />
+          <Autocomplete freeSolo options={remote ?? []} inputValue={form.modelId}
+            onInputChange={(_, v) => setForm((f) => ({ ...f, modelId: v, displayName: f.displayName || "" }))}
+            renderInput={(params) => <TextField {...params} label="Model ID" helperText={remote?.length ? `${remote.length} ${t.modelsAvailable}` : undefined} />} />
           <TextField label={t.displayName} value={form.displayName} onChange={set("displayName")} />
           <Typography variant="caption" color="text.secondary">{t.pricesHint}</Typography>
           <Stack direction="row" spacing={1}>

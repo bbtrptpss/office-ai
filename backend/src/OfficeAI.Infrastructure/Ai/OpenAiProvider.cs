@@ -46,6 +46,15 @@ public sealed class OpenAiProvider(IHttpClientFactory http, IOptions<OpenAiOptio
         return await HttpAi.CheckAsync(http, HttpClientName, message, "OpenAI", ct);
     }
 
+    public async Task<IReadOnlyList<string>> RemoteModelsAsync(CancellationToken ct)
+    {
+        if (CurrentKey is not { } key) return [];
+        using var message = new HttpRequestMessage(HttpMethod.Get, options.Value.BaseUrl.TrimEnd('/') + "/models");
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+        var json = await HttpAi.SendAsync(http, HttpClientName, message, TimeSpan.FromSeconds(15), "OpenAI", ct);
+        return json.GetProperty("data").EnumerateArray().Select(m => m.GetProperty("id").GetString()!).Order().ToList();
+    }
+
     public async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct)
     {
         if (CurrentKey is not { } _key) throw new AiProviderException("OpenAI API key is not configured.", retryable: false);

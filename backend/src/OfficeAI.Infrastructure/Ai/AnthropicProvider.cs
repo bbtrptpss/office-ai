@@ -55,6 +55,16 @@ public sealed class AnthropicProvider(IOptions<AnthropicOptions> options, IAiCre
         return await HttpAi.CheckAsync(http, HttpClientName, message, "Anthropic", ct);
     }
 
+    public async Task<IReadOnlyList<string>> RemoteModelsAsync(CancellationToken ct)
+    {
+        if (CurrentKey is not { } key || http is null) return [];
+        using var message = new HttpRequestMessage(HttpMethod.Get, "https://api.anthropic.com/v1/models?limit=1000");
+        message.Headers.Add("x-api-key", key);
+        message.Headers.Add("anthropic-version", "2023-06-01");
+        var json = await HttpAi.SendAsync(http!, HttpClientName, message, TimeSpan.FromSeconds(15), "Anthropic", ct);
+        return json.GetProperty("data").EnumerateArray().Select(m => m.GetProperty("id").GetString()!).Order().ToList();
+    }
+
     public async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct)
     {
         var _client = Client() ?? throw new AiProviderException("Anthropic API key is not configured.", retryable: false);

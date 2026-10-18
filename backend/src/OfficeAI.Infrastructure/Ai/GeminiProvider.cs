@@ -38,6 +38,28 @@ public sealed class GeminiProvider(IHttpClientFactory http, IOptions<GeminiOptio
         return await HttpAi.CheckAsync(http, HttpClientName, message, "Gemini", ct);
     }
 
+    /// <summary>Models that support generateContent, without the "models/" prefix.</summary>
+    public async Task<IReadOnlyList<string>> RemoteModelsAsync(CancellationToken ct)
+    {
+        if (CurrentKey is not { } key) return [];
+        var ids = new List<string>();
+        string? page = null;
+        for (var i = 0; i < 10; i++)
+        {
+            var url = $"{options.Value.BaseUrl.TrimEnd('/')}/models?pageSize=200" + (page is null ? "" : $"&pageToken={Uri.EscapeDataString(page)}");
+            using var message = new HttpRequestMessage(HttpMethod.Get, url);
+            message.Headers.Add("x-goog-api-key", key);
+            var json = await HttpAi.SendAsync(http, HttpClientName, message, TimeSpan.FromSeconds(15), "Gemini", ct);
+            if (json.TryGetProperty("models", out var models))
+                foreach (var m in models.EnumerateArray())
+                    if (m.TryGetProperty("supportedGenerationMethods", out var methods) && methods.EnumerateArray().Any(x => x.GetString() == "generateContent"))
+                        ids.Add(m.GetProperty("name").GetString()!.Replace("models/", ""));
+            page = json.TryGetProperty("nextPageToken", out var next) ? next.GetString() : null;
+            if (string.IsNullOrEmpty(page)) break;
+        }
+        return ids.Order().ToList();
+    }
+
     public async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct)
     {
         if (CurrentKey is not { } _key) throw new AiProviderException("Gemini API key is not configured.", retryable: false);

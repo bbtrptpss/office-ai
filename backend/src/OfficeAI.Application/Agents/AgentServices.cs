@@ -83,6 +83,20 @@ public class AgentAdminService(IAppDbContext db, AiProviderRegistry providers, T
         return new VerifyProviderDto(problem is null, problem);
     }
 
+    /// <summary>What the provider offers this key (free listing call), for picking a model id instead of typing it.</summary>
+    public async Task<IReadOnlyList<string>> RemoteModelsAsync(string provider, CancellationToken ct)
+    {
+        var p = RealProvider(provider);
+        try
+        {
+            return await p.RemoteModelsAsync(ct);
+        }
+        catch (AiProviderException ex)
+        {
+            throw new DomainException("validation", ex.Message);
+        }
+    }
+
     /// <summary>People add models (e.g. for OpenAI or Gemini) with their list prices; nothing is assumed free.</summary>
     public async Task<AiModelDto> CreateModelAsync(CreateAiModelRequest req, CancellationToken ct)
     {
