@@ -1,3 +1,4 @@
+using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +19,31 @@ namespace OfficeAI.Infrastructure;
 
 public static class DependencyInjection
 {
+    /// <summary>
+    /// With DataProtection:CertificatePath set, new cookie keys are encrypted with that certificate before they reach the database.
+    /// DataProtection:PreviousCertificatePaths keeps keys from a rotated-out certificate readable. Keys written before encryption
+    /// was turned on stay readable until they expire (90 days).
+    /// </summary>
+    public static void ProtectKeysAtRest(IDataProtectionBuilder builder, IConfiguration config)
+    {
+        var path = config["DataProtection:CertificatePath"];
+        if (string.IsNullOrWhiteSpace(path)) return;
+        var password = config["DataProtection:CertificatePassword"];
+        var current = LoadCertificate(path, password);
+        var previous = (config.GetSection("DataProtection:PreviousCertificatePaths").Get<string[]>() ?? [])
+            .Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => LoadCertificate(p, password));
+        builder.ProtectKeysWithCertificate(current);
+        builder.UnprotectKeysWithAnyCertificate([current, .. previous]);
+    }
+
+    private static X509Certificate2 LoadCertificate(string path, string? password)
+    {
+        if (!File.Exists(path)) throw new InvalidOperationException($"DataProtection certificate '{path}' was not found.");
+        var cert = X509CertificateLoader.LoadPkcs12FromFile(path, password);
+        if (!cert.HasPrivateKey) throw new InvalidOperationException($"DataProtection certificate '{path}' has no private key.");
+        return cert;
+    }
+
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
         var connectionString = config.GetConnectionString("Default")
@@ -25,7 +51,8 @@ public static class DependencyInjection
 
         services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connectionString));
         // Auth cookie keys survive restarts and are shared by every API instance.
-        services.AddDataProtection().PersistKeysToDbContext<AppDbContext>().SetApplicationName("OfficeAI");
+        var dataProtection = services.AddDataProtection().PersistKeysToDbContext<AppDbContext>().SetApplicationName("OfficeAI");
+        ProtectKeysAtRest(dataProtection, config);
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddSingleton(TimeProvider.System);
         services.Configure<SeedOptions>(config.GetSection("Seed"));

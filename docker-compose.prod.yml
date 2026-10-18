@@ -21,6 +21,11 @@ services:
       Logging__Json: "true"
       Integrations__AppBaseUrl: https://${APP_DOMAIN}
       Integrations__AllowHttp: "false"
+      # Cookie keys are encrypted at rest with this certificate (create it with scripts/new-dataprotection-cert.sh).
+      DataProtection__CertificatePath: /run/secrets/dataprotection.pfx
+      DataProtection__CertificatePassword: ${DATAPROTECTION_CERT_PASSWORD:?set DATAPROTECTION_CERT_PASSWORD}
+    volumes:
+      - ./secrets/dataprotection.pfx:/run/secrets/dataprotection.pfx:ro
     restart: unless-stopped
 
   sandbox-runner:

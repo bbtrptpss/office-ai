@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.3",
+    date: "2026-10-18",
+    title: { th: "เข้ารหัสกุญแจ cookie ในฐานข้อมูล", en: "Cookie keys encrypted at rest" },
+    changes: [
+      { type: "security", th: "กุญแจเข้ารหัส cookie (DataProtection) ถูกเข้ารหัสด้วย certificate ก่อนเก็บลงฐานข้อมูล — บังคับใช้ใน production", en: "Auth-cookie keys (DataProtection) are encrypted with a certificate before they reach the database — required in production" },
+      { type: "added", th: "สคริปต์ scripts/new-dataprotection-cert.sh สร้าง certificate และรองรับการเปลี่ยน certificate โดยกุญแจเดิมยังอ่านได้", en: "scripts/new-dataprotection-cert.sh creates the certificate; rotation keeps older keys readable" },
+      { type: "security", th: "ระบบไม่ยอมเริ่มถ้าไฟล์ certificate หายหรือรหัสผ่านผิด", en: "The API refuses to start when the certificate is missing or the password is wrong" },
+    ],
+  },
+  {
     version: "0.7.2",
     date: "2026-10-18",
     title: { th: "อนุมัติเพิ่มงบ workflow ได้จริง", en: "Budget escalations raise the workflow budget" },
@@ -135,7 +145,6 @@ export const TODO: Todo[] = [
   { status: "planned", area: { th: "โค้ด", en: "Code" }, th: "เชื่อม GitHub / GitLab แทน repository ในเครื่อง", en: "GitHub / GitLab hosting behind the repository interface" },
   { status: "planned", area: { th: "แชท", en: "Chat" }, th: "จำกัดสมาชิกช่องแชทโปรเจกต์ (ตอนนี้ทุกคนที่ล็อกอินอ่านได้ทุกช่อง)", en: "Per-project channel membership (today every signed-in person can read all channels)" },
   { status: "planned", area: { th: "แชท", en: "Chat" }, th: "การ @mention และการแจ้งเตือนในแชท", en: "@mentions and chat notifications" },
-  { status: "planned", area: { th: "ความปลอดภัย", en: "Security" }, th: "เข้ารหัส DataProtection keys ด้วย certificate", en: "Encrypt DataProtection keys at rest with a certificate" },
   { status: "planned", area: { th: "AI", en: "AI" }, th: "ทำงาน AI ต่อจากจุดที่ค้างได้เมื่อระบบรีสตาร์ต (ตอนนี้ล้มเหลวแล้วลองใหม่)", en: "Resume interrupted AI runs mid-call (today they fail and are retried)" },
 ];
 
