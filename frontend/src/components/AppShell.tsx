@@ -184,12 +184,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <ButtonBase aria-label={t.menu} aria-haspopup="menu" aria-expanded={open}
               onPointerDown={(e) => { lastPointer.current = e.pointerType; }}
               onClick={() => (lastPointer.current === "mouse" ? showMenu() : setOpen((o) => !o))}
-              sx={{ gap: 1, pl: 1, pr: 1.25, py: 0.75, borderRadius: 999, transition: "background-color .2s", bgcolor: open ? "action.hover" : "transparent", "&:hover": { bgcolor: "action.hover" } }}>
-              <Stack direction="row" spacing={0.75} aria-hidden>
-                {["#FF8A80", "#FFD36E", "#7ED9A6"].map((c) => (
-                  <Box key={c} sx={{ width: 11, height: 11, borderRadius: "50%", bgcolor: c, transition: "transform .2s", transform: open ? "scale(1.15)" : "none" }} />
-                ))}
-              </Stack>
+              sx={{ gap: 1, p: 0.5, pr: 1, borderRadius: 999, transition: "background-color .2s", bgcolor: open ? "action.hover" : "transparent", "&:hover": { bgcolor: "action.hover" } }}>
+              <Box aria-hidden sx={{ width: 36, height: 36, borderRadius: "12px", overflow: "hidden", display: "grid", placeItems: "center", bgcolor: brand.pinkSoft,
+                transition: "transform .2s", transform: open ? "scale(1.08) rotate(-4deg)" : "none" }}>
+                {art("logo")
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={art("logo")} alt="" width={36} height={36} />
+                  : <Mascot size={32} float={false} />}
+              </Box>
               {(badges.navApprovals ?? 0) + (badges.navChat ?? 0) + (badges.navAnnouncements ?? 0) > 0 && (
                 <Box aria-hidden sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "secondary.main" }} />
               )}

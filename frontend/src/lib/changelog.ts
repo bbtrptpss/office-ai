@@ -37,6 +37,7 @@ export const CHANGELOG: Release[] = [
     changes: [
       { type: "changed", th: "ซ่อนแถบเมนูด้านข้าง หน้าจอกว้างขึ้น — ชี้เมาส์ที่ • • • มุมซ้ายบนเพื่อเปิดเมนู (บนมือถือ/แท็บเล็ตให้แตะ) ปิดเองเมื่อเอาเมาส์ออก เลือกเมนู หรือกด Esc", en: "The side menu is hidden for a wider page — hover the • • • at the top left to open it (tap on phones/tablets); it closes when the mouse leaves, you pick an item, or press Esc" },
       { type: "added", th: "มีจุดสีชมพูข้าง • • • เมื่อมีงานรออนุมัติ แชทหรือประกาศที่ยังไม่อ่าน", en: "A pink dot next to • • • shows when approvals, chat or announcements are waiting" },
+      { type: "changed", th: "ปุ่มเปิดเมนูเป็นโลโก้ (ชุดรูปตัวละคร หรือมาสคอต Puni) แทน • • •", en: "The menu button is the logo (character pack or the Puni mascot) instead of • • •" },
     ],
   },
   {
