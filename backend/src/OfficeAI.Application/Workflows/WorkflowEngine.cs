@@ -88,7 +88,9 @@ public sealed class WorkflowEngine(
         var spent = await SpentAsync(db, w.Id, ct);
         var overBudget = spent >= w.BudgetUsd;
         if (overBudget && !await db.ApprovalRequests.AnyAsync(a => a.WorkflowExecutionId == w.Id && a.Kind == ApprovalKind.Escalation && a.TaskId == null && a.Status == ApprovalStatus.Pending, ct)
-            && !await db.WorkflowEvents.AnyAsync(e => e.WorkflowExecutionId == w.Id && e.Kind == "budget_reached", ct))
+            // One escalation per budget level: after a raise, reaching the new limit asks again.
+            && await db.WorkflowEvents.CountAsync(e => e.WorkflowExecutionId == w.Id && e.Kind == "budget_reached", ct)
+               <= await db.WorkflowEvents.CountAsync(e => e.WorkflowExecutionId == w.Id && e.Kind == "budget_raised", ct))
         {
             db.ApprovalRequests.Add(Approvals.Create(ApprovalKind.Escalation, $"Budget reached: {w.Objective}",
                 $"Spent {spent} of {w.BudgetUsd} USD. Raise the workflow budget to continue.", new { workflowId = w.Id, spent, budget = w.BudgetUsd }, now,

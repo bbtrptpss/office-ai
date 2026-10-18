@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.2",
+    date: "2026-10-18",
+    title: { th: "อนุมัติเพิ่มงบ workflow ได้จริง", en: "Budget escalations raise the workflow budget" },
+    changes: [
+      { type: "fixed", th: "อนุมัติคำขอ “งบเต็ม” แล้ว workflow ได้งบเพิ่มและทำงานต่อทันที (เดิมอนุมัติแล้วไม่มีผล)", en: "Approving a “budget reached” request now raises the workflow budget and work continues (before, approving did nothing)" },
+      { type: "added", th: "กรอกงบใหม่ได้ในหน้าการอนุมัติ (ค่าเริ่มต้น = 2 เท่าของงบเดิม) ต้องมากกว่ายอดที่ใช้ไปแล้ว", en: "Enter the new budget on the approval (default: double the current one); it must exceed what is already spent" },
+      { type: "fixed", th: "เมื่อใช้งบใหม่จนเต็มอีกครั้ง ระบบขออนุมัติใหม่ได้ (เดิมขอได้ครั้งเดียว)", en: "Reaching the raised budget asks again (before, it could only ask once)" },
+    ],
+  },
+  {
     version: "0.7.1",
     date: "2026-10-18",
     title: { th: "หน้าบันทึกอัปเดต", en: "Update log page" },
@@ -126,7 +136,6 @@ export const TODO: Todo[] = [
   { status: "planned", area: { th: "แชท", en: "Chat" }, th: "จำกัดสมาชิกช่องแชทโปรเจกต์ (ตอนนี้ทุกคนที่ล็อกอินอ่านได้ทุกช่อง)", en: "Per-project channel membership (today every signed-in person can read all channels)" },
   { status: "planned", area: { th: "แชท", en: "Chat" }, th: "การ @mention และการแจ้งเตือนในแชท", en: "@mentions and chat notifications" },
   { status: "planned", area: { th: "ความปลอดภัย", en: "Security" }, th: "เข้ารหัส DataProtection keys ด้วย certificate", en: "Encrypt DataProtection keys at rest with a certificate" },
-  { status: "planned", area: { th: "Workflow", en: "Workflow" }, th: "อนุมัติเพิ่มงบแล้วให้ workflow ได้งบเพิ่มอัตโนมัติ", en: "An approved budget escalation should raise the workflow budget by itself" },
   { status: "planned", area: { th: "AI", en: "AI" }, th: "ทำงาน AI ต่อจากจุดที่ค้างได้เมื่อระบบรีสตาร์ต (ตอนนี้ล้มเหลวแล้วลองใหม่)", en: "Resume interrupted AI runs mid-call (today they fail and are retried)" },
 ];
 

@@ -130,5 +130,4 @@ Decisions taken without the CEO: new permissions `comms.post` (Member, Manager, 
 - OpenAI / Gemini adapters (waiting on which accounts exist); first real Claude run needs ANTHROPIC_API_KEY.
 - Remote Git hosting (GitHub/GitLab) behind the repository interface.
 - Encrypting DataProtection keys at rest (certificate).
-- A budget escalation does not raise a workflow budget by itself.
 - Durable mid-call resume of AI runs (interrupted runs are failed and retried by the engine).

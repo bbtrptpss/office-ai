@@ -175,6 +175,8 @@ const th = {
   kindEstimate: "อนุมัติใบประเมินราคา",
   kindMerge: "อนุมัติ merge โค้ด",
   escalationHint: "อนุมัติ = ให้ลองใหม่, ไม่อนุมัติ = ยกเลิกงาน",
+  budgetEscalationHint: "อนุมัติ = เพิ่มงบเป็นจำนวนที่กรอก แล้วทำงานต่อ, ไม่อนุมัติ = คงงบเดิม (หยุดเริ่มงานใหม่)",
+  newBudgetUsd: "งบใหม่ (USD)",
   start: "เริ่ม",
 
   // delivery & code
@@ -534,6 +536,8 @@ const en: Dict = {
   kindEstimate: "Estimate approval",
   kindMerge: "Merge approval",
   escalationHint: "Approve = try again, Reject = cancel the task",
+  budgetEscalationHint: "Approve = raise the budget to the amount entered and continue, Reject = keep it (no new runs start)",
+  newBudgetUsd: "New budget (USD)",
   start: "Start",
   aiSettings: "AI settings",
   runWithAi: "Run with AI",
