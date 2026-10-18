@@ -154,3 +154,21 @@ internal class NotificationConfig : IEntityTypeConfiguration<Notification>
         b.HasIndex(n => new { n.UserId, n.Id });
     }
 }
+
+internal class ChatReplyConfig : IEntityTypeConfiguration<ChatReply>
+{
+    public void Configure(EntityTypeBuilder<ChatReply> b)
+    {
+        b.ToTable("ChatReplies");
+        b.HasKey(r => r.Id);
+        b.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(r => r.Provider).HasMaxLength(40);
+        b.Property(r => r.ModelId).HasMaxLength(100);
+        b.Property(r => r.Error).HasMaxLength(1000);
+        b.Property(r => r.CostUsd).HasPrecision(18, 6);
+        b.HasIndex(r => new { r.TriggerMessageId, r.EmployeeId }).IsUnique();
+        b.HasIndex(r => r.Status);
+        b.HasOne<ChatChannel>().WithMany().HasForeignKey(r => r.ChannelId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne<EmployeeProfile>().WithMany().HasForeignKey(r => r.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+    }
+}

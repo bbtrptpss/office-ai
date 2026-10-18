@@ -63,6 +63,7 @@ public interface IAppDbContext
     DbSet<MeetingActionItem> MeetingActionItems { get; }
     DbSet<ProjectMember> ProjectMembers { get; }
     DbSet<Notification> Notifications { get; }
+    DbSet<ChatReply> ChatReplies { get; }
 
     /// <summary>Sets the concurrency token the client last saw, so a stale update fails with <see cref="Domain.Common.ConcurrencyException"/>.</summary>
     void ExpectVersion<T>(T entity, uint version) where T : Domain.Common.Entity;
@@ -98,6 +99,8 @@ public interface IRealtimeNotifier
     Task ChatMessageAsync(Guid channelId, Guid messageId, CancellationToken ct = default);
     Task AnnouncementsChangedAsync(CancellationToken ct = default);
     Task MeetingChangedAsync(Guid meetingId, CancellationToken ct = default);
+    /// <summary>An AI employee started (or stopped) writing an answer in a channel.</summary>
+    Task ChatAiTypingAsync(Guid channelId, string employeeName, bool active, CancellationToken ct = default);
     /// <summary>Tells only these users that their notifications changed.</summary>
     Task NotificationsChangedAsync(IEnumerable<Guid> userIds, CancellationToken ct = default);
 }
@@ -123,6 +126,12 @@ public static class ActingAs
     {
         public void Dispose() => undo();
     }
+}
+
+/// <summary>Hands AI chat replies to the background worker.</summary>
+public interface IChatReplyQueue
+{
+    ValueTask EnqueueAsync(Guid replyId, CancellationToken ct = default);
 }
 
 /// <summary>Hands queued runs to the background executor.</summary>

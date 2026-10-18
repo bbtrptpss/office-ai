@@ -140,6 +140,7 @@ public static class DependencyInjection
         services.AddScoped<OfficeAI.Application.Communication.AnnouncementService>();
         services.AddScoped<OfficeAI.Application.Communication.MeetingService>();
         services.AddScoped<OfficeAI.Application.Communication.NotificationService>();
+        services.AddScoped<OfficeAI.Application.Communication.ChatReplyService>();
         services.Configure<OfficeAI.Application.Integrations.IntegrationSettings>(config.GetSection("Integrations"));
         services.AddHttpClient("integrations", c => c.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<OfficeAI.Application.Integrations.IntegrationService>();

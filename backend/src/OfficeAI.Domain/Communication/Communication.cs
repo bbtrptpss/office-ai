@@ -193,3 +193,35 @@ public class Notification
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? ReadAt { get; set; }
 }
+
+public enum ChatReplyStatus
+{
+    Queued = 1,
+    Running = 2,
+    Answered = 3,
+    Declined = 4,
+    Failed = 5,
+}
+
+/// <summary>
+/// An AI employee answering a person who @mentioned it in chat: one model call, no tools, costs recorded like any AI work.
+/// One row per (message, employee), so a mention is answered at most once.
+/// </summary>
+public class ChatReply
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid ChannelId { get; set; }
+    public Guid TriggerMessageId { get; set; }
+    public Guid EmployeeId { get; set; }
+    public ChatReplyStatus Status { get; set; } = ChatReplyStatus.Queued;
+    public string? Provider { get; set; }
+    public string? ModelId { get; set; }
+    public long InputTokens { get; set; }
+    public long OutputTokens { get; set; }
+    public decimal CostUsd { get; set; }
+    public bool IsSimulated { get; set; }
+    public Guid? ReplyMessageId { get; set; }
+    public string? Error { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? FinishedAt { get; set; }
+}

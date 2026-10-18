@@ -141,6 +141,11 @@ function Conversation({ channel, canManage, onBack, onChanged }: { channel: Chat
   const [mention, setMention] = useState<{ query: string; start: number; index: number } | null>(null);
   const [picked, setPicked] = useState<Record<string, string>>({});
   const input = useRef<HTMLTextAreaElement>(null);
+  const [typing, setTyping] = useState<string[]>([]);
+  useRealtime<{ channelId: string; employeeName: string; active: boolean }>("chatAiTyping", (p) => {
+    if (p.channelId !== channel.id) return;
+    setTyping((now) => (p.active ? [...now.filter((n) => n !== p.employeeName), p.employeeName] : now.filter((n) => n !== p.employeeName)));
+  });
   const [hasMore, setHasMore] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -329,6 +334,11 @@ function Conversation({ channel, canManage, onBack, onChanged }: { channel: Chat
           </>
         )}
       </Box>
+      {typing.length > 0 && (
+        <Typography variant="caption" color="text.secondary" sx={{ px: 2, pb: 0.5, fontStyle: "italic" }} aria-live="polite">
+          🤖 {typing.join(", ")} {t.aiTyping}
+        </Typography>
+      )}
       <Divider />
       {problem && messages && <Alert severity="warning" sx={{ borderRadius: 0 }} onClose={() => setProblem(null)}>{problem}</Alert>}
       {channel.isArchived ? (
@@ -345,6 +355,7 @@ function Conversation({ channel, canManage, onBack, onChanged }: { channel: Chat
                       <Typography variant="body2">{x.displayName}</Typography>
                       <Typography variant="caption" color="text.secondary">{x.jobTitle}</Typography>
                     </Box>
+                    {x.kind === "AI" && <Chip size="small" color="primary" variant="outlined" label={t.aiWillAnswer} sx={{ ml: 1, height: 18, fontSize: 11 }} />}
                   </MenuItem>
                 ))}
               </MenuList>

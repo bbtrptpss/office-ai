@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.9",
+    date: "2026-10-18",
+    title: { th: "AI ตอบในแชทเมื่อถูก @mention", en: "AI answers in chat when @mentioned" },
+    changes: [
+      { type: "added", th: "พิมพ์ @ชื่อพนักงาน AI ในแชท แล้ว AI จะตอบในช่องนั้น โดยอ่าน 20 ข้อความล่าสุดเป็นบริบท พร้อมแสดง “กำลังพิมพ์คำตอบ…”", en: "@mention an AI employee in chat and it answers in that channel, using the last 20 messages as context, with an “is writing” indicator" },
+      { type: "security", th: "AI ในแชทพูดคุยได้อย่างเดียว ใช้เครื่องมือหรือแก้ข้อมูลไม่ได้ — ตอบเฉพาะเมื่อ “คน” mention (AI ไม่สั่ง AI) สูงสุด 3 ตัวต่อข้อความ", en: "In chat, AI can only talk — no tools or data changes; it answers only when a person mentions it (never AI-to-AI), at most 3 per message" },
+      { type: "changed", th: "ค่าใช้จ่ายของคำตอบในแชทนับเป็นค่าใช้จ่ายจริงและอยู่ภายใต้งบเดียวกัน ถ้างบหมดหรือยังไม่ได้ตั้ง key AI จะบอกเหตุผลในแชทแทน", en: "Chat answers are recorded as real costs under the same budgets; if the budget is used up or no key is set, the AI explains in chat instead" },
+    ],
+  },
+  {
     version: "0.7.8",
     date: "2026-10-18",
     title: { th: "ใส่ API key ได้ที่หน้าตั้งค่า AI", en: "API keys on the AI settings page" },

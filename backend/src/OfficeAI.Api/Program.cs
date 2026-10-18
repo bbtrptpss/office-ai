@@ -47,6 +47,9 @@ builder.Services.AddScoped<IRealtimeNotifier, SignalRNotifier>();
 builder.Services.AddSingleton<AgentRunQueue>();
 builder.Services.AddSingleton<IAgentRunQueue>(sp => sp.GetRequiredService<AgentRunQueue>());
 builder.Services.AddHostedService<AgentRunWorker>();
+builder.Services.AddSingleton<ChatReplyQueue>();
+builder.Services.AddSingleton<IChatReplyQueue>(sp => sp.GetRequiredService<ChatReplyQueue>());
+builder.Services.AddHostedService<ChatReplyWorker>();
 builder.Services.AddHostedService<WorkflowEngineWorker>();
 builder.Services.AddHostedService<IntegrationWorker>();
 

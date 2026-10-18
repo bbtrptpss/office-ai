@@ -72,6 +72,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<MeetingActionItem> MeetingActionItems => Set<MeetingActionItem>();
     public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<ChatReply> ChatReplies => Set<ChatReply>();
     public DbSet<SeedMarker> SeedMarkers => Set<SeedMarker>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();

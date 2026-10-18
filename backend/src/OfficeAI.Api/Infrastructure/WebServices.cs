@@ -133,6 +133,9 @@ public class SignalRNotifier(IHubContext<EventsHub> hub) : IRealtimeNotifier
     public Task MeetingChangedAsync(Guid meetingId, CancellationToken ct = default) =>
         hub.Clients.All.SendAsync("meetingChanged", new { meetingId }, ct);
 
+    public Task ChatAiTypingAsync(Guid channelId, string employeeName, bool active, CancellationToken ct = default) =>
+        hub.Clients.All.SendAsync("chatAiTyping", new { channelId, employeeName, active }, ct);
+
     // SignalR's default user id is the NameIdentifier claim, i.e. the user's id.
     public Task NotificationsChangedAsync(IEnumerable<Guid> userIds, CancellationToken ct = default) =>
         hub.Clients.Users(userIds.Select(u => u.ToString()).Distinct().ToList()).SendAsync("notificationsChanged", ct);

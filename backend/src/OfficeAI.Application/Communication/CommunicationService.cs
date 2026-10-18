@@ -24,8 +24,11 @@ public record ChatAccess(bool CanModerate, bool SeesAllProjects);
 /// Company chat. Company and department channels are open to every signed-in person; a project channel only to the project's
 /// members (see <see cref="ProjectMembership"/>) and to people who manage projects or communication. Posting needs comms.post.
 /// </summary>
-public class ChatService(IAppDbContext db, ICurrentUser current, IRealtimeNotifier notifier, TimeProvider clock)
+public class ChatService(IAppDbContext db, ICurrentUser current, IRealtimeNotifier notifier, TimeProvider clock, IChatReplyQueue replies)
 {
+    /// <summary>At most this many AI employees answer one message.</summary>
+    public const int MaxAiRepliesPerMessage = 3;
+
     public const string GeneralChannel = "General";
     public const int MaxBody = 4000;
     public const int MaxMentions = 20;
@@ -198,9 +201,18 @@ public class ChatService(IAppDbContext db, ICurrentUser current, IRealtimeNotifi
         db.ChatMessages.Add(m);
         var notified = await NotificationService.AddForEmployeesAsync(db, mentions, current.UserId, NotificationKinds.Mention,
             $"{m.AuthorName} · #{channel.Name}", body, $"/chat?channel={channelId}", clock.GetUtcNow(), ct);
+        // A person @mentioning AI employees asks them to answer here. AI never triggers AI, so replies cannot loop.
+        var queued = new List<ChatReply>();
+        if (!current.IsAgent && mentions.Count > 0)
+        {
+            var ai = await db.Employees.AsNoTracking().Where(e => mentions.Contains(e.Id) && e.Kind == EmployeeKind.AI).Select(e => e.Id).ToListAsync(ct);
+            foreach (var e in mentions.Where(ai.Contains).Take(MaxAiRepliesPerMessage))
+                queued.Add(db.ChatReplies.Add(new ChatReply { ChannelId = channelId, TriggerMessageId = m.Id, EmployeeId = e, CreatedAt = clock.GetUtcNow() }).Entity);
+        }
         await db.SaveChangesAsync(ct);
         await notifier.ChatMessageAsync(channelId, m.Id, ct);
         if (notified.Count > 0) await notifier.NotificationsChangedAsync(notified, ct);
+        foreach (var r in queued) await replies.EnqueueAsync(r.Id, ct);
         await TryMarkReadAsync(channelId, m.CreatedAt, ct);
         return ToDto(m, access.CanModerate);
     }
