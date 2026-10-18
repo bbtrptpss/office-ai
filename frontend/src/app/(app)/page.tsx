@@ -8,7 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
 import { Loading, useLoad } from "@/components/common";
 import { Mascot } from "@/components/cute";
-import { Arrow, Calendar, Chart, Check, CheckSquare, ChevronRight, Clipboard, Doc, Dots, Next, Pen, Play, Prev, Search, Sparkle } from "@/components/dashIcons";
+import { Arrow, Calendar, Chart, Check, CheckSquare, ChevronRight, Clipboard, Doc, Dots, Pen, Search, Sparkle } from "@/components/dashIcons";
 import { art, FRIEND_ART } from "@/lib/characters";
 import s from "./dashboard.module.css";
 
@@ -65,7 +65,9 @@ function TaskListCard({ dashboard }: { dashboard: Dashboard }) {
       <div className={s.cardHead}>
         <span className={s.badgeIcon}><CheckSquare /></span>
         <h2>{t.dashTasks}</h2>
-        <span className={s.right}>{t.dashTasksRecent} · {dashboard.completedTasks}/{dashboard.totalTasks}</span>
+        <Link href="/projects" className={s.right} title={t.dashSeeAll}>
+          {dashboard.completedTasks}/{dashboard.totalTasks} · {t.dashSeeAll}<ChevronRight style={{ width: 14, height: 14 }} />
+        </Link>
       </div>
       <ul className={s.tasks}>
         {(data ?? []).map((task) => (
@@ -92,21 +94,22 @@ function TaskListCard({ dashboard }: { dashboard: Dashboard }) {
 const elapsed = (from: string | null, now: number) => Math.max(0, Math.floor((now - (from ? Date.parse(from) : now)) / 1000));
 const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 
-/** The mock-up's music player, playing the AI work that is running right now. */
+/** The AI work running right now: who is on what, for how long, at what cost so far. */
 function NowRunningCard() {
   const { t, label } = useI18n();
   const { data, reload } = useLoad(async () => (await api.get<AgentRun[]>("/api/agent-runs?take=50")).filter((r) => r.status === "Queued" || r.status === "Running"));
   useRealtime("agentRunChanged", () => void reload());
-  const [index, setIndex] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
   const runs = data ?? [];
-  const run = runs.length ? runs[index % runs.length] : undefined;
-  const secs = run ? elapsed(run.startedAt ?? run.createdAt, now) : 0;
-  const shown = Math.max(600, secs); // the bar fills over the default 10-minute run limit
+  const cover = (size: number, moving: boolean) => (
+    <div className={s.cover} style={{ width: size, height: size }}>
+      {art("cover") ? <Art name="cover" size={size} /> : <Mascot size={size * 0.78} float={moving} />}
+    </div>
+  );
   return (
     <section className={s.card}>
       <div className={s.cardHead}>
@@ -117,22 +120,26 @@ function NowRunningCard() {
         </div>
         <Link href="/agents" className={s.right} aria-label={t.navActivity}><ChevronRight /></Link>
       </div>
-      <div className={s.track}>
-        <div className={s.cover}>{art("cover") ? <Art name="cover" size={72} /> : <Mascot size={56} float={!!run} />}</div>
-        <div style={{ minWidth: 0 }}>
-          <b>{run ? run.taskTitle : t.dashNobodyRunning}</b>
-          <small>{run ? `${run.employeeName} · ${label(run.status)} · ${run.turns} turns` : t.dashNobodyRunningHint}</small>
-        </div>
-      </div>
-      <div className={s.seek}><span style={{ width: `${run ? (secs / shown) * 100 : 0}%` }} /></div>
-      <div className={s.times}>
-        <span>{mmss(secs)}</span>
-        <span>{run ? usd(run.costUsd) : "—"}</span>
-      </div>
-      <div className={s.controls}>
-        <button className={s.skip} title="Previous" disabled={runs.length < 2} onClick={() => setIndex((i) => (i - 1 + runs.length) % runs.length)}><Prev /></button>
-        <Link className={s.play} href={run ? `/agents` : "/office"} title={run ? t.navActivity : t.navOffice}><Play /></Link>
-        <button className={s.skip} title="Next" disabled={runs.length < 2} onClick={() => setIndex((i) => (i + 1) % runs.length)}><Next /></button>
+      <div className={s.runs}>
+        {runs.length === 0 && (
+          <Link href="/office" className={s.track}>
+            {cover(56, false)}
+            <div style={{ minWidth: 0 }}>
+              <b>{t.dashNobodyRunning}</b>
+              <small>{t.dashNobodyRunningHint}</small>
+            </div>
+          </Link>
+        )}
+        {runs.slice(0, 3).map((run) => (
+          <Link key={run.id} href="/agents" className={s.track}>
+            {cover(48, true)}
+            <div style={{ minWidth: 0 }}>
+              <b>{run.taskTitle}</b>
+              <small>{run.employeeName} · {label(run.status)} · {mmss(elapsed(run.startedAt ?? run.createdAt, now))} · {usd(run.costUsd)}</small>
+            </div>
+          </Link>
+        ))}
+        {runs.length > 3 && <Link href="/agents" className={s.sub}>+{runs.length - 3} {t.runs}</Link>}
       </div>
     </section>
   );

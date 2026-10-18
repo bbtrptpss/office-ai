@@ -63,20 +63,15 @@
 .progress { height: 6px; flex: 1; border-radius: 6px; background: var(--purple-soft); overflow: hidden; }
 .progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--pink), var(--purple)); border-radius: 6px; transition: width .3s; }
 
-/* "Now running" player */
-.track { display: flex; gap: 14px; align-items: center; background: rgba(255,255,255,.55); border-radius: 16px; padding: 10px; }
+/* AI at work */
+.runs { display: flex; flex-direction: column; gap: 10px; }
+.track { display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,.55); border-radius: 16px; padding: 10px; transition: background .2s; }
+.track:hover { background: #fff; }
 :global(html.dark) .track { background: rgba(255,255,255,.06); }
-.cover { width: 72px; height: 72px; border-radius: 14px; flex-shrink: 0; display: grid; place-items: center; background: linear-gradient(140deg, #5b4391, #9b7bf0); }
-.track b { display: block; font-size: 15px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+:global(html.dark) .track:hover { background: rgba(255,255,255,.1); }
+.cover { border-radius: 14px; flex-shrink: 0; display: grid; place-items: center; overflow: hidden; background: linear-gradient(140deg, #5b4391, #9b7bf0); }
+.track b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .track small { color: var(--muted); font-size: 12px; }
-.seek { margin: 14px 2px 4px; height: 6px; border-radius: 6px; background: var(--purple-soft); position: relative; overflow: hidden; }
-.seek span { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: var(--purple); transition: width 1s linear; }
-.times { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
-.controls { display: flex; align-items: center; justify-content: center; gap: 26px; margin-top: 8px; position: relative; }
-.play { width: 46px; height: 46px; border-radius: 50%; background: var(--purple); color: #fff; display: grid; place-items: center; box-shadow: 0 6px 16px rgba(124,92,224,.35); }
-.play :global(svg) { fill: #fff; stroke: none; width: 20px; height: 20px; }
-.skip :global(svg) { fill: var(--ink); stroke: none; }
-.skip:disabled { opacity: .35; cursor: default; }
 
 /* Center stage */
 .stage {
