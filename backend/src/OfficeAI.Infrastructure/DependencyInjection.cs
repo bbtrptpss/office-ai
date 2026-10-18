@@ -82,6 +82,11 @@ public static class DependencyInjection
         services.AddSingleton<IAgentTool, OfficeAI.Application.Knowledge.SearchKnowledgeTool>();
         services.AddSingleton<IAgentTool, OfficeAI.Application.Knowledge.ProposeKnowledgeTool>();
         services.AddSingleton<IAgentTool, OfficeAI.Application.Knowledge.WriteDocumentTool>();
+        services.AddSingleton<IAgentTool, OfficeAI.Application.Communication.ReadChatTool>();
+        services.AddSingleton<IAgentTool, OfficeAI.Application.Communication.PostChatTool>();
+        services.AddSingleton<IAgentTool, OfficeAI.Application.Communication.ListMeetingsTool>();
+        services.AddSingleton<IAgentTool, OfficeAI.Application.Communication.DraftMinutesTool>();
+        services.AddSingleton<IAgentTool, OfficeAI.Application.Communication.DraftAnnouncementTool>();
         services.AddSingleton<ToolRegistry>();
 
         services.AddScoped<AgentAdminService>();
@@ -96,6 +101,9 @@ public static class DependencyInjection
         services.AddScoped<CodeService>();
         services.AddScoped<OfficeAI.Application.Reports.ReportsService>();
         services.AddScoped<OfficeAI.Application.Knowledge.KnowledgeService>();
+        services.AddScoped<OfficeAI.Application.Communication.ChatService>();
+        services.AddScoped<OfficeAI.Application.Communication.AnnouncementService>();
+        services.AddScoped<OfficeAI.Application.Communication.MeetingService>();
         services.Configure<OfficeAI.Application.Integrations.IntegrationSettings>(config.GetSection("Integrations"));
         services.AddHttpClient("integrations", c => c.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<OfficeAI.Application.Integrations.IntegrationService>();

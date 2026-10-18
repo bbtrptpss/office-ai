@@ -4,6 +4,8 @@ using OfficeAI.Api.Infrastructure;
 using OfficeAI.Application.Abstractions;
 using OfficeAI.Application.Agents;
 using OfficeAI.Application.Code;
+using OfficeAI.Application.Communication;
+using OfficeAI.Domain.Communication;
 using OfficeAI.Application.Knowledge;
 using OfficeAI.Domain.Knowledge;
 using OfficeAI.Application.Delivery;
@@ -38,6 +40,7 @@ public static class Endpoints
         MapCode(api);
         MapReports(api);
         MapKnowledge(api);
+        MapCommunication(api);
         MapIntegrations(api);
         app.MapHub<EventsHub>("/hubs/events");
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
@@ -241,6 +244,61 @@ public static class Endpoints
             return Results.File(System.Text.Encoding.UTF8.GetBytes(d.Content ?? ""), "text/markdown; charset=utf-8", name);
         }).RequirePermission(Permissions.ProjectRead);
         api.MapPost("/documents/{id:guid}/finalize", (Guid id, KnowledgeService s, CancellationToken ct) => s.FinalizeDocumentAsync(id, ct)).RequirePermission(Permissions.KnowledgeManage);
+    }
+
+    private static async Task<bool> HasAsync(PermissionService perms, ICurrentUser me, string permission, CancellationToken ct) =>
+        me.UserId is { } id && (await perms.GetPermissionsAsync(id, ct)).Contains(permission);
+
+    private static void MapCommunication(RouteGroupBuilder api)
+    {
+        const string read = Permissions.OrgRead, post = Permissions.CommsPost, manage = Permissions.CommsManage;
+        var chat = api.MapGroup("/chat");
+        chat.MapGet("/channels", (bool? archived, ChatService s, CancellationToken ct) => s.ListChannelsAsync(archived ?? false, ct)).RequirePermission(read);
+        chat.MapPost("/channels", (CreateChannelRequest r, ChatService s, CancellationToken ct) => s.CreateChannelAsync(r, ct)).RequirePermission(manage);
+        chat.MapPost("/channels/open", (OpenChannelRequest r, ChatService s, CancellationToken ct) => s.OpenChannelAsync(r, ct)).RequirePermission(read);
+        chat.MapPost("/channels/{id:guid}/archive", (Guid id, ChatService s, CancellationToken ct) => s.SetArchivedAsync(id, true, ct)).RequirePermission(manage);
+        chat.MapPost("/channels/{id:guid}/unarchive", (Guid id, ChatService s, CancellationToken ct) => s.SetArchivedAsync(id, false, ct)).RequirePermission(manage);
+        chat.MapGet("/channels/{id:guid}/messages", async (Guid id, DateTimeOffset? before, int? limit, ChatService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+            await s.ListMessagesAsync(id, before, limit ?? 50, await HasAsync(perms, me, manage, ct), ct)).RequirePermission(read);
+        chat.MapPost("/channels/{id:guid}/messages", (Guid id, PostMessageRequest r, ChatService s, CancellationToken ct) => s.PostAsync(id, r, ct)).RequirePermission(post);
+        chat.MapPost("/channels/{id:guid}/read", async (Guid id, ChatService s, CancellationToken ct) =>
+        {
+            await s.MarkReadAsync(id, ct);
+            return Results.NoContent();
+        }).RequirePermission(read);
+        chat.MapDelete("/messages/{id:guid}", async (Guid id, ChatService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+        {
+            await s.DeleteAsync(id, await HasAsync(perms, me, manage, ct), ct);
+            return Results.NoContent();
+        }).RequirePermission(post);
+
+        api.MapGet("/announcements", async (AnnouncementStatus? status, AnnouncementService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+            await s.ListAsync(status, await HasAsync(perms, me, manage, ct), ct)).RequirePermission(read);
+        api.MapGet("/announcements/{id:guid}", async (Guid id, AnnouncementService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+            await s.GetAsync(id, await HasAsync(perms, me, manage, ct), ct)).RequirePermission(read);
+        api.MapPost("/announcements", (SaveAnnouncementRequest r, AnnouncementService s, CancellationToken ct) => s.CreateAsync(r, ct)).RequirePermission(manage);
+        api.MapPut("/announcements/{id:guid}", (Guid id, SaveAnnouncementRequest r, AnnouncementService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(manage);
+        api.MapPost("/announcements/{id:guid}/publish", (Guid id, AnnouncementService s, CancellationToken ct) => s.PublishAsync(id, ct)).RequirePermission(manage);
+        api.MapPost("/announcements/{id:guid}/archive", (Guid id, AnnouncementService s, CancellationToken ct) => s.ArchiveAsync(id, ct)).RequirePermission(manage);
+        api.MapPost("/announcements/{id:guid}/read", async (Guid id, AnnouncementService s, CancellationToken ct) =>
+        {
+            await s.MarkReadAsync(id, ct);
+            return Results.NoContent();
+        }).RequirePermission(read);
+
+        api.MapGet("/meetings", (DateTimeOffset? from, DateTimeOffset? to, Guid? projectId, MeetingService s, CancellationToken ct) => s.ListAsync(from, to, projectId, ct)).RequirePermission(read);
+        api.MapGet("/meetings/{id:guid}", (Guid id, MeetingService s, CancellationToken ct) => s.GetAsync(id, ct)).RequirePermission(read);
+        api.MapPost("/meetings", (SaveMeetingRequest r, MeetingService s, CancellationToken ct) => s.CreateAsync(r, ct)).RequirePermission(manage);
+        api.MapPut("/meetings/{id:guid}", (Guid id, SaveMeetingRequest r, MeetingService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(manage);
+        api.MapPost("/meetings/{id:guid}/status", (Guid id, SetMeetingStatusRequest r, MeetingService s, CancellationToken ct) => s.SetStatusAsync(id, r, ct)).RequirePermission(manage);
+        api.MapPost("/meetings/{id:guid}/attendance", (Guid id, SetAttendanceRequest r, MeetingService s, CancellationToken ct) => s.SetAttendanceAsync(id, r, ct)).RequirePermission(manage);
+        api.MapPut("/meetings/{id:guid}/minutes", (Guid id, SaveMinutesRequest r, MeetingService s, CancellationToken ct) => s.SaveMinutesAsync(id, r, ct)).RequirePermission(post);
+        api.MapPost("/meetings/{id:guid}/minutes/approve", (Guid id, MeetingService s, CancellationToken ct) => s.ApproveMinutesAsync(id, ct)).RequirePermission(manage);
+        api.MapPost("/meetings/{id:guid}/action-items", (Guid id, AddActionItemRequest r, MeetingService s, CancellationToken ct) => s.AddActionItemAsync(id, r, ct)).RequirePermission(post);
+        api.MapPut("/meetings/{id:guid}/action-items/{itemId:guid}", (Guid id, Guid itemId, UpdateActionItemRequest r, MeetingService s, CancellationToken ct) =>
+            s.UpdateActionItemAsync(id, itemId, r, ct)).RequirePermission(post);
+        api.MapPost("/meetings/{id:guid}/action-items/{itemId:guid}/task", (Guid id, Guid itemId, MeetingService s, CancellationToken ct) =>
+            s.CreateTaskAsync(id, itemId, ct)).RequirePermission(Permissions.TaskManage);
     }
 
     private static void MapIntegrations(RouteGroupBuilder api)

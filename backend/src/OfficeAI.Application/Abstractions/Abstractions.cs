@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Audit;
 using OfficeAI.Domain.Code;
+using OfficeAI.Domain.Communication;
 using OfficeAI.Domain.Finance;
 using OfficeAI.Domain.Integrations;
 using OfficeAI.Domain.Knowledge;
@@ -50,6 +51,15 @@ public interface IAppDbContext
     DbSet<ProjectDocument> Documents { get; }
     DbSet<IntegrationConfiguration> Integrations { get; }
     DbSet<IntegrationDelivery> IntegrationDeliveries { get; }
+    DbSet<ChatChannel> ChatChannels { get; }
+    DbSet<ChatMessage> ChatMessages { get; }
+    DbSet<ChannelReadState> ChannelReadStates { get; }
+    DbSet<Announcement> Announcements { get; }
+    DbSet<AnnouncementRead> AnnouncementReads { get; }
+    DbSet<Meeting> Meetings { get; }
+    DbSet<MeetingAgendaItem> MeetingAgendaItems { get; }
+    DbSet<MeetingParticipant> MeetingParticipants { get; }
+    DbSet<MeetingActionItem> MeetingActionItems { get; }
 
     /// <summary>Sets the concurrency token the client last saw, so a stale update fails with <see cref="Domain.Common.ConcurrencyException"/>.</summary>
     void ExpectVersion<T>(T entity, uint version) where T : Domain.Common.Entity;
@@ -81,6 +91,10 @@ public interface IRealtimeNotifier
     Task OrganizationChangedAsync(CancellationToken ct = default);
     Task AgentRunChangedAsync(Guid runId, Guid taskId, Guid projectId, string status, CancellationToken ct = default);
     Task ApprovalsChangedAsync(CancellationToken ct = default);
+    /// <summary>Carries ids only; clients re-read through the API, which checks permissions.</summary>
+    Task ChatMessageAsync(Guid channelId, Guid messageId, CancellationToken ct = default);
+    Task AnnouncementsChangedAsync(CancellationToken ct = default);
+    Task MeetingChangedAsync(Guid meetingId, CancellationToken ct = default);
 }
 
 /// <summary>Who is acting outside an HTTP request, e.g. an AI employee inside a background run.</summary>

@@ -1,3 +1,5 @@
+using OfficeAI.Application.Communication;
+using OfficeAI.Domain.Communication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -105,6 +107,14 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
         await SeedDeliveryAsync(now, ct);
         await GrantNewToolsOnceAsync("phase5-tool-grants",
             [OfficeAI.Application.Knowledge.SearchKnowledgeTool.ToolId, OfficeAI.Application.Knowledge.ProposeKnowledgeTool.ToolId, OfficeAI.Application.Knowledge.WriteDocumentTool.ToolId], now, ct);
+        await GrantNewToolsOnceAsync("phase7-tool-grants",
+            [.. AgentDefaults.CommsTools, OfficeAI.Application.Communication.DraftMinutesTool.ToolId, OfficeAI.Application.Communication.DraftAnnouncementTool.ToolId], now, ct);
+
+        if (!await db.ChatChannels.AnyAsync(c => c.Kind == ChannelKind.Company && c.Name == ChatService.GeneralChannel, ct))
+        {
+            db.ChatChannels.Add(new ChatChannel { Kind = ChannelKind.Company, Name = ChatService.GeneralChannel, Description = "Company-wide conversation" });
+            await db.SaveChangesAsync(ct);
+        }
     }
 
     /// <summary>Gives existing AI employees the default grants of tools introduced in a release (once; later changes by people are kept).</summary>
