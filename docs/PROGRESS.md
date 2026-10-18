@@ -111,9 +111,20 @@ Security testing, reliability/concurrency testing, observability, backup/restore
 | M5 | Deployment guide + production compose override (HTTPS proxy, no simulated AI, secrets) | done (docs/DEPLOYMENT.md, docker-compose.prod.yml + Caddy; config validated; change-password endpoint + UI added) |
 | M6 | Quality & Security overview page (tests, merge requests, failed runs, security events) | done (135 tests; verified in browser) |
 
+## Phase 7 — Company communication ✅ (branch phase-7)
+
+Company chat, internal announcements, meeting agendas/minutes (Master Prompt §8 and the "Company Chat" navigation item).
+
+| # | Milestone | Status |
+| --- | --- | --- |
+| M1 | Backend: channels (company / department / project, one per department/project, race-safe), messages with unread counts, author/moderator deletion (text kept, hidden); announcements (draft → published by a person, department audience, pin, read acknowledgement); meetings (agenda, participants + attendance, minutes approved by a person and filed as a final project document, action items → tasks exactly once); agent tools `chat.read`, `chat.post`, `meeting.list`, `meeting.draft_minutes`, `announcement.draft` — all scoped to the task's project or draft-only | done (144 tests) |
+| M2 | UI: Company Chat (live, unread badges, load earlier), Announcements (acknowledge, manager tabs), Meetings list + detail (agenda, attendance, minutes, action items), dashboard card, "Project chat" button on projects | done (verified in browser) |
+
+Decisions taken without the CEO: new permissions `comms.post` (Member, Manager, AI agents) and `comms.manage` (CEO, Manager; human-only). Every signed-in person can read every channel (there is no per-project membership model yet). Chat messages are not written to the audit log row by row; they keep author, AI and simulated flags themselves. Only executives' AI employees may draft announcements; writers, heads and executives may draft minutes.
+
 ## Open items (not built yet)
 
-- Company chat, announcements, meeting agendas/minutes UI (nav shows "Phase 7").
+- Per-project channel membership (today every signed-in person can read all channels); mentions and notifications for chat.
 - OpenAI / Gemini adapters (waiting on which accounts exist); first real Claude run needs ANTHROPIC_API_KEY.
 - Remote Git hosting (GitHub/GitLab) behind the repository interface.
 - Encrypting DataProtection keys at rest (certificate).

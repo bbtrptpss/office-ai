@@ -17,6 +17,8 @@ import ViewKanbanIcon from "@mui/icons-material/ViewKanbanOutlined";
 import TimelineIcon from "@mui/icons-material/TimelineOutlined";
 import TaskAltIcon from "@mui/icons-material/TaskAltOutlined";
 import ForumIcon from "@mui/icons-material/ForumOutlined";
+import CampaignIcon from "@mui/icons-material/CampaignOutlined";
+import EventIcon from "@mui/icons-material/EventOutlined";
 import MenuBookIcon from "@mui/icons-material/MenuBookOutlined";
 import PaymentsIcon from "@mui/icons-material/PaymentsOutlined";
 import VerifiedUserIcon from "@mui/icons-material/VerifiedUserOutlined";
@@ -31,7 +33,7 @@ import LightModeIcon from "@mui/icons-material/LightModeOutlined";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { stopRealtime, useRealtime } from "@/lib/realtime";
-import { api, Approval } from "@/lib/api";
+import { Announcement, api, Approval, ChatChannel } from "@/lib/api";
 import { useLoad } from "./common";
 import { Avatar, Mascot } from "@/components/cute";
 import { brand } from "@/theme";
@@ -40,7 +42,7 @@ const DRAWER_WIDTH = 264;
 
 type NavKey =
   | "navDashboard" | "navOrganization" | "navEmployees" | "navDepartments" | "navProjects" | "navActivity"
-  | "navApprovals" | "navChat" | "navKnowledge" | "navFinance" | "navQuality" | "navIntegrations"
+  | "navApprovals" | "navChat" | "navAnnouncements" | "navMeetings" | "navKnowledge" | "navFinance" | "navQuality" | "navIntegrations"
   | "navSecurity" | "navAudit" | "aiSettings" | "companySettings";
 
 interface NavItem {
@@ -60,7 +62,9 @@ const NAV: NavItem[] = [
   { key: "navProjects", href: "/projects", icon: <ViewKanbanIcon />, permission: "project.read" },
   { key: "navActivity", href: "/agents", icon: <TimelineIcon />, permission: "agent.read" },
   { key: "navApprovals", href: "/approvals", icon: <TaskAltIcon />, permission: "task.read" },
-  { key: "navChat", icon: <ForumIcon />, phase: 7 },
+  { key: "navChat", href: "/chat", icon: <ForumIcon />, permission: "org.read" },
+  { key: "navAnnouncements", href: "/announcements", icon: <CampaignIcon />, permission: "org.read" },
+  { key: "navMeetings", href: "/meetings", icon: <EventIcon />, permission: "org.read" },
   { key: "navKnowledge", href: "/knowledge", icon: <MenuBookIcon />, permission: "project.read" },
   { key: "navFinance", href: "/finance", icon: <PaymentsIcon />, permission: "finance.read" },
   { key: "navQuality", href: "/quality", icon: <VerifiedUserIcon />, permission: "audit.read" },
@@ -85,6 +89,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const items = NAV.filter((i) => !i.permission || can(i.permission));
   const pending = usePendingApprovals(can("task.read"));
+  const unreadChat = useUnreadChat(can("org.read"));
+  const unreadNews = useUnreadAnnouncements(can("org.read"));
+  const badges: Partial<Record<NavKey, number>> = { navApprovals: pending, navChat: unreadChat, navAnnouncements: unreadNews };
 
   const drawer = (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -111,7 +118,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             >
               <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
               <ListItemText primary={t[item.key]} />
-              {item.key === "navApprovals" && pending > 0 && <Chip size="small" color="secondary" label={pending} sx={{ height: 20, fontWeight: 700 }} />}
+              {(badges[item.key] ?? 0) > 0 && <Chip size="small" color="secondary" label={badges[item.key]! > 99 ? "99+" : badges[item.key]} sx={{ height: 20, fontWeight: 700 }} />}
               {item.phase && <Chip size="small" variant="outlined" label={`${t.comingInPhase} ${item.phase}`} sx={{ height: 20, fontSize: 11 }} />}
             </ListItemButton>
           );
@@ -197,6 +204,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 function usePendingApprovals(enabled: boolean) {
   const { data, reload } = useLoad(async () => (enabled ? (await api.get<Approval[]>("/api/approvals?status=Pending")).length : 0), String(enabled));
   useRealtime("approvalsChanged", () => void reload());
+  return data ?? 0;
+}
+
+/** Unread chat messages across channels, refreshed on every new message. */
+function useUnreadChat(enabled: boolean) {
+  const { data, reload } = useLoad(
+    async () => (enabled ? (await api.get<ChatChannel[]>("/api/chat/channels")).reduce((n, c) => n + c.unread, 0) : 0),
+    String(enabled),
+  );
+  useRealtime("chatMessage", () => void reload());
+  useRealtime("chatRead", () => void reload());
+  return data ?? 0;
+}
+
+/** Published announcements I have not acknowledged yet. */
+function useUnreadAnnouncements(enabled: boolean) {
+  const { data, reload } = useLoad(
+    async () => (enabled ? (await api.get<Announcement[]>("/api/announcements")).filter((a) => !a.isRead).length : 0),
+    String(enabled),
+  );
+  useRealtime("announcementsChanged", () => void reload());
+  useRealtime("announcementRead", () => void reload());
   return data ?? 0;
 }
 

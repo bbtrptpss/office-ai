@@ -594,3 +594,124 @@ export interface Delivery {
 }
 
 export const INTEGRATION_EVENTS = ["approval.requested", "workflow.completed", "workflow.escalated", "budget.reached", "run.failed"];
+
+export type ChannelKind = "Company" | "Department" | "Project";
+
+export interface ChatChannel {
+  id: string;
+  kind: ChannelKind;
+  name: string;
+  description: string | null;
+  departmentId: string | null;
+  projectId: string | null;
+  isArchived: boolean;
+  unread: number;
+  lastMessageAt: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  channelId: string;
+  authorName: string;
+  authorEmployeeId: string | null;
+  isAgent: boolean;
+  isSimulated: boolean;
+  body: string | null;
+  isDeleted: boolean;
+  createdAt: string;
+  canDelete: boolean;
+}
+
+export type AnnouncementStatus = "Draft" | "Published" | "Archived";
+export type AnnouncementPriority = "Normal" | "Important";
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  priority: AnnouncementPriority;
+  status: AnnouncementStatus;
+  departmentId: string | null;
+  departmentName: string | null;
+  isPinned: boolean;
+  publishedAt: string | null;
+  authorName: string | null;
+  isSimulated: boolean;
+  isRead: boolean;
+  readCount: number;
+  createdAt: string;
+  version: number;
+}
+
+export type MeetingStatus = "Scheduled" | "Held" | "Cancelled";
+export type MinutesStatus = "None" | "Draft" | "Approved";
+export type Attendance = "Invited" | "Attended" | "Absent";
+
+export interface MeetingSummary {
+  id: string;
+  title: string;
+  projectId: string | null;
+  projectName: string | null;
+  departmentId: string | null;
+  scheduledAt: string;
+  durationMinutes: number;
+  location: string | null;
+  status: MeetingStatus;
+  minutesStatus: MinutesStatus;
+  participantCount: number;
+  openActionItems: number;
+  version: number;
+}
+
+export interface AgendaItem {
+  id: string;
+  sortOrder: number;
+  title: string;
+  notes: string | null;
+  ownerEmployeeId: string | null;
+  ownerName: string | null;
+  durationMinutes: number | null;
+}
+
+export interface MeetingParticipant {
+  employeeId: string;
+  displayName: string;
+  kind: EmployeeKind;
+  attendance: Attendance;
+}
+
+export interface ActionItem {
+  id: string;
+  title: string;
+  ownerEmployeeId: string | null;
+  ownerName: string | null;
+  dueDate: string | null;
+  isDone: boolean;
+  taskId: string | null;
+  version: number;
+}
+
+export interface Meeting {
+  id: string;
+  title: string;
+  purpose: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  departmentId: string | null;
+  departmentName: string | null;
+  scheduledAt: string;
+  durationMinutes: number;
+  location: string | null;
+  status: MeetingStatus;
+  organizerName: string | null;
+  agenda: AgendaItem[];
+  participants: MeetingParticipant[];
+  actionItems: ActionItem[];
+  minutes: string | null;
+  minutesStatus: MinutesStatus;
+  minutesAuthorName: string | null;
+  minutesIsSimulated: boolean;
+  minutesApprovedAt: string | null;
+  minutesDocumentId: string | null;
+  version: number;
+}

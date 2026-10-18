@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { animate, useReducedMotion } from "motion/react";
-import { Box, Card, CardContent, Grid, LinearProgress, List, ListItem, ListItemIcon, ListItemText, Stack, Typography } from "@mui/material";
-import { api, Dashboard, UsageSummary, usd } from "@/lib/api";
+import Link from "next/link";
+import { Box, Button, Card, CardContent, Chip, Grid, LinearProgress, List, ListItem, ListItemIcon, ListItemText, Stack, Typography } from "@mui/material";
+import { Announcement, api, Dashboard, UsageSummary, usd } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -144,11 +145,7 @@ export default function DashboardPage() {
           </Rise>
         </Grid>
         {can("agent.read") && <AiCostCard />}
-        <Grid size={12}>
-          <Typography variant="body2" color="text.secondary">
-            Quality gates, profitability — {t.notYet} (Phase 4–5)
-          </Typography>
-        </Grid>
+        {can("org.read") && <AnnouncementsCard />}
       </Grid>
     </>
   );
@@ -183,6 +180,41 @@ function AiCostCard() {
                 <Typography variant="h6">{data.activeRuns}</Typography>
               </Box>
             </Stack>
+          </CardContent>
+        </Card>
+      </Rise>
+    </Grid>
+  );
+}
+
+function AnnouncementsCard() {
+  const { t, lang } = useI18n();
+  const { data, reload } = useLoad(() => api.get<Announcement[]>("/api/announcements"));
+  useRealtime("announcementsChanged", () => void reload());
+  useRealtime("announcementRead", () => void reload());
+  if (!data || data.length === 0) return null;
+  const fmt = new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-GB", { dateStyle: "medium" });
+  return (
+    <Grid size={12}>
+      <Rise index={12}>
+        <Card>
+          <CardContent>
+            <Stack direction="row" sx={{ alignItems: "center", mb: 1 }}>
+              <Typography variant="h6" sx={{ flex: 1 }}>📣 {t.latestAnnouncements}</Typography>
+              <Button component={Link} href="/announcements" size="small">{t.navAnnouncements}</Button>
+            </Stack>
+            <List dense disablePadding>
+              {data.slice(0, 3).map((a) => (
+                <ListItem key={a.id} disableGutters>
+                  <ListItemText
+                    primary={<Stack direction="row" spacing={1} component="span" sx={{ alignItems: "center" }}>
+                      <span style={{ fontWeight: a.isRead ? 400 : 700 }}>{a.isPinned ? "📌 " : ""}{a.title}</span>
+                      {a.priority === "Important" && <Chip size="small" color="error" variant="outlined" label={t.important} sx={{ height: 18 }} />}
+                    </Stack>}
+                    secondary={`${a.departmentName ?? t.wholeCompany} · ${fmt.format(new Date(a.publishedAt ?? a.createdAt))}`} />
+                </ListItem>
+              ))}
+            </List>
           </CardContent>
         </Card>
       </Rise>
