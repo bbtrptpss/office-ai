@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  AppBar, Box, Chip, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText,
-  Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Toolbar, Tooltip, Typography, useMediaQuery, useTheme,
+  AppBar, Box, ButtonBase, Chip, Divider, IconButton, List, ListItemButton, ListItemIcon, ListItemText,
+  Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Toolbar, Tooltip, Typography,
 } from "@mui/material";
 import { useColorScheme } from "@mui/material/styles";
-import MenuIcon from "@mui/icons-material/Menu";
 import DashboardIcon from "@mui/icons-material/SpaceDashboardOutlined";
 import ViewInArIcon from "@mui/icons-material/ViewInArOutlined";
 import AccountTreeIcon from "@mui/icons-material/AccountTreeOutlined";
@@ -43,7 +42,7 @@ import { NotificationBell } from "@/components/notifications";
 import { LATEST_VERSION, SEEN_KEY } from "@/lib/changelog";
 import { art } from "@/lib/characters";
 
-const DRAWER_WIDTH = 272;
+const MENU_WIDTH = 300;
 
 /** Pages also offered as pill tabs in the top bar, like the reference design's Dashboard / Widgets / Recent. */
 const TOP_TABS: NavKey[] = ["navDashboard", "navOffice", "navProjects", "navChat", "navApprovals"];
@@ -100,9 +99,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { mode, systemMode, setMode } = useColorScheme();
   const pathname = usePathname();
   const router = useRouter();
-  const muiTheme = useTheme();
-  const desktop = useMediaQuery(muiTheme.breakpoints.up("md"));
+  // The menu lives behind the • • • at the top left: a mouse opens it by hovering, touch and keyboard by pressing.
   const [open, setOpen] = useState(false);
+  const closeTimer = useRef<number | undefined>(undefined);
+  const lastPointer = useRef<string>("");
+  const showMenu = () => { window.clearTimeout(closeTimer.current); setOpen(true); };
+  const hideMenuSoon = () => { window.clearTimeout(closeTimer.current); closeTimer.current = window.setTimeout(() => setOpen(false), 200); };
   const [passwordOpen, setPasswordOpen] = useState(false);
   const dark = (mode === "system" ? systemMode : mode) === "dark";
 
@@ -114,7 +116,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const updatesUnseen = useUpdatesUnseen();
 
   const drawer = (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 96px)" }}>
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", px: 2, pt: 2, pb: 1.5 }}>
         <Box sx={{ width: 52, height: 52, borderRadius: "18px", display: "grid", placeItems: "center", bgcolor: brand.pinkSoft, flexShrink: 0 }}>
           {art("logo")
@@ -129,7 +131,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <Typography variant="overline" color="primary" sx={{ fontSize: 10, lineHeight: 1.6 }}>Magic AI Office ✦</Typography>
         </Box>
       </Stack>
-      <List dense sx={{ flex: 1, overflowY: "auto" }}>
+      <List dense sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {items.map((item) => {
           const selected = item.href === "/" ? pathname === "/" : !!item.href && pathname.startsWith(item.href);
           return (
@@ -174,18 +176,35 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         position="fixed"
         color="transparent"
         elevation={0}
-        sx={{ width: { md: `calc(100% - ${DRAWER_WIDTH}px)` }, ml: { md: `${DRAWER_WIDTH}px` }, px: { xs: 1, md: 2 }, pt: 1.5, background: "none" }}
+        sx={{ px: { xs: 1, md: 2 }, pt: 1.5, background: "none" }}
       >
         <Toolbar sx={(th) => ({ ...glassPanel(th), borderRadius: 999, minHeight: { xs: 56, sm: 56 }, px: { xs: 1, sm: 1.5 }, gap: 0.5 })}>
-          {!desktop ? (
-            <IconButton onClick={() => setOpen(true)} aria-label="menu">
-              <MenuIcon />
-            </IconButton>
-          ) : (
-            <Stack direction="row" spacing={0.75} aria-hidden sx={{ pl: 1, pr: 2 }}>
-              {["#FF8A80", "#FFD36E", "#7ED9A6"].map((c) => <Box key={c} sx={{ width: 11, height: 11, borderRadius: "50%", bgcolor: c }} />)}
-            </Stack>
-          )}
+          <Box sx={{ position: "relative", mr: 1 }} onPointerEnter={(e) => e.pointerType === "mouse" && showMenu()}
+            onPointerLeave={(e) => e.pointerType === "mouse" && hideMenuSoon()} onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
+            <ButtonBase aria-label={t.menu} aria-haspopup="menu" aria-expanded={open}
+              onPointerDown={(e) => { lastPointer.current = e.pointerType; }}
+              onClick={() => (lastPointer.current === "mouse" ? showMenu() : setOpen((o) => !o))}
+              sx={{ gap: 1, pl: 1, pr: 1.25, py: 0.75, borderRadius: 999, transition: "background-color .2s", bgcolor: open ? "action.hover" : "transparent", "&:hover": { bgcolor: "action.hover" } }}>
+              <Stack direction="row" spacing={0.75} aria-hidden>
+                {["#FF8A80", "#FFD36E", "#7ED9A6"].map((c) => (
+                  <Box key={c} sx={{ width: 11, height: 11, borderRadius: "50%", bgcolor: c, transition: "transform .2s", transform: open ? "scale(1.15)" : "none" }} />
+                ))}
+              </Stack>
+              {(badges.navApprovals ?? 0) + (badges.navChat ?? 0) + (badges.navAnnouncements ?? 0) > 0 && (
+                <Box aria-hidden sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "secondary.main" }} />
+              )}
+            </ButtonBase>
+            <Box role="menu" sx={(th) => ({
+              position: "absolute", top: "calc(100% + 12px)", left: -8, width: MENU_WIDTH, maxWidth: "calc(100vw - 24px)", zIndex: 10,
+              borderRadius: "26px", overflow: "hidden", backgroundColor: "rgba(255,255,255,.985)",
+              border: "1px solid rgba(255,255,255,.9)", boxShadow: "0 18px 50px rgba(110,80,170,.25)", color: "text.primary",
+              transformOrigin: "top left", transition: "opacity .18s ease, transform .18s ease, visibility .18s",
+              opacity: open ? 1 : 0, transform: open ? "none" : "translateY(-6px) scale(.98)", visibility: open ? "visible" : "hidden",
+              ...th.applyStyles("dark", { backgroundColor: "rgba(38,30,64,.985)", border: "1px solid rgba(190,165,245,.18)", boxShadow: "0 18px 50px rgba(0,0,0,.5)" }),
+            })}>
+              {drawer}
+            </Box>
+          </Box>
           <Box sx={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
             <Stack direction="row" spacing={0.5} sx={{ display: { xs: "none", sm: "flex" }, p: 0.5, borderRadius: 999, bgcolor: "action.hover" }}>
               {tabs.map((item) => {
@@ -233,18 +252,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </Tooltip>
         </Toolbar>
       </AppBar>
-
-      <Box component="nav" sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}>
-        <Drawer
-          variant={desktop ? "permanent" : "temporary"}
-          open={desktop || open}
-          onClose={() => setOpen(false)}
-          ModalProps={{ keepMounted: true }}
-          sx={{ "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box", border: 0, background: desktop ? "none" : undefined, p: 1.5 } }}
-        >
-          <Box sx={(th) => ({ ...glassPanel(th), height: "100%", borderRadius: "28px", overflow: "hidden" })}>{drawer}</Box>
-        </Drawer>
-      </Box>
 
       <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
 

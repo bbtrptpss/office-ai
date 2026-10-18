@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.11.2",
+    date: "2026-10-19",
+    title: { th: "เมนูย้ายไปที่ • • • มุมซ้ายบน", en: "Menu moved behind the • • • at the top left" },
+    changes: [
+      { type: "changed", th: "ซ่อนแถบเมนูด้านข้าง หน้าจอกว้างขึ้น — ชี้เมาส์ที่ • • • มุมซ้ายบนเพื่อเปิดเมนู (บนมือถือ/แท็บเล็ตให้แตะ) ปิดเองเมื่อเอาเมาส์ออก เลือกเมนู หรือกด Esc", en: "The side menu is hidden for a wider page — hover the • • • at the top left to open it (tap on phones/tablets); it closes when the mouse leaves, you pick an item, or press Esc" },
+      { type: "added", th: "มีจุดสีชมพูข้าง • • • เมื่อมีงานรออนุมัติ แชทหรือประกาศที่ยังไม่อ่าน", en: "A pink dot next to • • • shows when approvals, chat or announcements are waiting" },
+    ],
+  },
+  {
     version: "0.11.1",
     date: "2026-10-19",
     title: { th: "ชุดรูปตัวละครแบบเปิด/ปิดได้", en: "Switchable character artwork pack" },

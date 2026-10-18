@@ -29,6 +29,7 @@ const th = {
   comingInPhase: "Phase",
 
   // navigation
+  menu: "เมนู",
   navDashboard: "Executive Dashboard",
   navOffice: "ออฟฟิศ 3D",
   officeHint: "ทุกแผนกเป็นห้องที่เชื่อมกันด้วยทางเดิน คนที่ว่างจะเดินไปนั่งเล่นหรือแวะห้องอื่น และรีบกลับโต๊ะเมื่อมีงาน — คลิกตัวละครเพื่อดูรายละเอียด",
@@ -473,6 +474,7 @@ const en: Dict = {
   conflict: "Someone else changed this record. The latest data has been reloaded.",
   forbidden: "You don't have permission to do this",
   comingInPhase: "Phase",
+  menu: "Menu",
   navDashboard: "Executive Dashboard",
   navOffice: "3D Office",
   officeHint: "Departments are rooms joined by corridors; free people visit the lounge or other rooms and hurry back when work arrives — click a character for details",
