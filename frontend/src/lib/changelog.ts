@@ -210,7 +210,7 @@ export const CHANGELOG: Release[] = [
 ];
 
 export const TODO: Todo[] = [
-  { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "เติมเครดิต Anthropic (ต้องผูกบัตร) เพื่อให้ AI ที่ใช้ Claude ทำงานได้ — ตอนนี้ 3 ตัวใช้ Gemini ฟรีแทน", en: "Add Anthropic credit (needs a card) so Claude-based AI can work — 3 employees use free Gemini meanwhile" },
+  { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้าจะกลับไปใช้ Claude: เติมเครดิต Anthropic (ต้องผูกบัตร) — ตอนนี้ AI ทั้ง 30 ตัวใช้ Gemini 3.8 Flash (free tier)", en: "To go back to Claude: add Anthropic credit (needs a card) — all 30 AI employees use Gemini 3.8 Flash (free tier) for now" },
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
