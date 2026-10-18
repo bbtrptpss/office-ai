@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { AgentRun, api, Assistant, ChatMessage, Dashboard, Meeting, RecentTask, usd } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -10,10 +11,14 @@ import { Loading, useLoad } from "@/components/common";
 import { Mascot } from "@/components/cute";
 import { Arrow, Calendar, Chart, Check, CheckSquare, ChevronRight, Clipboard, Doc, Dots, Pen, Search, Sparkle } from "@/components/dashIcons";
 import { art, FRIEND_ART } from "@/lib/characters";
+import { SCENE_BLOBS } from "@/components/stageArt";
 import s from "./dashboard.module.css";
 
 /** Optional artwork for the center stage: STAGE_IMAGE, else the character pack's scene. Without either the mascot stands there. */
 const STAGE_IMAGE = process.env.NEXT_PUBLIC_STAGE_IMAGE || art("scene");
+
+// WebGL only runs in the browser; the CSS background shows the still picture until (or if) it loads.
+const StageArt = dynamic(() => import("@/components/stageArt"), { ssr: false });
 
 /** A character pack image, or the built-in mascot. */
 function Art({ name, size, round, float = false }: { name: Parameters<typeof art>[0]; size: number; round?: boolean; float?: boolean }) {
@@ -169,6 +174,7 @@ function Stage() {
   const [input, setInput] = useState("");
   const [bubble, setBubble] = useState<Bubble | null>(null);
   const waiting = useRef<{ after: string; employeeId: string } | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState(false);
 
   const members = assistant?.members ?? [];
@@ -222,7 +228,8 @@ function Stage() {
 
   return (
     <>
-      <div className={s.stage} style={STAGE_IMAGE ? { backgroundImage: `url("${STAGE_IMAGE}")` } : undefined}>
+      <div ref={stageRef} className={s.stage} style={STAGE_IMAGE ? { backgroundImage: `url("${STAGE_IMAGE}")` } : undefined}>
+        {STAGE_IMAGE && <StageArt src={STAGE_IMAGE} blobs={STAGE_IMAGE === art("scene") ? SCENE_BLOBS : []} trackRef={stageRef} />}
         <span className={s.sparkle} style={{ left: "22%", top: 60 }}>✦</span>
         <span className={s.sparkle} style={{ left: "70%", top: 120, animationDelay: "1s" }}>✦</span>
         <span className={s.sparkle} style={{ left: "30%", top: 250, animationDelay: "2s", fontSize: 16 }}>✦</span>

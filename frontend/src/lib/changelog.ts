@@ -31,6 +31,14 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.11.3",
+    date: "2026-10-19",
+    title: { th: "รูปกลางหน้าภาพรวมเคลื่อนไหวแบบ 2.5D", en: "2.5D animated stage picture" },
+    changes: [
+      { type: "added", th: "รูปกลางหน้าภาพรวมมีมิติ: ตัวละครลอยเด่นจากฉากและขยับตามเมาส์ (parallax) แต่ละตัวโยกเบา ๆ คนละจังหวะ และฉากแกว่งช้า ๆ เองเมื่อไม่ได้ขยับเมาส์ — ปิดการเคลื่อนไหวอัตโนมัติถ้าเครื่องตั้ง “ลดการเคลื่อนไหว”", en: "The dashboard's center picture gains depth: characters stand out and follow the mouse (parallax), each bobs on its own beat, and the scene sways gently when the mouse is still — automatic motion is off when the device asks for reduced motion" },
+    ],
+  },
+  {
     version: "0.11.2",
     date: "2026-10-19",
     title: { th: "เมนูย้ายไปที่ • • • มุมซ้ายบน", en: "Menu moved behind the • • • at the top left" },
