@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.12",
+    date: "2026-10-18",
+    title: { th: "ไอคอนเปิดระบบบน Desktop + เริ่มเองเมื่อเปิดเครื่อง", en: "Desktop icon + start on sign-in" },
+    changes: [
+      { type: "added", th: "ไอคอน “Office AI” บน Desktop ของ Windows: ดับเบิลคลิกแล้วเปิด Docker Desktop, เริ่มระบบ, รอจนพร้อม แล้วเปิดหน้าเว็บให้", en: "An “Office AI” Windows desktop icon: double-click to start Docker Desktop and the system, wait until it is ready, then open the web app" },
+      { type: "added", th: "ระบบเริ่มเองเมื่อ login เข้า Windows (shortcut ใน Startup) ติดตั้งหรือลบได้ด้วย scripts\\windows\\install-shortcuts.ps1", en: "The system starts on Windows sign-in (Startup shortcut); install or remove with scripts\\windows\\install-shortcuts.ps1" },
+    ],
+  },
+  {
     version: "0.7.11",
     date: "2026-10-18",
     title: { th: "รอโควตา AI อย่างถูกวิธี + Network Engineer", en: "Patient retries on AI rate limits + Network Engineer" },

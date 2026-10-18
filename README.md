@@ -18,6 +18,16 @@ API key ใส่ได้ที่หน้า “ตั้งค่า AI” �
 docker compose up -d --build
 ```
 
+**Windows: เปิดด้วยไอคอนบน Desktop / เริ่มเองเมื่อเปิดเครื่อง** — รันครั้งเดียว:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\windows\install-shortcuts.ps1
+```
+
+จะได้ไอคอน “Office AI” บน Desktop (เปิด Docker Desktop → `docker compose up -d` → รอระบบพร้อม → เปิดเบราว์เซอร์)
+และ shortcut ใน Startup ที่เริ่มระบบให้เองตอน login (ไม่เปิดเบราว์เซอร์) — ไม่เอา Startup ใส่ `-NoStartup`, ลบทั้งคู่ใส่ `-Remove`
+log อยู่ที่ `%LOCALAPPDATA%\OfficeAI\start.log` · ถ้าแก้โค้ดแล้วยังต้อง `docker compose up -d --build` เอง
+
 | บริการ | URL |
 | --- | --- |
 | หน้าเว็บ | http://localhost:3000 |
