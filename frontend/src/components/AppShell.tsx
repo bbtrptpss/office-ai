@@ -37,11 +37,23 @@ import { stopRealtime, useRealtime } from "@/lib/realtime";
 import { Announcement, api, Approval, ChatChannel } from "@/lib/api";
 import { useLoad } from "./common";
 import { Avatar, Mascot } from "@/components/cute";
-import { brand } from "@/theme";
+import { brand, glass } from "@/theme";
 import { NotificationBell } from "@/components/notifications";
 import { LATEST_VERSION, SEEN_KEY } from "@/lib/changelog";
 
-const DRAWER_WIDTH = 264;
+const DRAWER_WIDTH = 272;
+
+/** Pages also offered as pill tabs in the top bar, like the reference design's Dashboard / Widgets / Recent. */
+const TOP_TABS: NavKey[] = ["navDashboard", "navProjects", "navChat", "navApprovals"];
+
+/** A frosted-glass panel floating over the starry background. */
+const glassPanel = (th: import("@mui/material/styles").Theme) => ({
+  backgroundColor: glass.light.bg,
+  backdropFilter: glass.blur,
+  border: `1px solid ${glass.light.border}`,
+  boxShadow: glass.light.shadow,
+  ...th.applyStyles("dark", { backgroundColor: glass.dark.bg, border: `1px solid ${glass.dark.border}`, boxShadow: glass.dark.shadow }),
+});
 
 type NavKey =
   | "navDashboard" | "navOrganization" | "navEmployees" | "navDepartments" | "navProjects" | "navActivity"
@@ -100,13 +112,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const drawer = (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center", px: 2, pt: 2, pb: 1 }}>
-        <Mascot size={52} />
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center", px: 2, pt: 2, pb: 1.5 }}>
+        <Box sx={{ width: 52, height: 52, borderRadius: "18px", display: "grid", placeItems: "center", bgcolor: brand.pinkSoft, flexShrink: 0 }}>
+          <Mascot size={46} />
+        </Box>
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h6" sx={{ lineHeight: 1.15, fontSize: 17 }}>
+          <Typography variant="h6" sx={{ lineHeight: 1.15, fontSize: 16 }}>
             {t.appName}
           </Typography>
-          <Typography variant="caption" color="text.secondary">Cute AI Office ✦</Typography>
+          <Typography variant="overline" color="primary" sx={{ fontSize: 10, lineHeight: 1.6 }}>Magic AI Office ✦</Typography>
         </Box>
       </Stack>
       <List dense sx={{ flex: 1, overflowY: "auto" }}>
@@ -130,9 +144,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           );
         })}
       </List>
-      <Divider />
+      <Divider sx={{ mx: 2 }} />
       <Stack direction="row" spacing={1.5} onClick={() => setPasswordOpen(true)} title={t.changePassword}
-        sx={{ p: 2, alignItems: "center", cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}>
+        sx={{ p: 2, m: 1, borderRadius: "18px", alignItems: "center", cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}>
         <Avatar kind="Human" seed={me?.displayName ?? "me"} size={38} />
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="body2" fontWeight={600} noWrap>
@@ -146,28 +160,51 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     </Box>
   );
 
+  const tabs = TOP_TABS.map((k) => items.find((i) => i.key === k)).filter((i): i is NavItem => !!i?.href);
+
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh" }}>
       <AppBar
         position="fixed"
-        color="inherit"
+        color="transparent"
         elevation={0}
-        sx={{ borderBottom: 1, borderColor: "divider", bgcolor: (th) => `rgba(${th.vars?.palette.background.defaultChannel} / 0.72)`, backdropFilter: "blur(12px)", width: { md: `calc(100% - ${DRAWER_WIDTH}px)` }, ml: { md: `${DRAWER_WIDTH}px` } }}
+        sx={{ width: { md: `calc(100% - ${DRAWER_WIDTH}px)` }, ml: { md: `${DRAWER_WIDTH}px` }, px: { xs: 1, md: 2 }, pt: 1.5, background: "none" }}
       >
-        <Toolbar>
-          {!desktop && (
-            <IconButton edge="start" onClick={() => setOpen(true)} aria-label="menu" sx={{ mr: 1 }}>
+        <Toolbar sx={(th) => ({ ...glassPanel(th), borderRadius: 999, minHeight: { xs: 56, sm: 56 }, px: { xs: 1, sm: 1.5 }, gap: 0.5 })}>
+          {!desktop ? (
+            <IconButton onClick={() => setOpen(true)} aria-label="menu">
               <MenuIcon />
             </IconButton>
+          ) : (
+            <Stack direction="row" spacing={0.75} aria-hidden sx={{ pl: 1, pr: 2 }}>
+              {["#FF8A80", "#FFD36E", "#7ED9A6"].map((c) => <Box key={c} sx={{ width: 11, height: 11, borderRadius: "50%", bgcolor: c }} />)}
+            </Stack>
           )}
-          <Box sx={{ flex: 1 }} />
+          <Box sx={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
+            <Stack direction="row" spacing={0.5} sx={{ display: { xs: "none", sm: "flex" }, p: 0.5, borderRadius: 999, bgcolor: "action.hover" }}>
+              {tabs.map((item) => {
+                const selected = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href!);
+                return (
+                  <Button key={item.key} component={Link} href={item.href!} size="small" startIcon={item.icon}
+                    sx={(th) => ({
+                      px: 1.75, py: 0.5, color: selected ? "primary.main" : "text.secondary", fontWeight: selected ? 700 : 500,
+                      bgcolor: selected ? "#fff" : "transparent", boxShadow: selected ? `0 2px 10px ${brand.purple}26` : "none",
+                      "& .MuiSvgIcon-root": { fontSize: 18 }, "&:hover": { bgcolor: selected ? "#fff" : "action.hover" },
+                      ...th.applyStyles("dark", { bgcolor: selected ? "rgba(185,160,242,.2)" : "transparent", "&:hover": { bgcolor: "rgba(185,160,242,.14)" } }),
+                    })}>
+                    {t[item.key]}
+                    {(badges[item.key] ?? 0) > 0 && <Box component="span" sx={{ ml: 0.75, minWidth: 18, height: 18, px: 0.5, borderRadius: 999, bgcolor: "secondary.main", color: "#fff", fontSize: 11, lineHeight: "18px", textAlign: "center" }}>{badges[item.key]! > 99 ? "99+" : badges[item.key]}</Box>}
+                  </Button>
+                );
+              })}
+            </Stack>
+          </Box>
           <NotificationBell />
           <Chip
             label={lang === "th" ? "EN" : "ไทย"}
             onClick={() => setLang(lang === "th" ? "en" : "th")}
             size="small"
             variant="outlined"
-            sx={{ mr: 1 }}
           />
           <Tooltip title={dark ? "Light" : "Dark"}>
             <IconButton onClick={() => setMode(dark ? "light" : "dark")}>{dark ? <LightModeIcon /> : <DarkModeIcon />}</IconButton>
@@ -183,6 +220,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <LogoutIcon />
             </IconButton>
           </Tooltip>
+          <Tooltip title={t.changePassword}>
+            <IconButton onClick={() => setPasswordOpen(true)} sx={{ p: 0.5 }}>
+              <Avatar kind="Human" seed={me?.displayName ?? "me"} size={34} />
+            </IconButton>
+          </Tooltip>
         </Toolbar>
       </AppBar>
 
@@ -192,15 +234,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           open={desktop || open}
           onClose={() => setOpen(false)}
           ModalProps={{ keepMounted: true }}
-          sx={(th) => ({ "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box", borderRight: `1.5px solid ${th.vars?.palette.divider}`, backgroundImage: `linear-gradient(180deg, ${brand.lilac} 0%, transparent 55%)`, ...th.applyStyles("dark", { backgroundImage: "linear-gradient(180deg, #2c2150 0%, transparent 55%)" }) } })}
+          sx={{ "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box", border: 0, background: desktop ? "none" : undefined, p: 1.5 } }}
         >
-          {drawer}
+          <Box sx={(th) => ({ ...glassPanel(th), height: "100%", borderRadius: "28px", overflow: "hidden" })}>{drawer}</Box>
         </Drawer>
       </Box>
 
       <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
 
-      <Box component="main" sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 3 }, mt: 8, backgroundImage: `radial-gradient(600px 300px at 90% 0%, ${brand.pinkSoft}55, transparent 70%), radial-gradient(500px 280px at 10% 100%, ${brand.lavender}44, transparent 70%)`, backgroundAttachment: "fixed" }}>
+      <Box component="main" sx={{ flex: 1, minWidth: 0, px: { xs: 1.5, md: 2 }, pb: 3, pt: { xs: 10, md: 11 } }}>
         {children}
       </Box>
     </Box>

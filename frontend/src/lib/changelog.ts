@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.9.0",
+    date: "2026-10-18",
+    title: { th: "หน้าตาใหม่: ออฟฟิศเวทมนตร์สีพาสเทล", en: "New look: pastel magic office" },
+    changes: [
+      { type: "changed", th: "ธีมใหม่ตามภาพ newOffice: พื้นหลังม่วงลาเวนเดอร์–ชมพูพร้อมดาว การ์ดแบบกระจกฝ้า มุมโค้งมน ปุ่มสีม่วงพาสเทล ทั้งโหมดสว่างและมืด", en: "New theme after newOffice: lavender-to-pink starry background, frosted-glass cards, rounded corners and pastel purple buttons, in light and dark mode" },
+      { type: "changed", th: "แถบด้านบนเป็นแคปซูลลอย มีแท็บลัดไปภาพรวม โปรเจกต์ แชท และการอนุมัติ และเมนูด้านข้างเป็นแผงกระจกลอย", en: "The top bar is a floating pill with quick tabs (dashboard, projects, chat, approvals); the side menu is a floating glass panel" },
+      { type: "changed", th: "หน้าภาพรวมจัดเป็นวิดเจ็ต: ภารกิจวันนี้, ค่า AI เดือนนี้, เวทีมาสคอตสีชมพูตรงกลาง, ประกาศล่าสุด, ปฏิทิน และทีมงาน", en: "The dashboard is now widgets: today's missions, AI spend this month, a pink mascot stage in the middle, latest announcements, a calendar and the team" },
+    ],
+  },
+  {
     version: "0.8.0",
     date: "2026-10-18",
     title: { th: "สั่งงาน AI จากแชทด้วย /run", en: "Give AI work from chat with /run" },

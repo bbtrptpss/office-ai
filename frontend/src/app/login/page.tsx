@@ -8,7 +8,6 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { Mascot, Sparkles } from "@/components/cute";
-import { brand } from "@/theme";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -42,7 +41,7 @@ export default function LoginPage() {
         placeItems: "center",
         p: 2,
         overflow: "hidden",
-        background: `linear-gradient(135deg, ${brand.purpleDeep} 0%, ${brand.purple} 45%, ${brand.pink} 100%)`,
+        background: "none",
       }}
     >
       <Sparkles count={22} />
@@ -55,7 +54,7 @@ export default function LoginPage() {
         <Box sx={{ display: "flex", justifyContent: "center", mb: -4, position: "relative", zIndex: 1 }}>
           <Mascot size={120} />
         </Box>
-        <Card sx={{ borderRadius: "28px", boxShadow: "0 24px 60px rgba(40,10,80,.35)" }}>
+        <Card sx={{ borderRadius: "28px", boxShadow: "0 24px 60px rgba(110,80,170,.22)" }}>
           <CardContent sx={{ p: 4, pt: 6 }}>
             <Typography variant="h5" align="center" gutterBottom>
               {t.appName}
