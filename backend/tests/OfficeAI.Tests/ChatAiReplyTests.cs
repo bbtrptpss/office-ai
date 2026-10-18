@@ -86,6 +86,8 @@ public class ChatAiReplyTests(ApiFixture fx)
         Assert.Contains("คิดว่ายังไง", prompt);
         Assert.Empty(seen.Tools);
         Assert.True(seen.MaxTokens <= ChatReplyService.MaxReplyTokens);
+        Assert.Contains("Company snapshot", seen.SystemPrompt); // real data for "summarize today"
+        Assert.Contains("Approvals waiting for a person", seen.SystemPrompt);
 
         var row = await ReplyRowAsync(question.Id, ai.Id);
         Assert.Equal(ChatReplyStatus.Answered, row.Status);
@@ -215,6 +217,22 @@ public class ChatAiReplyTests(ApiFixture fx)
 
         Assert.Empty(await ceo.GetAsync<List<TaskDto>>($"/api/projects/{project}/tasks"));
         Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public async Task The_dashboard_assistant_has_its_channel_and_recent_tasks_span_projects()
+    {
+        var ceo = await fx.CeoAsync();
+        var assistant = await ceo.GetAsync<AssistantDto>("/api/assistant");
+        var channels = await ceo.GetAsync<List<ChannelDto>>("/api/chat/channels");
+        Assert.Contains(channels, c => c.Id == assistant.ChannelId && c.Name == ChatService.AssistantChannel);
+        Assert.All(assistant.Members, m => Assert.NotEqual(Domain.Organization.EmployeeStatus.Inactive, m.Status));
+
+        var (project, _) = await ProjectChannelAsync(ceo);
+        var task = await ceo.PostAsync<TaskDto>($"/api/projects/{project}/tasks", new { title = $"Recent {Guid.NewGuid():N}" });
+        var recent = await ceo.GetAsync<List<RecentTaskDto>>("/api/tasks/recent?take=5");
+        Assert.Equal(task.Id, recent[0].Id);
+        Assert.Equal("Chat run", recent[0].ProjectName);
     }
 
     [Theory]

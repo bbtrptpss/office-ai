@@ -116,6 +116,11 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
             db.ChatChannels.Add(new ChatChannel { Kind = ChannelKind.Company, Name = ChatService.GeneralChannel, Description = "Company-wide conversation" });
             await db.SaveChangesAsync(ct);
         }
+        if (!await db.ChatChannels.AnyAsync(c => c.Kind == ChannelKind.Company && c.Name == ChatService.AssistantChannel, ct))
+        {
+            db.ChatChannels.Add(new ChatChannel { Kind = ChannelKind.Company, Name = ChatService.AssistantChannel, Description = "Questions to the AI assistants from the dashboard" });
+            await db.SaveChangesAsync(ct);
+        }
     }
 
     /// <summary>Gives one tool to the existing AI employees of one position (once; other positions and later changes by people are untouched).</summary>

@@ -249,6 +249,23 @@ export interface AgentConfig {
   version: number;
 }
 
+export interface RecentTask {
+  id: string;
+  projectId: string;
+  projectName: string;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assigneeName: string | null;
+  dueDate: string | null;
+  changedAt: string;
+}
+
+export interface Assistant {
+  channelId: string;
+  members: { employeeId: string; displayName: string; jobTitle: string; status: EmployeeStatus; openTasks: number; currentTask: string | null }[];
+}
+
 export interface AgentRun {
   id: string;
   taskId: string;

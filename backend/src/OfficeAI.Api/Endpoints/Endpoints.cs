@@ -124,6 +124,8 @@ public static class Endpoints
     private static void MapWork(RouteGroupBuilder api)
     {
         api.MapGet("/dashboard", (WorkService s, CancellationToken ct) => s.GetDashboardAsync(ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/tasks/recent", (int? take, WorkService s, CancellationToken ct) => s.RecentTasksAsync(take ?? 8, ct)).RequirePermission(Permissions.TaskRead);
+        api.MapGet("/assistant", (OfficeAI.Application.Communication.AssistantService s, CancellationToken ct) => s.GetAsync(ct)).RequirePermission(Permissions.OrgRead);
 
         api.MapGet("/projects", (WorkService s, CancellationToken ct) => s.ListProjectsAsync(ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/projects/{id:guid}", (Guid id, WorkService s, CancellationToken ct) => s.GetProjectAsync(id, ct)).RequirePermission(Permissions.ProjectRead);

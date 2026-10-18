@@ -32,6 +32,8 @@ public class ChatService(IAppDbContext db, ICurrentUser current, IRealtimeNotifi
     public const int MaxAiRepliesPerMessage = 3;
 
     public const string GeneralChannel = "General";
+    /// <summary>Company channel behind the dashboard's "ask the AI" box (see <see cref="AssistantService"/>).</summary>
+    public const string AssistantChannel = "AI Assistant";
     public const int MaxBody = 4000;
     public const int MaxMentions = 20;
 

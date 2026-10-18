@@ -32,6 +32,8 @@ public record DashboardDto(
     int ActiveProjects, int TotalTasks, int CompletedTasks, int BlockedTasks, int OverdueTasks, int WaitingApproval,
     int HumanEmployees, int AiEmployees, int AiAvailable, int AiWorking, List<WorkloadDto> Workload);
 public record WorkloadDto(Guid EmployeeId, string DisplayName, EmployeeKind Kind, int OpenTasks);
+public record RecentTaskDto(Guid Id, Guid ProjectId, string ProjectName, string Title, WorkTaskStatus Status, TaskPriority Priority,
+    string? AssigneeName, DateOnly? DueDate, DateTimeOffset ChangedAt);
 
 public class WorkService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvider clock)
 {
@@ -282,6 +284,17 @@ public class WorkService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvi
     }
 
     // ---------- Dashboard ----------
+
+    /// <summary>The most recently changed tasks across open projects, for the dashboard's task list.</summary>
+    public async Task<List<RecentTaskDto>> RecentTasksAsync(int take, CancellationToken ct) =>
+        await db.Tasks.AsNoTracking()
+            .Where(t => db.Projects.Any(p => p.Id == t.ProjectId && p.Status != ProjectStatus.Cancelled && p.Status != ProjectStatus.Completed))
+            .OrderByDescending(t => t.UpdatedAt ?? t.CreatedAt).Take(Math.Clamp(take, 1, 50))
+            .Select(t => new RecentTaskDto(t.Id, t.ProjectId, db.Projects.Where(p => p.Id == t.ProjectId).Select(p => p.Name).First(), t.Title, t.Status, t.Priority,
+                db.TaskAssignments.Where(a => a.TaskId == t.Id && a.UnassignedAt == null)
+                    .Join(db.Employees, a => a.EmployeeId, e => e.Id, (a, e) => e.DisplayName).FirstOrDefault(),
+                t.DueDate, t.UpdatedAt ?? t.CreatedAt))
+            .ToListAsync(ct);
 
     public async Task<DashboardDto> GetDashboardAsync(CancellationToken ct)
     {

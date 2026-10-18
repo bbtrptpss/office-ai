@@ -51,7 +51,7 @@ public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, Re
 
         try
         {
-            var request = new AiRequest(config.ModelId, SystemPrompt(employee, channel),
+            var request = new AiRequest(config.ModelId, SystemPrompt(employee, channel) + await CompanyFactsAsync(ct),
                 [new AiMessage(AiRole.User, [new AiText(await TranscriptAsync(reply, employee, ct))])], [],
                 Math.Min(MaxReplyTokens, config.MaxTokensPerCall), Effort.Low);
             var response = await CallAsync(provider, request, ct);
@@ -113,6 +113,11 @@ public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, Re
         sb.AppendLine("- If you do not know something about this company or project, say so; never invent facts, numbers or commitments.");
         return sb.ToString();
     }
+
+    /// <summary>Live company facts so questions like "summarize today" are answered from real data.</summary>
+    private async Task<string> CompanyFactsAsync(CancellationToken ct) =>
+        "\nCompany snapshot (live data from the system; use it when asked about progress, work or priorities, and say when it does not cover the question):\n"
+        + await AssistantService.SnapshotAsync(db, ct);
 
     /// <summary>The recent conversation in the channel, oldest first, ending with the message that mentioned this employee.</summary>
     private async Task<string> TranscriptAsync(ChatReply reply, Domain.Organization.EmployeeProfile employee, CancellationToken ct)

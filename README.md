@@ -81,6 +81,7 @@ frontend/                      Next.js 16 + Material UI + motion
 ธีมเป็นโทนม่วง ลาเวนเดอร์ และชมพู มาสคอต "Puni" และตัวละครพนักงาน AI ออกแบบใหม่ทั้งหมด ไม่ได้ใช้ภาพตัวละครของ Sanrio
 
 ถ้ามีรูปที่ได้สิทธิ์ใช้งาน ให้วางไฟล์ไว้ใน `frontend/public/characters/` แล้วตั้งค่า `MASCOT_IMAGE=/characters/<ไฟล์>` ใน `.env` จากนั้น rebuild ด้วย `docker compose up -d --build web`
+รูปฉากกลางหน้าภาพรวมก็ทำแบบเดียวกันด้วย `STAGE_IMAGE=/characters/<ไฟล์>` (ไม่ตั้งค่า = ใช้มาสคอต Puni)
 
 Animation จะลดลงอัตโนมัติถ้าผู้ใช้เปิด "ลดการเคลื่อนไหว" ในระบบปฏิบัติการ
 

@@ -31,6 +31,17 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.11.0",
+    date: "2026-10-19",
+    title: { th: "หน้าภาพรวมใหม่จาก kuromi-ai", en: "New dashboard from kuromi-ai" },
+    changes: [
+      { type: "changed", th: "ย้ายหน้าตาจากโปรเจกต์ kuromi-ai มาเป็นหน้าภาพรวม: รายการงาน, การ์ด “AI กำลังทำงาน” แบบเครื่องเล่นเพลง, เวทีตรงกลางพร้อมกล่องถาม AI, ปฏิทินสัปดาห์, สรุปจาก AI และการ์ดให้กำลังใจ — ทุกการ์ดใช้ข้อมูลจริง", en: "The kuromi-ai mock-up is now the dashboard: task list, an “AI at work” player card, a center stage with an ask-the-AI box, week calendar, AI summary and a cheer card — all on live data" },
+      { type: "added", th: "ถาม AI จากหน้าภาพรวมได้: เลือก COO / PM / CTO AI แล้วพิมพ์หรือกดปุ่มลัด (สรุปวันนี้ วางแผนต่อ งานเสี่ยง ไอเดีย) คำตอบขึ้นในกล่องข้อความ และเก็บไว้ในห้องแชท “AI Assistant”", en: "Ask the AI from the dashboard: pick COO / PM / CTO AI, type or use a shortcut (summarize, plan, risks, ideas); the answer appears in the bubble and is kept in the “AI Assistant” chat channel" },
+      { type: "added", th: "AI ที่ตอบในแชทเห็นภาพรวมบริษัทแบบสด (ความคืบหน้าโปรเจกต์ งานค้าง งานรออนุมัติ ใครกำลังทำงาน) จึงสรุปจากข้อมูลจริงได้", en: "AI chat answers see a live company snapshot (project progress, open work, pending approvals, who is working), so summaries use real data" },
+      { type: "added", th: "ใส่รูปเวทีของตัวเองได้ด้วย STAGE_IMAGE ใน .env (ไฟล์ที่ได้สิทธิ์ใช้งาน วางใน frontend/public)", en: "Use your own stage artwork with STAGE_IMAGE in .env (a file you have the rights to, placed in frontend/public)" },
+    ],
+  },
+  {
     version: "0.10.4",
     date: "2026-10-19",
     title: { th: "ทุกแผนกสั่งงานแบบวางแผนได้", en: "Every department can take planned work" },
