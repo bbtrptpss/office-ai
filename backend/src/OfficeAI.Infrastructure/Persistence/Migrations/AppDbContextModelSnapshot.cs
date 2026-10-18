@@ -232,6 +232,9 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                     b.Property<bool>("CancelRequested")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("ConversationJson")
+                        .HasColumnType("text");
+
                     b.Property<string>("CorrelationId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -281,6 +284,9 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<int>("ResumeCount")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");

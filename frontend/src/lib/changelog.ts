@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.7",
+    date: "2026-10-18",
+    title: { th: "งาน AI ทำต่อได้หลังเซิร์ฟเวอร์รีสตาร์ต", en: "AI runs resume after a server restart" },
+    changes: [
+      { type: "changed", th: "ถ้าเซิร์ฟเวอร์รีสตาร์ตระหว่างที่พนักงาน AI ทำงาน งานจะทำต่อจากขั้นล่าสุดที่บันทึกไว้ แทนที่จะล้มเหลวและเริ่มใหม่ (สูงสุด 2 ครั้งต่องาน)", en: "If the server restarts while an AI employee is working, the run continues from its last saved step instead of failing and starting over (at most twice per run)" },
+      { type: "fixed", th: "เครื่องมือที่ทำไปแล้วจะไม่ถูกทำซ้ำเมื่อทำต่อ — มีเพียงคำถามถึงโมเดลที่ค้างอยู่เท่านั้นที่ถามใหม่", en: "Tools that already ran are not repeated on resume — only the model call that was in flight is asked again" },
+      { type: "added", th: "ประวัติการทำงานของ AI แสดงข้อความเมื่องานถูกทำต่อหลังรีสตาร์ต", en: "The run transcript notes when a run was resumed after a restart" },
+    ],
+  },
+  {
     version: "0.7.6",
     date: "2026-10-18",
     title: { th: "เชื่อม GitHub / GitLab", en: "GitHub / GitLab remotes" },
@@ -174,7 +184,6 @@ export const TODO: Todo[] = [
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
-  { status: "planned", area: { th: "AI", en: "AI" }, th: "ทำงาน AI ต่อจากจุดที่ค้างได้เมื่อระบบรีสตาร์ต (ตอนนี้ล้มเหลวแล้วลองใหม่)", en: "Resume interrupted AI runs mid-call (today they fail and are retried)" },
 ];
 
 export const LATEST_VERSION = CHANGELOG[0].version;
