@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.11.1",
+    date: "2026-10-19",
+    title: { th: "ชุดรูปตัวละครแบบเปิด/ปิดได้", en: "Switchable character artwork pack" },
+    changes: [
+      { type: "added", th: "ตั้ง CHARACTER_PACK ใน .env เพื่อใช้ชุดรูปตัวละคร (ฉากกลาง โลโก้ ปก เพื่อนผู้ช่วย การ์ดให้กำลังใจ) ไม่ตั้ง = ใช้มาสคอต Puni — โฟลเดอร์รูปไม่ขึ้น git และอยู่แค่ในเครื่องนี้", en: "Set CHARACTER_PACK in .env to use a character artwork pack (stage, logo, cover, assistant friends, cheer card); unset = the Puni mascot — pack folders are git-ignored and stay on this machine" },
+      { type: "fixed", th: "รูปใน frontend/public (เช่น MASCOT_IMAGE) ไม่ขึ้นเมื่อรันด้วย Docker เพราะ image ไม่ได้ copy โฟลเดอร์ public — แก้แล้ว", en: "Images in frontend/public (e.g. MASCOT_IMAGE) did not load under Docker because the image never copied the public folder — fixed" },
+    ],
+  },
+  {
     version: "0.11.0",
     date: "2026-10-19",
     title: { th: "หน้าภาพรวมใหม่จาก kuromi-ai", en: "New dashboard from kuromi-ai" },

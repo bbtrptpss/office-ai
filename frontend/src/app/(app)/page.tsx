@@ -9,10 +9,20 @@ import { useRealtime } from "@/lib/realtime";
 import { Loading, useLoad } from "@/components/common";
 import { Mascot } from "@/components/cute";
 import { Arrow, Calendar, Chart, Check, CheckSquare, ChevronRight, Clipboard, Doc, Dots, Next, Pen, Play, Prev, Search, Sparkle } from "@/components/dashIcons";
+import { art, FRIEND_ART } from "@/lib/characters";
 import s from "./dashboard.module.css";
 
-/** Optional artwork for the center stage (a file you have the rights to, placed in /public). Without it the mascot stands there. */
-const STAGE_IMAGE = process.env.NEXT_PUBLIC_STAGE_IMAGE;
+/** Optional artwork for the center stage: STAGE_IMAGE, else the character pack's scene. Without either the mascot stands there. */
+const STAGE_IMAGE = process.env.NEXT_PUBLIC_STAGE_IMAGE || art("scene");
+
+/** A character pack image, or the built-in mascot. */
+function Art({ name, size, round, float = false }: { name: Parameters<typeof art>[0]; size: number; round?: boolean; float?: boolean }) {
+  const src = art(name);
+  return src
+    // eslint-disable-next-line @next/next/no-img-element
+    ? <img src={src} alt="" width={size} height={size} style={{ width: size, height: size, objectFit: "cover", borderRadius: round ? "50%" : 12, flexShrink: 0 }} />
+    : <Mascot size={size} float={float} />;
+}
 
 const cx = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(" ");
 
@@ -73,7 +83,7 @@ function TaskListCard({ dashboard }: { dashboard: Dashboard }) {
       </ul>
       <div className={s.taskFoot}>
         <div className={s.progress}><span style={{ width: `${pct}%` }} /></div>
-        <Mascot size={40} float={false} />
+        <Art name="mini" size={40} />
       </div>
     </section>
   );
@@ -108,7 +118,7 @@ function NowRunningCard() {
         <Link href="/agents" className={s.right} aria-label={t.navActivity}><ChevronRight /></Link>
       </div>
       <div className={s.track}>
-        <div className={s.cover}><Mascot size={56} float={!!run} /></div>
+        <div className={s.cover}>{art("cover") ? <Art name="cover" size={72} /> : <Mascot size={56} float={!!run} />}</div>
         <div style={{ minWidth: 0 }}>
           <b>{run ? run.taskTitle : t.dashNobodyRunning}</b>
           <small>{run ? `${run.employeeName} · ${label(run.status)} · ${run.turns} turns` : t.dashNobodyRunningHint}</small>
@@ -242,7 +252,7 @@ function Stage() {
             {members.map((m, i) => (
               <button key={m.employeeId} className={cx(s.friend, s[`friend${i % 4}`], m.employeeId === current?.employeeId && s.active)}
                 onClick={() => { setPickedId(m.employeeId); setBubble({ answer: `${m.jobTitle} — ${status(m)}`, from: m.displayName }); }}>
-                <Mascot size={32} float={false} />
+                <Art name={FRIEND_ART[i % FRIEND_ART.length]} size={32} round />
                 <span style={{ minWidth: 0 }}>
                   <b>{m.displayName}</b>
                   <small>{status(m)}</small>
@@ -393,7 +403,10 @@ function CheerCard() {
     <div className={s.cheer}>
       <p>{line.split("\n").map((l) => <span key={l} style={{ display: "block" }}>{l}</span>)}</p>
       <small>{t.dashKeepGoing}</small>
-      <div className={s.cheerArt}><Mascot size={110} /></div>
+      {art("cheer")
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img className={s.cheerImg} src={art("cheer")} alt="" />
+        : <div className={s.cheerArt}><Mascot size={110} /></div>}
     </div>
   );
 }

@@ -70,6 +70,7 @@ services:
         NEXT_PUBLIC_API_URL: http://localhost:5000
         NEXT_PUBLIC_MASCOT_IMAGE: ${MASCOT_IMAGE:-}
         NEXT_PUBLIC_STAGE_IMAGE: ${STAGE_IMAGE:-}
+        NEXT_PUBLIC_CHARACTER_PACK: ${CHARACTER_PACK:-}
     ports:
       - "3000:3000"
     depends_on:

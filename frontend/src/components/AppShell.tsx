@@ -41,6 +41,7 @@ import { Avatar, Mascot } from "@/components/cute";
 import { brand, glass } from "@/theme";
 import { NotificationBell } from "@/components/notifications";
 import { LATEST_VERSION, SEEN_KEY } from "@/lib/changelog";
+import { art } from "@/lib/characters";
 
 const DRAWER_WIDTH = 272;
 
@@ -116,7 +117,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", px: 2, pt: 2, pb: 1.5 }}>
         <Box sx={{ width: 52, height: 52, borderRadius: "18px", display: "grid", placeItems: "center", bgcolor: brand.pinkSoft, flexShrink: 0 }}>
-          <Mascot size={46} />
+          {art("logo")
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={art("logo")} alt="" width={52} height={52} style={{ borderRadius: 18 }} />
+            : <Mascot size={46} />}
         </Box>
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="h6" sx={{ lineHeight: 1.15, fontSize: 16 }}>

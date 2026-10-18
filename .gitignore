@@ -22,3 +22,6 @@ Thumbs.db
 .idea/
 backups/
 secrets/
+
+# Licensed / personal character artwork stays on this machine (see CHARACTER_PACK in .env)
+frontend/public/characters/*/

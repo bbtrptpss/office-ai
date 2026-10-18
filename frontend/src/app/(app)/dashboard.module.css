@@ -166,6 +166,10 @@
 .cheer p { margin: 0; font-weight: 700; font-size: 15px; line-height: 1.35; position: relative; z-index: 1; max-width: 62%; }
 .cheer small { display: block; margin-top: 10px; color: #8b80a8; position: relative; z-index: 1; }
 .cheerArt { position: absolute; right: 6px; bottom: -6px; }
+.cheerImg {
+  position: absolute; right: 0; bottom: 0; height: 100%; width: auto;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 35%); mask-image: linear-gradient(90deg, transparent, #000 35%);
+}
 
 @media (max-width: 1280px) {
   .grid { grid-template-columns: 280px 1fr; }
