@@ -19,9 +19,13 @@ public interface IClaudeBridge
 {
     bool IsConfigured { get; }
     Task<ClaudeBridgeReply> AskAsync(string prompt, string system, string? sessionId, CancellationToken ct);
+    /// <summary>The dashboard terminal: one PowerShell command in the project folder on the host.</summary>
+    Task<TerminalResultDto> RunAsync(string command, CancellationToken ct);
 }
 
 public record ClaudeBridgeReply(string Reply, string SessionId, decimal CostUsd);
+public record TerminalRequest(string Command);
+public record TerminalResultDto(string Output, int ExitCode, bool TimedOut, long Ms);
 public record ClaudeAskRequest(string Message, bool NewChat = false);
 /// <param name="EquivalentCostUsd">What the call would cost on the API; the person's Claude plan actually pays for it.</param>
 /// <param name="TasksStarted">How many tasks Claude handed to AI employees in this reply.</param>

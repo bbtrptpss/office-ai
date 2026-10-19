@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { AgentRun, api, Assistant, ChatMessage, ClaudeReply, Dashboard, Meeting, RecentTask, usd } from "@/lib/api";
+import { AgentRun, api, Assistant, ChatMessage, ClaudeReply, Dashboard, Meeting, RecentTask, TerminalResult, usd } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -152,7 +152,8 @@ function NowRunningCard() {
 
 // ---------------- center ----------------
 
-type Bubble = { question?: string; answer?: string; typing?: boolean; from?: string };
+/** `mono`: terminal output, shown as-is in a monospace font. */
+type Bubble = { question?: string; answer?: string; typing?: boolean; from?: string; mono?: boolean };
 
 /** Chat answers use light markdown: show **bold** as bold, keep the rest (line breaks are kept by the bubble's CSS). */
 function Rich({ text }: { text: string }) {
@@ -188,8 +189,12 @@ function Stage() {
 
   const [newChat, setNewChat] = useState(false);
   const claudeOn = !!assistant?.claudeAvailable && can("agent.manage");
+  // The CEO's Claude card is a terminal (PowerShell in the project folder on this PC) unless they switch back to the Claude chat.
+  const isCeo = !!me?.roles.includes("CEO");
+  const [chatMode, setChatMode] = useState(false);
+  const terminal = isCeo && !chatMode;
   const members = [
-    ...(claudeOn ? [{ employeeId: CLAUDE_ID, displayName: "Claude", jobTitle: t.dashClaudeTitle, status: "Available" as const, openTasks: 0, currentTask: null }] : []),
+    ...(claudeOn ? [{ employeeId: CLAUDE_ID, displayName: terminal ? "Terminal" : "Claude", jobTitle: terminal ? t.dashTerminalTitle : t.dashClaudeTitle, status: "Available" as const, openTasks: 0, currentTask: null }] : []),
     ...(assistant?.members ?? []),
   ];
   const current = members.find((m) => m.employeeId === pickedId) ?? members[0];
@@ -227,6 +232,21 @@ function Stage() {
     if (!question || !canAsk) return;
     setInput("");
     setBubble({ question, typing: true });
+    if (isClaude && terminal) {
+      setPending(true);
+      try {
+        const res = await api.post<TerminalResult>("/api/assistant/terminal", { command: question });
+        const footer = res.timedOut ? t.dashTerminalTimedOut : `exit ${res.exitCode} · ${(res.ms / 1000).toFixed(1)}s`;
+        setBubble({ question: `PS> ${question}`, answer: `${res.output || t.dashTerminalNoOutput}
+
+${footer}`, from: "Terminal", mono: true });
+      } catch (err) {
+        setBubble({ question: `PS> ${question}`, answer: err instanceof Error ? err.message : String(err), from: "Terminal" });
+      } finally {
+        setPending(false);
+      }
+      return;
+    }
     if (isClaude) {
       setPending(true);
       try {
@@ -252,7 +272,7 @@ function Stage() {
   };
 
   const status = (m: NonNullable<typeof current>) =>
-    m.employeeId === CLAUDE_ID ? t.dashClaudeStatus : m.currentTask ? `${t.dashFriendWorking} ${m.currentTask}` : m.openTasks > 0 ? `${label(m.status)} · ${t.dashFriendOpen} ${m.openTasks}` : label(m.status);
+    m.employeeId === CLAUDE_ID ? (terminal ? t.dashTerminalStatus : t.dashClaudeStatus) : m.currentTask ? `${t.dashFriendWorking} ${m.currentTask}` : m.openTasks > 0 ? `${label(m.status)} · ${t.dashFriendOpen} ${m.openTasks}` : label(m.status);
 
   return (
     <>
@@ -282,7 +302,7 @@ function Stage() {
               ) : (
                 <>
                   <b>{bubble.from ?? current?.displayName}</b>
-                  <Rich text={bubble.answer ?? ""} />
+                  {bubble.mono ? <pre className={s.mono}>{bubble.answer}</pre> : <Rich text={bubble.answer ?? ""} />}
                 </>
               )}
             </>
@@ -308,16 +328,21 @@ function Stage() {
       <div className={s.composer}>
         <form className={s.ask} onSubmit={ask}>
           <input value={input} onChange={(e) => setInput(e.target.value)} disabled={!canAsk} autoComplete="off" maxLength={3000}
-            placeholder={current ? t.dashAskPlaceholder.replace("{name}", current.displayName) : t.dashNoAssistant} />
+            placeholder={isClaude && terminal ? t.dashTerminalPlaceholder : current ? t.dashAskPlaceholder.replace("{name}", current.displayName) : t.dashNoAssistant} />
           <button type="submit" className={s.send} title={t.send} disabled={!canAsk || !input.trim() || pending}><Arrow /></button>
         </form>
         <div className={s.chips}>
           {CHIPS.map(({ key, prompt, Icon }) => (
             <button key={key} className={s.chip} onClick={() => setInput(t[prompt])}><Icon />{t[key]}</button>
           ))}
-          {isClaude && (
+          {isClaude && !terminal && (
             <button className={s.chip} onClick={() => { setNewChat(true); setBubble({ answer: t.dashClaudeNew, from: "Claude" }); }}>
               <Sparkle />{t.dashChipNewChat}
+            </button>
+          )}
+          {isClaude && isCeo && (
+            <button className={s.chip} onClick={() => { setChatMode(!chatMode); setBubble(null); }}>
+              <Sparkle />{terminal ? t.dashChipToClaude : t.dashChipToTerminal}
             </button>
           )}
           <Link href={assistant ? `/chat?channel=${assistant.channelId}` : "/chat"} className={s.chip}><Dots />{t.dashChipChat}</Link>

@@ -32,4 +32,13 @@ public sealed class HttpClaudeBridge(HttpClient http, IOptions<ClaudeBridgeOptio
             throw new HttpRequestException(answer?.Error ?? $"Claude bridge returned {(int)res.StatusCode}.");
         return new ClaudeBridgeReply(answer.Reply, answer.SessionId, answer.CostUsd);
     }
+
+    public async Task<TerminalResultDto> RunAsync(string command, CancellationToken ct)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Post, new Uri(new Uri(options.Value.Url!), "/run")) { Content = JsonContent.Create(new { command }) };
+        req.Headers.Add("x-bridge-token", options.Value.Token);
+        using var res = await http.SendAsync(req, ct);
+        if (!res.IsSuccessStatusCode) throw new HttpRequestException($"Claude bridge returned {(int)res.StatusCode}.");
+        return await res.Content.ReadFromJsonAsync<TerminalResultDto>(ct) ?? throw new HttpRequestException("Claude bridge returned nothing.");
+    }
 }

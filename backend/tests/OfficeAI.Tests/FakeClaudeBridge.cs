@@ -16,4 +16,12 @@ public sealed class FakeClaudeBridge : IClaudeBridge
         Calls.Enqueue((prompt, system, sessionId));
         return Task.FromResult(new ClaudeBridgeReply(Script?.Invoke(prompt) ?? $"echo: {prompt}", sessionId ?? Guid.NewGuid().ToString(), 0.01m));
     }
+
+    public ConcurrentQueue<string> Commands { get; } = new();
+
+    public Task<TerminalResultDto> RunAsync(string command, CancellationToken ct)
+    {
+        Commands.Enqueue(command);
+        return Task.FromResult(new TerminalResultDto($"ran: {command}", 0, false, 5));
+    }
 }

@@ -1,5 +1,6 @@
 // Lets the Office AI API (in Docker) ask the Claude Code CLI that is signed in on this Windows machine.
 // Claude Code runs with every tool and MCP server disabled, in an empty folder, one question at a time; the API carries out the <action> blocks it writes.
+// POST /run is the dashboard terminal: one PowerShell command in the project folder (the API sends it for the CEO only).
 //   node scripts/windows/claude-bridge.mjs        (start-office-ai.ps1 starts it; token from .env CLAUDE_BRIDGE_TOKEN)
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
@@ -61,9 +62,55 @@ function ask({ prompt, system, sessionId }) {
   });
 }
 
+const RUN_TIMEOUT_MS = 10 * 60_000;
+const MAX_OUTPUT = 20_000;
+
+// The dashboard terminal (the API allows it for the CEO only): one PowerShell command in the project folder, output and exit code back.
+function run({ command }) {
+  return new Promise((resolve) => {
+    // -EncodedCommand (UTF-16LE base64): needs no quoting, and keeps Thai text intact, which PowerShell reading stdin does not.
+    // Errors are merged into the output as plain text (otherwise PowerShell writes them as CLIXML); the exit code is the last program's.
+    // Lines are written to stdout as UTF-8 bytes directly: with a (hidden) console attached, PowerShell's own writer uses the ANSI code page.
+    const script = [
+      "[Console]::OutputEncoding = [Text.Encoding]::UTF8", "$ProgressPreference = 'SilentlyContinue'", "$global:LASTEXITCODE = 0",
+      "$__out = [Console]::OpenStandardOutput(); $__utf8 = New-Object Text.UTF8Encoding $false",
+      "& {", command, "} 2>&1 | ForEach-Object { $__b = $__utf8.GetBytes(\"$_`n\"); $__out.Write($__b, 0, $__b.Length) }",
+      "$__out.Flush()", "exit $global:LASTEXITCODE",
+    ].join("\n");
+    const encoded = Buffer.from(script, "utf16le").toString("base64");
+    const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], { cwd: root, windowsHide: true });
+    let out = "";
+    const add = (d) => { if (out.length < MAX_OUTPUT * 2) out += d; };
+    const started = Date.now();
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill(); }, RUN_TIMEOUT_MS);
+    child.stdout.on("data", add);
+    child.stderr.on("data", add);
+    child.on("error", (e) => { clearTimeout(timer); resolve({ output: e.message, exitCode: -1, timedOut: false, ms: Date.now() - started }); });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      const clipped = out.length > MAX_OUTPUT ? "…" + out.slice(-MAX_OUTPUT) : out;
+      resolve({ output: clipped.replace(/\s+$/, ""), exitCode: code ?? -1, timedOut, ms: Date.now() - started });
+    });
+    child.stdin.end();
+  });
+}
+
 const server = createServer((req, res) => {
   const send = (status, body) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(body)); };
   if (req.method === "GET" && req.url === "/health") return send(200, { ok: true });
+  if (req.method === "POST" && req.url === "/run") {
+    if (!sameToken(req.headers["x-bridge-token"])) return send(401, { error: "unauthorized" });
+    let body = "";
+    req.on("data", (d) => { body += d; if (body.length > 50_000) req.destroy(); });
+    req.on("end", async () => {
+      let input;
+      try { input = JSON.parse(body); } catch { return send(400, { error: "invalid json" }); }
+      if (typeof input.command !== "string" || !input.command.trim()) return send(400, { error: "command is required" });
+      send(200, await serialized(() => run(input)));
+    });
+    return;
+  }
   if (req.method !== "POST" || req.url !== "/ask") return send(404, { error: "not found" });
   if (!sameToken(req.headers["x-bridge-token"])) return send(401, { error: "unauthorized" });
   let body = "";

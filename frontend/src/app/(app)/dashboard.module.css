@@ -90,6 +90,7 @@
   padding: 14px 16px; font-size: 14px; line-height: 1.55; box-shadow: var(--shadow); white-space: pre-wrap;
 }
 .bubble b { display: block; }
+.bubble .mono { margin: 0; font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
 .bubble .you { font-size: 12px; color: #8b80a8; margin-bottom: 6px; }
 .typing span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--purple); margin-right: 3px; animation: dot 1s infinite; }
 .typing span:nth-child(2) { animation-delay: .15s; }

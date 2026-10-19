@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.13.0",
+    date: "2026-10-19",
+    title: { th: "Terminal บนหน้า dashboard", en: "Terminal on the dashboard" },
+    changes: [
+      { type: "added", th: "สำหรับ CEO การ์ด Claude บนหน้า dashboard กลายเป็น Terminal แล้ว พิมพ์คำสั่ง PowerShell ในช่องเดิม คำสั่งจะรันในโฟลเดอร์โปรเจกต์บนเครื่องนี้ และ output แสดงใน bubble (รันได้ครั้งละ 1 คำสั่ง ไม่เกิน 10 นาที) ถ้าจะคุยกับ Claude แบบเดิม กดปุ่ม “คุยกับ Claude”", en: "For the CEO, the dashboard's Claude card is now a terminal: type a PowerShell command in the same box, it runs in the project folder on this PC and the output shows in the bubble (one command at a time, up to 10 minutes); “Chat with Claude” switches back to the Claude chat" },
+      { type: "security", th: "Terminal ใช้ได้เฉพาะบทบาท CEO ไม่จำกัดคำสั่ง ทุกคำสั่งบันทึกลง audit log ก่อนรัน และตัวเชื่อมยังรับเฉพาะการเชื่อมต่อจากเครื่องนี้ (loopback) พร้อม token", en: "The terminal is for the CEO role only and does not restrict commands; every command is written to the audit log before it runs, and the bridge still accepts only loopback connections with its token" },
+    ],
+  },
+  {
     version: "0.12.1",
     date: "2026-10-19",
     title: { th: "สั่งงานผ่าน Claude ได้แล้ว", en: "Claude can hand out work" },

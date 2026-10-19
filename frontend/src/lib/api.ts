@@ -276,6 +276,14 @@ export interface ClaudeReply {
   tasksStarted: number;
 }
 
+/** One dashboard terminal command (CEO only): PowerShell in the project folder on the host. */
+export interface TerminalResult {
+  output: string;
+  exitCode: number;
+  timedOut: boolean;
+  ms: number;
+}
+
 export interface AgentRun {
   id: string;
   taskId: string;
