@@ -142,3 +142,16 @@ The planned items left open after Phase 7, each with its own commit and Update l
 ## Open items (not built yet)
 
 - First real run with any provider needs its key (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY); OpenAI/Gemini models and prices are added by the CEO in AI settings.
+
+## Phase 9 — Master Prompt gaps ✅ (merged to master, 2026-10-19)
+
+Items from the Master Prompt that were not built yet, each with an Update log entry (v0.14.0–v0.14.3).
+
+| Item | Status |
+| --- | --- |
+| §9 Profitability per project (planned vs forecast margin, AI overrun, at-risk flag) + read-only what-if scenario planning on the approved estimate | done (Finance → “Profitability & scenarios”) |
+| §15 Model selection by task complexity: task `Complexity` (Routine/Standard/Complex) routes runs to the cheapest routine-tier / advanced-tier model of the same provider; planner can set it | done (default Standard = no change) |
+| §11 Company-wide Task Board (/tasks) with project / assignee / priority / overdue filters | done |
+| §15 Caching where safe: automatic prompt caching on Anthropic calls | done (not yet exercised against the real API) |
+
+187 tests. Not changed on purpose: the dashboard keeps its one-screen layout; profitability and quality live on the Finance and Quality pages.
