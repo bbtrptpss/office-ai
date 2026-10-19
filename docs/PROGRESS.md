@@ -204,3 +204,15 @@ Read-only: gates report, they don't block actions (blocking stays where it alrea
 
 196 tests.
 
+
+## Phase 15 — Defect tracking (QA) ✅ (2026-10-19)
+
+| Item | Status |
+| --- | --- |
+| §7 Stage 6 “Record reproducible defects”: `Defect` (DEF-001…, severity, steps to reproduce required, expected/actual, environment, affected task, failing test run). `GET/POST /projects/{id}/defects` (task.read / task.manage) | done |
+| §7 Stage 6 “Send failed tasks back to the appropriate developer”: each defect creates a fix task (priority from severity, same milestone/skills) assigned to the last assignee of the affected task; reopen creates a new fix task for the same developer | done |
+| §7 Stage 6 “Prevent failed quality gates from being marked as passed”: a task with an open defect cannot move to Done (board and approval inbox); `verify` (needs the fix task Done), `reject` (cancels an unstarted fix task), `reopen` — task.approve, human-only | done |
+| QA stage gate adds “no open defects”; AI tool `defect.report` for quality positions (granted once to existing employees) | done |
+| Project page “Defects” tab | done (typecheck/lint clean; browser walkthrough not done — Chrome extension was not connected; API smoke-tested on the running stack) |
+
+Fix tasks are ordinary tasks, not part of a workflow, so the engine does not start them by itself; run them with AI from the task dialog. 200 tests.

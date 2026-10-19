@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Application.Abstractions;
+using OfficeAI.Application.Delivery;
 using OfficeAI.Domain.Common;
 using OfficeAI.Domain.Organization;
 using OfficeAI.Domain.Work;
@@ -193,6 +194,7 @@ public class WorkService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvi
             throw new DomainException("task.invalid_transition", $"A task cannot move from {task.Status} to {to}.");
         if (TaskStateMachine.RequiresApprover(task.Status, to) && !canApprove)
             throw new ForbiddenException("Only an approver can mark a task as Done.");
+        if (to == WorkTaskStatus.Done) await DefectService.EnsureNoOpenDefectsAsync(db, id, ct);
 
         if (to == WorkTaskStatus.InProgress)
         {

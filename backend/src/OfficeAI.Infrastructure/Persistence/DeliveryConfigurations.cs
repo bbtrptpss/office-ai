@@ -93,3 +93,23 @@ internal class EstimateLineItemConfig : IEntityTypeConfiguration<EstimateLineIte
         b.Property(i => i.Amount).HasPrecision(18, 2);
     }
 }
+
+internal class DefectConfig : IEntityTypeConfiguration<Defect>
+{
+    public void Configure(EntityTypeBuilder<Defect> b)
+    {
+        EntityConfig.Base(b);
+        b.ToTable("Defects");
+        b.Property(d => d.Code).HasMaxLength(20);
+        b.Property(d => d.Title).HasMaxLength(200);
+        b.Property(d => d.Environment).HasMaxLength(500);
+        b.Property(d => d.Severity).HasConversion<string>().HasMaxLength(10);
+        b.Property(d => d.Status).HasConversion<string>().HasMaxLength(10);
+        b.HasIndex(d => new { d.ProjectId, d.Code }).IsUnique();
+        b.HasIndex(d => new { d.TaskId, d.Status });
+        b.HasIndex(d => d.FixTaskId);
+        b.HasOne<Project>().WithMany().HasForeignKey(d => d.ProjectId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne<WorkTask>().WithMany().HasForeignKey(d => d.TaskId).OnDelete(DeleteBehavior.SetNull);
+        b.HasOne<WorkTask>().WithMany().HasForeignKey(d => d.FixTaskId).OnDelete(DeleteBehavior.SetNull);
+    }
+}

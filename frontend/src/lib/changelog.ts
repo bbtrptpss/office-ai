@@ -31,6 +31,17 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.19.0",
+    date: "2026-10-19",
+    title: { th: "บันทึกข้อบกพร่อง (QA) ส่งงานแก้กลับให้นักพัฒนา", en: "Defect log (QA) that sends fixes back to the developer" },
+    changes: [
+      { type: "added", th: "แท็บ “ข้อบกพร่อง” ในหน้าโปรเจกต์: บันทึกข้อบกพร่องพร้อมขั้นตอนทำซ้ำ ผลที่ควรเป็น/ที่เกิดจริง ความรุนแรง และงานที่พบ (รหัส DEF-001…)", en: "Project “Defects” tab: record a defect with steps to reproduce, expected/actual result, severity and the task it was found in (codes DEF-001…)" },
+      { type: "added", th: "ทุกข้อบกพร่องสร้างงานแก้ไขให้อัตโนมัติ ความสำคัญตามความรุนแรง และมอบให้คนที่ทำงานนั้นล่าสุด; ยืนยันว่าแก้แล้ว / เปิดใหม่ (สร้างงานแก้ใหม่) / ปฏิเสธ (ยกเลิกงานแก้ที่ยังไม่เริ่ม) ทำได้เฉพาะคนที่มีสิทธิ์อนุมัติงาน", en: "Each defect creates a fix task with a priority from its severity, assigned to whoever last worked on the task; verify / reopen (new fix task) / reject (cancels an unstarted fix task) are for people with task approval rights" },
+      { type: "added", th: "Quality gate: งานที่มีข้อบกพร่องค้างจะปิดเป็น Done ไม่ได้ ทั้งจากกระดานงานและจากกล่องอนุมัติ; ขั้นตอนส่งมอบขั้น QA เพิ่มเกณฑ์ “ไม่มีข้อบกพร่องค้าง”", en: "Quality gate: a task with an open defect cannot be marked Done, from the board or the approval inbox; the QA delivery stage adds the “no open defects” exit check" },
+      { type: "added", th: "เครื่องมือ AI `defect.report` สำหรับตำแหน่งสายคุณภาพ (QA, Automation Test, Code Reviewer, Security, Release)", en: "AI tool `defect.report` for the quality positions (QA, Automation Test, Code Reviewer, Security, Release)" },
+    ],
+  },
+  {
     version: "0.18.1",
     date: "2026-10-19",
     title: { th: "โปรไฟล์พนักงานครบขึ้น และแก้การเรียงความสำคัญของงาน", en: "Fuller employee profile, and task priority ordering fixed" },

@@ -927,3 +927,34 @@ export interface EmployeeOverview {
   };
 }
 
+
+// ---------- defects ----------
+
+export type DefectSeverity = "Low" | "Medium" | "High" | "Critical";
+
+export interface Defect {
+  id: string;
+  code: string;
+  title: string;
+  severity: DefectSeverity;
+  status: "Open" | "Verified" | "Rejected";
+  state: "open" | "fixReady" | "verified" | "rejected";
+  stepsToReproduce: string;
+  expectedResult: string | null;
+  actualResult: string | null;
+  environment: string | null;
+  taskId: string | null;
+  taskTitle: string | null;
+  testRunId: string | null;
+  fixTaskId: string | null;
+  fixTaskTitle: string | null;
+  fixTaskStatus: TaskStatus | null;
+  assigneeName: string | null;
+  reporterName: string | null;
+  reportedByAi: boolean;
+  reopenCount: number;
+  resolutionNote: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  version: number;
+}

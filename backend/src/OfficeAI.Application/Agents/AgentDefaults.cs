@@ -47,6 +47,7 @@ public static class AgentDefaults
         foreach (var id in RoleTools.GetValueOrDefault(roleCode ?? "", [])) yield return id;
         if (Engineers.Contains(roleCode ?? "")) foreach (var id in CodeWriteTools) yield return id;
         if (Engineers.Contains(roleCode ?? "") || Quality.Contains(roleCode ?? "")) foreach (var id in CodeReadTools) yield return id;
+        if (Quality.Contains(roleCode ?? "")) yield return Delivery.ReportDefectTool.ToolId;
     }
 
     /// <summary>Specialist tools by position code.</summary>

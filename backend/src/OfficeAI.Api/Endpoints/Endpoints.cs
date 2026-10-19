@@ -217,6 +217,11 @@ public static class Endpoints
         api.MapGet("/projects/{id:guid}/decisions", (Guid id, DeliveryService s, CancellationToken ct) => s.ListDecisionsAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapPost("/decisions/{id:guid}/status", (Guid id, SetDecisionStatusRequest r, DeliveryService s, CancellationToken ct) => s.SetDecisionStatusAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapGet("/projects/{id:guid}/stages", (Guid id, StageGateService s, CancellationToken ct) => s.GetAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/projects/{id:guid}/defects", (Guid id, DefectService s, CancellationToken ct) => s.ListAsync(id, ct)).RequirePermission(Permissions.TaskRead);
+        api.MapPost("/projects/{id:guid}/defects", (Guid id, ReportDefectRequest r, DefectService s, CancellationToken ct) => s.ReportAsync(id, r, ct)).RequirePermission(Permissions.TaskManage);
+        api.MapPost("/defects/{id:guid}/verify", (Guid id, ResolveDefectRequest r, DefectService s, CancellationToken ct) => s.VerifyAsync(id, r, ct)).RequirePermission(Permissions.TaskApprove);
+        api.MapPost("/defects/{id:guid}/reject", (Guid id, ResolveDefectRequest r, DefectService s, CancellationToken ct) => s.RejectAsync(id, r, ct)).RequirePermission(Permissions.TaskApprove);
+        api.MapPost("/defects/{id:guid}/reopen", (Guid id, ResolveDefectRequest r, DefectService s, CancellationToken ct) => s.ReopenAsync(id, r, ct)).RequirePermission(Permissions.TaskApprove);
         api.MapGet("/projects/{id:guid}/estimates", (Guid id, DeliveryService s, CancellationToken ct) => s.ListEstimatesAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/rate-card", (DeliveryService s, CancellationToken ct) => s.ListRatesAsync(ct)).RequirePermission(Permissions.ProjectRead);
         api.MapPut("/rate-card/{roleDefinitionId:guid}", (Guid roleDefinitionId, SetRoleRateRequest r, DeliveryService s, CancellationToken ct) => s.SetRateAsync(roleDefinitionId, r, ct)).RequirePermission(Permissions.ProjectManage);

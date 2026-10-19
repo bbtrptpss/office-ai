@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Application.Abstractions;
 using OfficeAI.Application.Agents;
+using OfficeAI.Application.Delivery;
 using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Common;
 using OfficeAI.Domain.Organization;
@@ -156,6 +157,7 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
             throw new DomainException("approval.task_state", $"The task is {task.Status}, not waiting for approval.");
         if (approve)
         {
+            await DefectService.EnsureNoOpenDefectsAsync(db, task.Id, ct);
             task.Status = WorkTaskStatus.Done;
         }
         else

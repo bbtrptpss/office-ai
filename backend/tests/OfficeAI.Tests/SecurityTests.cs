@@ -57,7 +57,7 @@ public class SecurityTests(ApiFixture fx)
         using var scope = fx.Factory.Services.CreateScope();
         var tools = scope.ServiceProvider.GetRequiredService<ToolRegistry>().All.Select(t => t.Descriptor.Id).ToList();
         string[] allowedPrefixes = ["task.", "project.", "org.", "deliverable.", "plan.", "review.", "requirements.", "adr.", "estimate.", "repo.",
-            "sandbox.", "knowledge.", "document.", "test.", "chat.", "meeting.", "announcement."];
+            "sandbox.", "knowledge.", "document.", "test.", "chat.", "meeting.", "announcement.", "defect."];
         Assert.All(tools, id => Assert.Contains(allowedPrefixes, p => id.StartsWith(p, StringComparison.Ordinal)));
         Assert.DoesNotContain(tools, id => id.Contains("security") || id.Contains("permission") || id.Contains("budget") || id.Contains("shell") || id.Contains("exec"));
     }

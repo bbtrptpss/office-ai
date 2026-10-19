@@ -37,6 +37,7 @@ public class StageGateService(IAppDbContext db)
             .GroupBy(t => t.RepositoryId).Select(g => g.OrderByDescending(t => t.StartedAt).Select(t => t.Status).First()).ToListAsync(ct);
         var taskIds = tasks.Select(t => t.Id).ToList();
         var pendingDeliverables = await db.Deliverables.CountAsync(d => taskIds.Contains(d.TaskId) && d.Status == DeliverableStatus.Submitted, ct);
+        var openDefects = await db.Defects.CountAsync(d => d.ProjectId == projectId && d.Status == DefectStatus.Open, ct);
         var lessons = await db.KnowledgeEntries.CountAsync(k => k.ProjectId == projectId && k.Kind == KnowledgeKind.Lesson && k.Status == KnowledgeStatus.Validated, ct);
 
         bool Doc(DocumentKind k) => docs.Any(d => d.Kind == k);
@@ -78,8 +79,9 @@ public class StageGateService(IAppDbContext db)
                 ["code", "mergeRequests"], mergesApproved),
             ("qa", [],
                 [new("testsPassing", latestTests.Count > 0 && latestTests.All(s => s == TestRunStatus.Passed), $"{latestTests.Count(s => s == TestRunStatus.Passed)}/{latestTests.Count}"),
-                    new("noFailedTasks", tasks.All(t => t.Status != WorkTaskStatus.Failed)), new("deliverablesReviewed", pendingDeliverables == 0, $"{pendingDeliverables}")],
-                ["testReports"], tasksDone),
+                    new("noFailedTasks", tasks.All(t => t.Status != WorkTaskStatus.Failed)), new("deliverablesReviewed", pendingDeliverables == 0, $"{pendingDeliverables}"),
+                    new("noOpenDefects", openDefects == 0, $"{openDefects}")],
+                ["testReports", "defectLog"], tasksDone),
             ("release", [],
                 [new("releaseNotesDoc", Doc(DocumentKind.ReleaseNotes)), new("noBlockedTasks", tasks.All(t => t.Status is not (WorkTaskStatus.Blocked or WorkTaskStatus.Failed)))],
                 ["releaseNotes", "deploymentPlan", "rollbackPlan"], releaseNotesFinal),
