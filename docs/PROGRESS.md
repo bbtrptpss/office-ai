@@ -195,3 +195,12 @@ Never removed: costs/usage, documents, knowledge, estimates, the audit log (appe
 
 Read-only: gates report, they don't block actions (blocking stays where it already is: estimate/merge/plan approvals, Done needs task.approve). Production deployment is still outside the system. 194 tests.
 
+## Phase 14 — Employee profile + priority ordering fix ✅ (2026-10-19)
+
+| Item | Status |
+| --- | --- |
+| §11 AI Employee Profile “role and manager, skills, current assignments, work history, deliverables, quality metrics”: `GET /employees/{id}/overview` (agent.read) + profile cards; respects the project scope | done |
+| Bug: `TaskPriority` is stored as text, so `OrderBy(t => t.Priority)` sorted alphabetically. Fixed in the workflow engine dispatch, task board and assistant with `TaskOrdering.PriorityRank`; regression test on the board | done |
+
+196 tests.
+

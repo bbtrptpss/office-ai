@@ -101,7 +101,7 @@ public sealed class WorkflowEngine(
         }
 
         var tasks = await db.Tasks.AsNoTracking().Where(t => t.WorkflowExecutionId == w.Id && t.Id != w.PlanningTaskId)
-            .OrderByDescending(t => t.Priority).ThenBy(t => t.CreatedAt).ToListAsync(ct);
+            .OrderByDescending(TaskOrdering.PriorityRank).ThenBy(t => t.CreatedAt).ToListAsync(ct);
         if (tasks.Count > 0 && tasks.All(t => t.Status is WorkTaskStatus.Done or WorkTaskStatus.Cancelled))
         {
             w.Status = tasks.Any(t => t.Status == WorkTaskStatus.Done) ? WorkflowStatus.Completed : WorkflowStatus.Failed;

@@ -12,6 +12,7 @@ import { useRealtime } from "@/lib/realtime";
 import { Loading, StatusChip, useErrorMessage, useLoad } from "@/components/common";
 import { Avatar, Rise } from "@/components/cute";
 import { RunList } from "@/components/agents";
+import { EmployeeOverviewCards } from "@/components/employeeOverview";
 
 const EFFORTS: Effort[] = ["Low", "Medium", "High", "XHigh", "Max"];
 
@@ -80,6 +81,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
           </CardContent>
         </Card>
       </Rise>
+
+      {can("agent.read") && <EmployeeOverviewCards employeeId={id} isAi={employee.kind === "AI"} />}
 
       {ai && config && (
         <Grid container spacing={2}>

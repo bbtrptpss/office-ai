@@ -309,7 +309,7 @@ public class WorkService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvi
         if (q.Priority is { } pr) tasks = tasks.Where(t => t.Priority == pr);
         if (q.OverdueOnly) tasks = tasks.Where(t => t.DueDate != null && t.DueDate < today && t.Status != WorkTaskStatus.Done);
 
-        var list = await tasks.OrderByDescending(t => t.Priority).ThenBy(t => t.DueDate == null).ThenBy(t => t.DueDate).ThenBy(t => t.CreatedAt)
+        var list = await tasks.OrderByDescending(TaskOrdering.PriorityRank).ThenBy(t => t.DueDate == null).ThenBy(t => t.DueDate).ThenBy(t => t.CreatedAt)
             .Take(BoardLimit).ToListAsync(ct);
         var projectIds = list.Select(t => t.ProjectId).Distinct().ToList();
         var projects = await db.Projects.AsNoTracking().Where(p => projectIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => new { p.Code, p.Name }, ct);

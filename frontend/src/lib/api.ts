@@ -910,3 +910,20 @@ export interface DeliveryStages {
   stages: Stage[];
 }
 
+// ---------- employee overview ----------
+
+export interface EmployeeOverview {
+  employeeId: string;
+  managerId: string | null;
+  managerName: string | null;
+  roleDescription: string | null;
+  responsibilities: string[];
+  skills: string[];
+  assignments: { id: string; projectId: string; projectCode: string; title: string; status: TaskStatus; priority: TaskPriority; dueDate: string | null }[];
+  deliverables: { id: string; taskId: string; projectId: string; title: string; status: string; isSimulated: boolean; createdAt: string }[];
+  quality: {
+    runs: number; succeeded: number; failed: number; successRate: number; costUsd: number; tokens: number; tasksDone: number;
+    reviewsApproved: number; changesRequested: number; firstPassApprovalRate: number; deliverablesAccepted: number; deliverablesRejected: number;
+  };
+}
+

@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.18.1",
+    date: "2026-10-19",
+    title: { th: "โปรไฟล์พนักงานครบขึ้น และแก้การเรียงความสำคัญของงาน", en: "Fuller employee profile, and task priority ordering fixed" },
+    changes: [
+      { type: "added", th: "หน้าโปรไฟล์พนักงานแสดงหัวหน้า หน้าที่ ทักษะ งานที่รับผิดชอบอยู่ (กดเปิดงานได้) ผลงานล่าสุด และคุณภาพงานทั้งหมด (งาน AI สำเร็จ รีวิวผ่าน/ขอให้แก้ ผ่านรีวิวครั้งแรก ผลงานที่รับ การใช้งาน)", en: "Employee profiles show manager, responsibilities, skills, current assignments (linked), recent deliverables and all-time quality (AI runs succeeded, reviews approved / changes requested, first-pass approval, deliverables accepted, usage)" },
+      { type: "fixed", th: "การเรียงงานตามความสำคัญเรียงตามตัวอักษรอยู่ (กลาง ก่อน วิกฤต) ทำให้ workflow engine หยิบงานวิกฤตทำทีหลัง และกระดานงาน/ผู้ช่วยเรียงผิด ตอนนี้เรียงวิกฤต → สูง → กลาง → ต่ำ แล้ว", en: "Ordering by priority was alphabetical (Medium before Critical), so the workflow engine started critical work last and the task board and assistant listed tasks in the wrong order; now Critical → High → Medium → Low" },
+    ],
+  },
+  {
     version: "0.18.0",
     date: "2026-10-19",
     title: { th: "ขั้นตอนส่งมอบงาน 8 ขั้นพร้อมเกณฑ์", en: "Eight delivery stages with gates" },

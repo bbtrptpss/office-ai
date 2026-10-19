@@ -34,6 +34,18 @@ public class TaskBoardTests(ApiFixture fx)
     }
 
     [Fact]
+    public async Task Board_orders_by_real_priority_not_alphabetically()
+    {
+        var ceo = await fx.CeoAsync();
+        var p = await ceo.PostAsync<ProjectDto>("/api/projects", new { code = $"BP-{Guid.NewGuid():N}"[..14], name = "Board order", status = "Active" });
+        foreach (var priority in new[] { "Medium", "Low", "Critical", "High" })
+            await ceo.PostAsync<TaskDto>($"/api/projects/{p.Id}/tasks", new { title = priority, priority });
+
+        var board = await ceo.GetAsync<List<BoardTaskDto>>($"/api/tasks/board?projectId={p.Id}");
+        Assert.Equal(["Critical", "High", "Medium", "Low"], board.Select(x => x.Task.Title));
+    }
+
+    [Fact]
     public async Task Board_needs_task_read()
     {
         var anon = fx.Factory.CreateClient();

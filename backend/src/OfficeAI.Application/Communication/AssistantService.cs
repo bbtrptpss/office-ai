@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Application.Abstractions;
+using OfficeAI.Application.Work;
 using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Communication;
 using OfficeAI.Domain.Organization;
@@ -60,7 +61,7 @@ public class AssistantService(IAppDbContext db, IClaudeBridge claude)
         var byStatus = await db.Tasks.AsNoTracking().Where(t => !closed.Contains(t.Status)).GroupBy(t => t.Status)
             .Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct);
         var open = await db.Tasks.AsNoTracking().Where(t => !closed.Contains(t.Status))
-            .OrderByDescending(t => t.Priority).ThenBy(t => t.DueDate).Take(10)
+            .OrderByDescending(TaskOrdering.PriorityRank).ThenBy(t => t.DueDate).Take(10)
             .Select(t => new { t.Title, t.Status, t.Priority, t.DueDate }).ToListAsync(ct);
         var approvals = await db.ApprovalRequests.CountAsync(a => a.Status == ApprovalStatus.Pending, ct);
         var working = await db.AgentRuns.AsNoTracking().Where(r => r.Status == AgentRunStatus.Queued || r.Status == AgentRunStatus.Running)

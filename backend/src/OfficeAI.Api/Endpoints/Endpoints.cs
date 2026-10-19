@@ -115,6 +115,8 @@ public static class Endpoints
 
         api.MapGet("/employees", (OrganizationService s, CancellationToken ct) => s.ListEmployeesAsync(ct)).RequirePermission(Permissions.OrgRead);
         api.MapGet("/employees/{id:guid}", (Guid id, OrganizationService s, CancellationToken ct) => s.GetEmployeeAsync(id, ct)).RequirePermission(Permissions.OrgRead);
+        // Includes AI cost and deliverables, so it needs agent.read like runs and usage do.
+        api.MapGet("/employees/{id:guid}/overview", (Guid id, EmployeeOverviewService s, CancellationToken ct) => s.GetAsync(id, ct)).RequirePermission(Permissions.AgentRead);
         api.MapPost("/employees", (SaveEmployeeRequest r, OrganizationService s, CancellationToken ct) => s.CreateEmployeeAsync(r, ct)).RequirePermission(Permissions.OrgManage);
         api.MapPut("/employees/{id:guid}", (Guid id, SaveEmployeeRequest r, OrganizationService s, CancellationToken ct) => s.UpdateEmployeeAsync(id, r, ct)).RequirePermission(Permissions.OrgManage);
 

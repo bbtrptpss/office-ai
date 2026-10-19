@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddScoped<Seeder>();
 
         services.AddScoped<OrganizationService>();
+        services.AddScoped<EmployeeOverviewService>();
         services.AddScoped<WorkService>();
         services.AddScoped<PermissionService>();
         services.AddScoped<SecurityAdminService>();
