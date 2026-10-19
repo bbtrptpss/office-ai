@@ -217,7 +217,7 @@ public class ReportsService(IAppDbContext db, TimeProvider clock)
     {
         days = Math.Clamp(days, 1, 365);
         var since = clock.GetUtcNow().AddDays(-days);
-        var tests = await db.TestRuns.AsNoTracking().Where(t => t.StartedAt >= since)
+        var tests = await db.TestRuns.AsNoTracking().Where(t => t.StartedAt >= since && t.Kind == Domain.Code.CheckKind.Test)
             .Select(t => new { t.Id, t.RepositoryId, t.Branch, t.Status, t.StartedAt }).ToListAsync(ct);
         var passed = tests.Count(t => t.Status == Domain.Code.TestRunStatus.Passed);
         var mrs = await db.MergeRequests.AsNoTracking().GroupBy(m => m.Status).Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct);

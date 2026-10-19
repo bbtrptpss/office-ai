@@ -20,6 +20,8 @@ public record DeliveryStagesDto(Guid ProjectId, int CurrentStage, List<StageDto>
 /// </summary>
 public class StageGateService(IAppDbContext db)
 {
+    private const CheckKind TestKind = CheckKind.Test;
+
     public async Task<DeliveryStagesDto> GetAsync(Guid projectId, CancellationToken ct)
     {
         var p = await db.Projects.AsNoTracking().FirstOrDefaultAsync(x => x.Id == projectId, ct) ?? throw new NotFoundException("Project", projectId);
@@ -33,7 +35,7 @@ public class StageGateService(IAppDbContext db)
         var repoIds = await db.CodeRepositories.Where(r => r.ProjectId == projectId).Select(r => r.Id).ToListAsync(ct);
         var mrs = await db.MergeRequests.AsNoTracking().Where(m => m.ProjectId == projectId).Select(m => m.Status).ToListAsync(ct);
         // Latest test run per repository decides whether the build is green.
-        var latestTests = await db.TestRuns.AsNoTracking().Where(t => repoIds.Contains(t.RepositoryId))
+        var latestTests = await db.TestRuns.AsNoTracking().Where(t => repoIds.Contains(t.RepositoryId) && t.Kind == TestKind)
             .GroupBy(t => t.RepositoryId).Select(g => g.OrderByDescending(t => t.StartedAt).Select(t => t.Status).First()).ToListAsync(ct);
         var taskIds = tasks.Select(t => t.Id).ToList();
         var pendingDeliverables = await db.Deliverables.CountAsync(d => taskIds.Contains(d.TaskId) && d.Status == DeliverableStatus.Submitted, ct);

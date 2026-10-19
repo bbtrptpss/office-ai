@@ -118,6 +118,8 @@ public static class DependencyInjection
         services.AddSingleton<IAgentTool, DiffTool>();
         services.AddSingleton<IAgentTool, CommitTool>();
         services.AddSingleton<IAgentTool, RunTestsTool>();
+        services.AddSingleton<IAgentTool, RunLintTool>();
+        services.AddSingleton<IAgentTool, ScanSecretsTool>();
         services.AddSingleton<IAgentTool, OpenMergeRequestTool>();
         services.AddSingleton<IAgentTool, OfficeAI.Application.Knowledge.SearchKnowledgeTool>();
         services.AddSingleton<IAgentTool, OfficeAI.Application.Knowledge.ProposeKnowledgeTool>();

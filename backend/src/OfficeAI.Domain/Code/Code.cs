@@ -14,6 +14,9 @@ public class CodeRepository : Entity, IAuditable
 
     /// <summary>Command run inside the sandbox to test the code. Set by people, never by agents.</summary>
     public required string TestCommand { get; set; }
+
+    /// <summary>Optional lint / format check / static analysis command (e.g. "npx eslint . && npx prettier --check ."). Set by people, never by agents.</summary>
+    public string? LintCommand { get; set; }
     public bool IsDefault { get; set; } = true;
 
     /// <summary>Optional GitHub/GitLab (or any HTTPS Git host) mirror. Only the default branch is pushed, after people approve merges.</summary>
@@ -24,6 +27,13 @@ public class CodeRepository : Entity, IAuditable
     public DateTimeOffset? RemotePushedAt { get; set; }
     public string? RemotePushedSha { get; set; }
     public string? RemoteError { get; set; }
+}
+
+/// <summary>What a sandbox run checked: the test command or the lint / static analysis command.</summary>
+public enum CheckKind
+{
+    Test = 1,
+    Lint = 2,
 }
 
 public enum TestRunStatus
@@ -39,6 +49,7 @@ public class TestRun
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid RepositoryId { get; set; }
+    public CheckKind Kind { get; set; } = CheckKind.Test;
     public Guid? TaskId { get; set; }
     public Guid? RunId { get; set; }
     public required string Branch { get; set; }

@@ -8,20 +8,21 @@ namespace OfficeAI.Application.Code;
 
 public record RepositoryDto(Guid Id, Guid ProjectId, string Name, string DefaultBranch, string SandboxImage, string TestCommand, bool IsDefault, DateTimeOffset CreatedAt, uint Version,
     string? RemoteUrl = null, string? RemoteTokenEnvVar = null, bool RemoteTokenPresent = false, DateTimeOffset? RemotePushedAt = null, string? RemotePushedSha = null,
-    string? RemoteError = null);
+    string? RemoteError = null, string? LintCommand = null);
 /// <param name="ImportUrl">Start from a copy of this remote (GitHub/GitLab) instead of an empty repository; it also becomes the push remote.</param>
 public record CreateRepositoryRequest(string Name, string SandboxImage, string TestCommand, string DefaultBranch = "main", string? ImportUrl = null,
-    string? RemoteTokenEnvVar = null);
+    string? RemoteTokenEnvVar = null, string? LintCommand = null);
 /// <summary>Null RemoteUrl removes the remote.</summary>
 public record SetRemoteRequest(string? RemoteUrl, string? RemoteTokenEnvVar, uint? Version = null);
-public record UpdateRepositoryRequest(string SandboxImage, string TestCommand, uint? Version = null);
+/// <param name="LintCommand">Lint / format check / static analysis; blank removes it.</param>
+public record UpdateRepositoryRequest(string SandboxImage, string TestCommand, uint? Version = null, string? LintCommand = null);
 public record TestRunDto(Guid Id, Guid RepositoryId, Guid? TaskId, Guid? RunId, string Branch, string? CommitSha, string Image, string Command,
-    TestRunStatus Status, int? ExitCode, string? Output, int DurationMs, DateTimeOffset StartedAt);
+    TestRunStatus Status, int? ExitCode, string? Output, int DurationMs, DateTimeOffset StartedAt, CheckKind Kind = CheckKind.Test);
 public record MergeRequestDto(Guid Id, Guid ProjectId, Guid RepositoryId, Guid? TaskId, int Number, string Title, string? Description, string SourceBranch,
     string TargetBranch, string HeadSha, MergeRequestStatus Status, Guid? LatestTestRunId, TestRunStatus? LatestTestStatus, string? AuthorName,
     string? MergedSha, DateTimeOffset? MergedAt, DateTimeOffset CreatedAt);
 public record MergeRequestDetailDto(MergeRequestDto MergeRequest, string Diff);
-public record RunBranchTestsRequest(string? Branch);
+public record RunBranchTestsRequest(string? Branch, CheckKind Kind = CheckKind.Test);
 public record SandboxInfoDto(bool IsAvailable, IReadOnlyCollection<string> AllowedImages);
 
 public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, ISandbox sandbox, TimeProvider clock)
@@ -64,13 +65,19 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
     public async Task<List<RepositoryDto>> ListAsync(Guid projectId, CancellationToken ct) =>
         (await db.CodeRepositories.AsNoTracking().Where(r => r.ProjectId == projectId).OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name).ToListAsync(ct))
             .Select(r => new RepositoryDto(r.Id, r.ProjectId, r.Name, r.DefaultBranch, r.SandboxImage, r.TestCommand, r.IsDefault, r.CreatedAt, r.Version,
-                r.RemoteUrl, r.RemoteTokenEnvVar, !string.IsNullOrEmpty(ReadToken(r.RemoteTokenEnvVar)), r.RemotePushedAt, r.RemotePushedSha, r.RemoteError))
+                r.RemoteUrl, r.RemoteTokenEnvVar, !string.IsNullOrEmpty(ReadToken(r.RemoteTokenEnvVar)), r.RemotePushedAt, r.RemotePushedSha, r.RemoteError, r.LintCommand))
             .ToList();
 
     private void ValidateSandbox(string image, string command)
     {
         if (!sandbox.AllowedImages.Contains(image)) throw new DomainException("validation", $"Image '{image}' is not on the sandbox allow-list.");
         if (string.IsNullOrWhiteSpace(command) || command.Length > 1000) throw new DomainException("validation", "testCommand is required (max 1000 characters).");
+    }
+
+    private static string? CleanLint(string? command)
+    {
+        if (command is { Length: > 1000 }) throw new DomainException("validation", "lintCommand must be at most 1000 characters.");
+        return string.IsNullOrWhiteSpace(command) ? null : command.Trim();
     }
 
     public async Task<RepositoryDto> CreateAsync(Guid projectId, CreateRepositoryRequest req, CancellationToken ct)
@@ -85,7 +92,7 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
 
         var repo = new CodeRepository
         {
-            ProjectId = projectId, Name = name, DefaultBranch = req.DefaultBranch, SandboxImage = req.SandboxImage, TestCommand = req.TestCommand.Trim(),
+            ProjectId = projectId, Name = name, DefaultBranch = req.DefaultBranch, SandboxImage = req.SandboxImage, TestCommand = req.TestCommand.Trim(), LintCommand = CleanLint(req.LintCommand),
             IsDefault = !await db.CodeRepositories.AnyAsync(r => r.ProjectId == projectId, ct),
         };
         if (string.IsNullOrWhiteSpace(req.ImportUrl))
@@ -119,6 +126,7 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
         ValidateSandbox(req.SandboxImage, req.TestCommand);
         repo.SandboxImage = req.SandboxImage;
         repo.TestCommand = req.TestCommand.Trim();
+        repo.LintCommand = CleanLint(req.LintCommand);
         await db.SaveChangesAsync(ct);
         return (await ListAsync(repo.ProjectId, ct)).First(r => r.Id == id);
     }
@@ -170,24 +178,26 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
         var q = db.TestRuns.AsNoTracking().Where(t => t.RepositoryId == repositoryId);
         if (taskId is { } tid) q = q.Where(t => t.TaskId == tid);
         return await q.OrderByDescending(t => t.StartedAt).Take(100)
-            .Select(t => new TestRunDto(t.Id, t.RepositoryId, t.TaskId, t.RunId, t.Branch, t.CommitSha, t.Image, t.Command, t.Status, t.ExitCode, t.Output, t.DurationMs, t.StartedAt))
+            .Select(t => new TestRunDto(t.Id, t.RepositoryId, t.TaskId, t.RunId, t.Branch, t.CommitSha, t.Image, t.Command, t.Status, t.ExitCode, t.Output, t.DurationMs, t.StartedAt, t.Kind))
             .ToListAsync(ct);
     }
 
-    /// <summary>A person runs the tests on a branch (e.g. before approving a merge). Kept like any other test run.</summary>
-    public async Task<TestRunDto> RunTestsAsync(Guid repositoryId, string? branch, TimeProvider clock, CancellationToken ct)
+    /// <summary>A person runs the tests (or the lint command) on a branch, e.g. before approving a merge. Kept like any other run.</summary>
+    public async Task<TestRunDto> RunTestsAsync(Guid repositoryId, string? branch, TimeProvider clock, CancellationToken ct, CheckKind kind = CheckKind.Test)
     {
         var repo = await RepoAsync(repositoryId, ct);
+        var command = kind == CheckKind.Lint ? repo.LintCommand : repo.TestCommand;
+        if (string.IsNullOrWhiteSpace(command)) throw new DomainException("validation", "This repository has no lint command.");
         if (!sandbox.IsAvailable) throw new DomainException("code.sandbox_disabled", "The test sandbox is not enabled on this server.");
         branch = string.IsNullOrWhiteSpace(branch) ? repo.DefaultBranch : branch.Trim();
         if (!(await store.BranchesAsync(repo, ct)).Contains(branch)) throw new DomainException("code.not_found", $"No branch '{branch}'.");
         var path = await store.CheckoutBranchAsync(repo, branch, ct);
         var sha = (await store.GitAsync(path, ["rev-parse", "HEAD"], ct)).Output.Trim();
         var started = clock.GetUtcNow();
-        var result = await sandbox.RunAsync(new SandboxRequest(repo.SandboxImage, path, repo.TestCommand, sandbox.TestTimeout, 1.0, 2048), ct);
+        var result = await sandbox.RunAsync(new SandboxRequest(repo.SandboxImage, path, command, sandbox.TestTimeout, 1.0, 2048), ct);
         var run = new TestRun
         {
-            RepositoryId = repo.Id, Branch = branch, CommitSha = sha, Image = repo.SandboxImage, Command = repo.TestCommand,
+            RepositoryId = repo.Id, Kind = kind, Branch = branch, CommitSha = sha, Image = repo.SandboxImage, Command = command,
             Status = result.Error is not null ? TestRunStatus.Error : result.TimedOut ? TestRunStatus.TimedOut : result.ExitCode == 0 ? TestRunStatus.Passed : TestRunStatus.Failed,
             ExitCode = result.ExitCode, Output = result.Error ?? result.Output, DurationMs = result.DurationMs, StartedAt = started,
         };

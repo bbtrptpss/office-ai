@@ -31,6 +31,17 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.23.0",
+    date: "2026-10-19",
+    title: { th: "AI ตรวจ lint / static analysis และหารหัสลับในโค้ดก่อนเปิด merge request", en: "AI lint / static analysis and secret scanning before merge requests" },
+    changes: [
+      { type: "added", th: "ตั้ง “คำสั่ง lint / static analysis” ต่อ repository ได้ (เช่น eslint + prettier --check หรือ dotnet format --verify-no-changes) ผ่านปุ่ม “แก้คำสั่งตรวจ” ในแท็บ Repository คนเท่านั้นที่ตั้งได้", en: "Set a “lint / static analysis command” per repository (e.g. eslint + prettier --check, or dotnet format --verify-no-changes) from “Edit checks” on the Repository tab; only people can set it" },
+      { type: "added", th: "เครื่องมือ AI `sandbox.run_lint` รันคำสั่งนั้นใน sandbox แบบไม่มี network และเก็บผลเป็นหลักฐานคู่กับผลเทสต์ (รายการผลตรวจแสดงว่าเป็นเทสต์หรือ lint) คนกด “รัน lint” เองได้ด้วย", en: "AI tool `sandbox.run_lint` runs it in the network-less sandbox and keeps the result as evidence next to test runs (the list shows tests or lint); people can “Run lint” too" },
+      { type: "security", th: "เครื่องมือ AI `repo.scan_secrets` หา API key, token, private key และรหัสผ่านที่เขียนลงโค้ดในส่วนที่งานนั้นเพิ่ม รายงานแค่ไฟล์ บรรทัด และชนิด ไม่แสดงค่าจริง", en: "AI tool `repo.scan_secrets` finds API keys, tokens, private keys and hard-coded passwords in the lines a task added, reporting file, line and kind but never the value" },
+      { type: "changed", th: "เปิด merge request ได้เมื่อ commit ล่าสุดผ่านเทสต์ ผ่าน lint (ถ้าตั้งคำสั่งไว้) และไม่มีรหัสลับใน commit; รายงานคุณภาพ ขั้นตอนส่งมอบ และความพร้อม release นับเฉพาะผลเทสต์", en: "Merge requests need the latest commit to pass tests, pass lint (when set) and contain no credentials; quality reports, delivery stages and release readiness count test runs only" },
+    ],
+  },
+  {
     version: "0.22.0",
     date: "2026-10-19",
     title: { th: "ชุดส่งมอบลูกค้า และบันทึกการรับงาน", en: "Customer delivery package and acceptance" },
@@ -547,7 +558,6 @@ export const TODO: Todo[] = [
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
-  { status: "planned", area: { th: "เครื่องมือ AI", en: "AI tools" }, th: "เครื่องมือ lint / format / static analysis สำหรับ AI (ตอนนี้ใส่ไว้ในคำสั่งเทสต์ของ repository ได้)", en: "Lint / format / static-analysis tools for AI (for now they can go in the repository test command)" },
   { status: "planned", area: { th: "เชื่อมต่อ", en: "Integrations" }, th: "เชื่อมอีเมลและปฏิทิน (ตอนนี้แจ้งออกภายนอกผ่าน webhook)", en: "Email and calendar integrations (outbound notices use webhooks today)" },
   { status: "planned", area: { th: "โครงสร้าง", en: "Infrastructure" }, th: "Redis และที่เก็บไฟล์แบบ S3 — ทำเมื่อเลือกที่ deploy แล้ว", en: "Redis and S3-compatible storage — once the deploy target is chosen" },
   { status: "planned", area: { th: "AI", en: "AI" }, th: "1 ม.ค. 2027: แก้ราคา Gemini 3.8 Flash ในหน้าตั้งค่า AI เป็น $1.50 / $7.50 ต่อล้าน token (ราคาโปรหมด)", en: "1 Jan 2027: update Gemini 3.8 Flash prices in AI settings to $1.50 / $7.50 per million tokens (intro pricing ends)" },

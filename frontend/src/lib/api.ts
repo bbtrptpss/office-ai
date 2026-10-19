@@ -511,6 +511,7 @@ export interface Repository {
   defaultBranch: string;
   sandboxImage: string;
   testCommand: string;
+  lintCommand: string | null;
   isDefault: boolean;
   createdAt: string;
   version: number;
@@ -536,6 +537,7 @@ export interface TestRun {
   output: string | null;
   durationMs: number;
   startedAt: string;
+  kind: "Test" | "Lint";
 }
 
 export interface MergeRequest {

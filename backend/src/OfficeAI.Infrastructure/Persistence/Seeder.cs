@@ -112,6 +112,7 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
         await GrantRoleToolOnceAsync("v0.10.4-operations-planner", "OPERATIONS", PlanSubmitTool.ToolId, now, ct);
         await GrantNewToolsOnceAsync("v0.19.0-defect-tool", [ReportDefectTool.ToolId], now, ct);
         await GrantNewToolsOnceAsync("v0.20.0-release-tool", [PrepareReleaseTool.ToolId], now, ct);
+        await GrantNewToolsOnceAsync("v0.23.0-lint-tools", [Application.Code.RunLintTool.ToolId, Application.Code.ScanSecretsTool.ToolId], now, ct);
 
         if (!await db.ChatChannels.AnyAsync(c => c.Kind == ChannelKind.Company && c.Name == ChatService.GeneralChannel, ct))
         {

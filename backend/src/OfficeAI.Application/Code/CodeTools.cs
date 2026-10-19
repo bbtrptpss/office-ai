@@ -209,29 +209,85 @@ public sealed class RunTestsTool(CodeWorkspace code, ISandbox sandbox) : IAgentT
         "Run the project's tests on your working copy in an isolated sandbox (no network). Returns pass/fail and the output; the result is kept as evidence.",
         CodeSchemas.Obj(new { }), TimeSpan.FromMinutes(11), 30_000, false, true, CodeSchemas.ReadPurposes);
 
-    public async Task<ToolResult> ExecuteAsync(ToolContext ctx, JsonElement input, CancellationToken ct)
+    public Task<ToolResult> ExecuteAsync(ToolContext ctx, JsonElement input, CancellationToken ct) => SandboxCheck.RunAsync(code, sandbox, ctx, CheckKind.Test, ct);
+}
+
+/// <summary>Runs the repository's lint / format check / static analysis command. Set by people; the agent cannot choose it.</summary>
+public sealed class RunLintTool(CodeWorkspace code, ISandbox sandbox) : IAgentTool
+{
+    public const string ToolId = "sandbox.run_lint";
+
+    public ToolDescriptor Descriptor { get; } = new(ToolId, "1.0",
+        "Run the project's lint, format check and static analysis on your working copy in an isolated sandbox (no network). " +
+        "Returns pass/fail and the findings; the result is kept as evidence. When the repository has a lint command, merge requests need it to pass.",
+        CodeSchemas.Obj(new { }), TimeSpan.FromMinutes(11), 30_000, false, true, CodeSchemas.ReadPurposes);
+
+    public Task<ToolResult> ExecuteAsync(ToolContext ctx, JsonElement input, CancellationToken ct) => SandboxCheck.RunAsync(code, sandbox, ctx, CheckKind.Lint, ct);
+}
+
+internal static class SandboxCheck
+{
+    public static async Task<ToolResult> RunAsync(CodeWorkspace code, ISandbox sandbox, ToolContext ctx, CheckKind kind, CancellationToken ct)
     {
         if (await code.OpenAsync(ctx, ct) is not { } ws) return ToolResult.Fail(CodeWorkspace.NoRepository);
+        var command = kind == CheckKind.Lint ? ws.Repo.LintCommand : ws.Repo.TestCommand;
+        if (string.IsNullOrWhiteSpace(command)) return ToolResult.Fail("This repository has no lint command. Ask a person to set one on the repository.");
         if (!sandbox.IsAvailable) return ToolResult.Fail("The test sandbox is not enabled on this server.");
         var clean = (await code.Store.GitAsync(ws.Path, ["status", "--porcelain"], ct)).Output.Length == 0;
         var sha = (await code.Store.GitAsync(ws.Path, ["rev-parse", "HEAD"], ct)).Output.Trim();
 
         var started = ctx.Clock.GetUtcNow();
-        var result = await sandbox.RunAsync(new SandboxRequest(ws.Repo.SandboxImage, ws.Path, ws.Repo.TestCommand, sandbox.TestTimeout, 1.0, 2048), ct);
+        var result = await sandbox.RunAsync(new SandboxRequest(ws.Repo.SandboxImage, ws.Path, command, sandbox.TestTimeout, 1.0, 2048), ct);
         var status = result.Error is not null ? TestRunStatus.Error
             : result.TimedOut ? TestRunStatus.TimedOut
             : result.ExitCode == 0 ? TestRunStatus.Passed : TestRunStatus.Failed;
         var run = new TestRun
         {
-            RepositoryId = ws.Repo.Id, TaskId = ctx.TaskId, RunId = ctx.RunId, Branch = ws.Branch, CommitSha = clean ? sha : null,
-            Image = ws.Repo.SandboxImage, Command = ws.Repo.TestCommand, Status = status, ExitCode = result.ExitCode,
+            RepositoryId = ws.Repo.Id, Kind = kind, TaskId = ctx.TaskId, RunId = ctx.RunId, Branch = ws.Branch, CommitSha = clean ? sha : null,
+            Image = ws.Repo.SandboxImage, Command = command, Status = status, ExitCode = result.ExitCode,
             Output = result.Error ?? result.Output, DurationMs = result.DurationMs, StartedAt = started,
         };
         ctx.Db.TestRuns.Add(run);
         await ctx.Db.SaveChangesAsync(ct);
         var tail = run.Output is { Length: > 8000 } o ? "…" + o[^8000..] : run.Output;
+        var what = kind == CheckKind.Lint ? "Lint" : "Tests";
         return new ToolResult(status == TestRunStatus.Passed,
-            $"Tests {status} (exit {run.ExitCode?.ToString() ?? "-"}, {run.DurationMs} ms){(clean ? "" : " — uncommitted changes were included; commit and re-run before opening a merge request")}\n{tail}");
+            $"{what} {status} (exit {run.ExitCode?.ToString() ?? "-"}, {run.DurationMs} ms){(clean ? "" : " — uncommitted changes were included; commit and re-run before opening a merge request")}\n{tail}");
+    }
+}
+
+/// <summary>Looks for credentials in what this task changed (committed and not yet committed). No sandbox needed.</summary>
+public sealed class ScanSecretsTool(CodeWorkspace code) : IAgentTool
+{
+    public const string ToolId = "repo.scan_secrets";
+
+    public ToolDescriptor Descriptor { get; } = new(ToolId, "1.0",
+        "Scan the lines your task added (committed and uncommitted, new files included) for credentials such as API keys, tokens, private keys " +
+        "and hard-coded passwords. Reports file, line and kind, never the value. Merge requests are refused while committed changes contain one; " +
+        "read secrets from configuration or environment variables instead.",
+        CodeSchemas.Obj(new { }), TimeSpan.FromSeconds(30), 8_000, false, false, CodeSchemas.ReadPurposes);
+
+    public async Task<ToolResult> ExecuteAsync(ToolContext ctx, JsonElement input, CancellationToken ct)
+    {
+        if (await code.OpenAsync(ctx, ct) is not { } ws) return ToolResult.Fail(CodeWorkspace.NoRepository);
+        await code.Store.GitAsync(ws.Path, ["fetch", "--quiet", "origin"], ct);
+        // Intent-to-add makes new files show in the diff without staging their content.
+        await code.Store.GitAsync(ws.Path, ["add", "--intent-to-add", "--all"], ct);
+        var diff = await code.Store.GitAsync(ws.Path, ["diff", "--no-color", "--unified=0", $"origin/{ws.Repo.DefaultBranch}"], ct);
+        if (!diff.Ok) return ToolResult.Fail(diff.Error.Trim());
+        var findings = SecretScanner.ScanDiff(diff.Output);
+        return findings.Count == 0
+            ? ToolResult.Ok(new { findings = 0, result = "No credentials found in your changes." })
+            : new ToolResult(false, $"{findings.Count} possible credential(s) found. Move them to configuration and remove them from the code:\n" + Format(findings));
+    }
+
+    internal static string Format(List<SecretFinding> findings) => string.Join("\n", findings.Select(f => $"- {f.File}:{f.Line} ({f.Rule})"));
+
+    /// <summary>The gate used when opening a merge request: committed changes only.</summary>
+    internal static async Task<List<SecretFinding>> CommittedFindingsAsync(CodeWorkspace code, string path, string defaultBranch, CancellationToken ct)
+    {
+        var diff = await code.Store.GitAsync(path, ["diff", "--no-color", "--unified=0", $"origin/{defaultBranch}...HEAD"], ct);
+        return diff.Ok ? SecretScanner.ScanDiff(diff.Output) : [];
     }
 }
 
@@ -241,7 +297,8 @@ public sealed class OpenMergeRequestTool(CodeWorkspace code) : IAgentTool
     public const string ToolId = "repo.open_merge_request";
 
     public ToolDescriptor Descriptor { get; } = new(ToolId, "1.0",
-        "Open a merge request for your task branch into the main branch. Needs committed work whose latest commit passed sandbox.run_tests. " +
+        "Open a merge request for your task branch into the main branch. Needs committed work whose latest commit passed sandbox.run_tests " +
+        "(and sandbox.run_lint when the repository has a lint command) and contains no credentials. " +
         "A person reviews and approves the merge.",
         CodeSchemas.Obj(new { title = new { type = "string", maxLength = 200 }, description = new { type = "string", maxLength = 8000 } }, ["title"]),
         TimeSpan.FromSeconds(30), 2_000, false, true);
@@ -258,10 +315,20 @@ public sealed class OpenMergeRequestTool(CodeWorkspace code) : IAgentTool
         var ahead = (await code.Store.GitAsync(ws.Path, ["rev-list", "--count", $"origin/{ws.Repo.DefaultBranch}..HEAD"], ct)).Output.Trim();
         if (ahead == "0") return ToolResult.Fail("The branch has no commits to merge.");
 
-        var test = await ctx.Db.TestRuns.Where(t => t.RepositoryId == ws.Repo.Id && t.Branch == ws.Branch && t.CommitSha == head)
+        var test = await ctx.Db.TestRuns.Where(t => t.RepositoryId == ws.Repo.Id && t.Kind == CheckKind.Test && t.Branch == ws.Branch && t.CommitSha == head)
             .OrderByDescending(t => t.StartedAt).FirstOrDefaultAsync(ct);
         if (test is not { Status: TestRunStatus.Passed })
             return ToolResult.Fail("The latest commit has no passing test run. Run sandbox.run_tests on the committed code first.");
+        if (!string.IsNullOrWhiteSpace(ws.Repo.LintCommand))
+        {
+            var lint = await ctx.Db.TestRuns.Where(t => t.RepositoryId == ws.Repo.Id && t.Kind == CheckKind.Lint && t.Branch == ws.Branch && t.CommitSha == head)
+                .OrderByDescending(t => t.StartedAt).Select(t => (TestRunStatus?)t.Status).FirstOrDefaultAsync(ct);
+            if (lint != TestRunStatus.Passed)
+                return ToolResult.Fail("The latest commit has no passing lint run. Run sandbox.run_lint on the committed code and fix the findings first.");
+        }
+        var secrets = await ScanSecretsTool.CommittedFindingsAsync(code, ws.Path, ws.Repo.DefaultBranch, ct);
+        if (secrets.Count > 0)
+            return ToolResult.Fail("Your commits contain possible credentials; move them to configuration first:\n" + ScanSecretsTool.Format(secrets));
         if (await ctx.Db.MergeRequests.AnyAsync(m => m.RepositoryId == ws.Repo.Id && m.SourceBranch == ws.Branch && m.Status == MergeRequestStatus.Open, ct))
             return ToolResult.Fail("A merge request for this branch is already open.");
 

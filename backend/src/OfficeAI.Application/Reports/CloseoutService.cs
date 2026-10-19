@@ -65,7 +65,7 @@ public class CloseoutService(IAppDbContext db, TimeProvider clock)
 
         var taskIds = tasks.Select(t => t.Id).ToList();
         var repoIds = db.CodeRepositories.Where(r => r.ProjectId == projectId).Select(r => r.Id);
-        var tests = await db.TestRuns.AsNoTracking().Where(t => repoIds.Contains(t.RepositoryId)).Select(t => t.Status).ToListAsync(ct);
+        var tests = await db.TestRuns.AsNoTracking().Where(t => repoIds.Contains(t.RepositoryId) && t.Kind == Domain.Code.CheckKind.Test).Select(t => t.Status).ToListAsync(ct);
         var mrs = await db.MergeRequests.AsNoTracking().Where(m => m.ProjectId == projectId).Select(m => m.Status).ToListAsync(ct);
         var reviews = await db.Reviews.AsNoTracking().Where(r => taskIds.Contains(r.TaskId)).Select(r => r.Outcome).ToListAsync(ct);
         var deliverables = await db.Deliverables.AsNoTracking().Where(d => taskIds.Contains(d.TaskId)).Select(d => d.Status).ToListAsync(ct);

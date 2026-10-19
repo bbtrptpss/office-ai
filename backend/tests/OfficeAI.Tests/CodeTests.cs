@@ -141,7 +141,7 @@ public class CodeTests(ApiFixture fx)
         ]);
         await RunAsync(ceo, task.Id);
         var run = Assert.Single(await ceo.GetAsync<List<TestRunDto>>($"/api/repositories/{repo.Id}/test-runs?taskId={task.Id}"));
-        Assert.Equal(TestRunStatus.Passed, run.Status);
+        Assert.True(run.Status == TestRunStatus.Passed, run.Output);
         Assert.Contains("ISOLATED", run.Output);
         Assert.Null(run.CommitSha); // uncommitted changes are never treated as evidence for a commit
     }
@@ -319,5 +319,92 @@ public class CodeTests(ApiFixture fx)
         var empty = await FakeRemoteAsync();
         var res = await ceo.PostAsJsonAsync($"/api/projects/{project.Id}/repositories", new { name = "nothing", sandboxImage = Image, testCommand = "true", importUrl = empty });
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode); // no main branch to start from
+    }
+
+    private static AiResponse Lint() => ScriptedProvider.Call("sandbox_run_lint", new { });
+    private static AiResponse ScanSecrets() => ScriptedProvider.Call("repo_scan_secrets", new { });
+
+    [Fact]
+    public async Task Lint_command_is_set_by_people_and_must_pass_before_a_merge_request()
+    {
+        var (ceo, _, task, project, repo) = await SetupAsync("BACKEND",
+        [
+            Write("app.txt", "hello\n"),
+            Write("test.sh", "true"),
+            Write("lint.sh", "grep -q hello app.txt && echo LINT_OK"),
+            Commit("Add greeting"),
+            Test(),
+            OpenMr("Too early"),
+            Lint(),
+            OpenMr("Greeting"),
+        ]);
+        repo = await ceo.PutAsync<RepositoryDto>($"/api/repositories/{repo.Id}", new { sandboxImage = Image, testCommand = "sh test.sh", lintCommand = "sh lint.sh", version = repo.Version });
+        Assert.Equal("sh lint.sh", repo.LintCommand);
+
+        var detail = await RunAsync(ceo, task.Id);
+        var results = detail.ToolExecutions.Select(x => (x.ToolId, x.Status)).ToList();
+        Assert.Equal((OpenMergeRequestTool.ToolId, ToolExecutionStatus.Failed), results[5]);
+        Assert.Equal((RunLintTool.ToolId, ToolExecutionStatus.Succeeded), results[6]);
+        Assert.Equal((OpenMergeRequestTool.ToolId, ToolExecutionStatus.Succeeded), results[7]);
+
+        var runs = await ceo.GetAsync<List<TestRunDto>>($"/api/repositories/{repo.Id}/test-runs?taskId={task.Id}");
+        Assert.Contains(runs, r => r.Kind == CheckKind.Lint && r.Status == TestRunStatus.Passed && r.Output!.Contains("LINT_OK"));
+        Assert.Contains(runs, r => r.Kind == CheckKind.Test);
+        Assert.Single(await ceo.GetAsync<List<MergeRequestDto>>($"/api/projects/{project.Id}/merge-requests"));
+
+        // People can run it on a branch too; without a lint command it is refused.
+        var manual = await ceo.PostAsync<TestRunDto>($"/api/repositories/{repo.Id}/test-runs", new { branch = "main", kind = "Lint" });
+        Assert.Equal(CheckKind.Lint, manual.Kind);
+        await ceo.PutAsync<RepositoryDto>($"/api/repositories/{repo.Id}", new { sandboxImage = Image, testCommand = "sh test.sh", lintCommand = " " });
+        Assert.Equal(HttpStatusCode.BadRequest, (await ceo.PostAsJsonAsync($"/api/repositories/{repo.Id}/test-runs", new { kind = "Lint" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Credentials_in_committed_code_block_the_merge_request_and_are_never_echoed()
+    {
+        const string key = "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789";
+        var (ceo, _, task, project, _) = await SetupAsync("BACKEND",
+        [
+            Write("test.sh", "true"),
+            Write("config.js", $"const apiKey = \"{key}\";\nconst url = process.env.API_URL;\n"),
+            ScanSecrets(),
+            Commit("Add config"),
+            Test(),
+            OpenMr("Config"),
+        ]);
+        var detail = await RunAsync(ceo, task.Id);
+        var scan = detail.ToolExecutions.First(x => x.ToolId == ScanSecretsTool.ToolId);
+        Assert.Equal(ToolExecutionStatus.Failed, scan.Status);
+        var mr = detail.ToolExecutions.Last(x => x.ToolId == OpenMergeRequestTool.ToolId);
+        Assert.Equal(ToolExecutionStatus.Failed, mr.Status);
+        Assert.Empty(await ceo.GetAsync<List<MergeRequestDto>>($"/api/projects/{project.Id}/merge-requests"));
+        // The agent wrote the value itself; the checks report where it is without repeating it.
+        foreach (var x in new[] { scan, mr }) Assert.DoesNotContain(key, (x.Output ?? "") + (x.Error ?? ""));
+        Assert.Contains("config.js:1 (anthropic-key)", (scan.Output ?? "") + (scan.Error ?? ""));
+        Assert.Contains("config.js:1 (anthropic-key)", (mr.Output ?? "") + (mr.Error ?? ""));
+    }
+
+    [Fact]
+    public void Secret_scanner_reports_added_lines_only_and_skips_placeholders()
+    {
+        var diff = string.Join("\n",
+            "diff --git a/src/app.py b/src/app.py",
+            "--- a/src/app.py",
+            "+++ b/src/app.py",
+            "@@ -10,2 +10,4 @@",
+            " import os",
+            "-OLD = 'AKIAABCDEFGHIJKLMNOP'",
+            "+password = \"hunter2hunter2\"",
+            "+token = os.environ['TOKEN']",
+            "+example_key = \"AKIAEXAMPLEEXAMPLE12\"",
+            "+aws = 'AKIAQWERTYUIOPASDFGH'",
+            "diff --git a/k.pem b/k.pem",
+            "--- /dev/null",
+            "+++ b/k.pem",
+            "@@ -0,0 +1 @@",
+            "+-----BEGIN RSA PRIVATE KEY-----");
+        var findings = SecretScanner.ScanDiff(diff);
+        Assert.Equal([new SecretFinding("src/app.py", 11, "hardcoded-credential"), new SecretFinding("src/app.py", 14, "aws-access-key"),
+            new SecretFinding("k.pem", 1, "private-key")], findings);
     }
 }

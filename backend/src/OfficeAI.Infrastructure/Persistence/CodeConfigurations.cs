@@ -19,6 +19,7 @@ internal class CodeRepositoryConfig : IEntityTypeConfiguration<CodeRepository>
         b.Property(r => r.DefaultBranch).HasMaxLength(63);
         b.Property(r => r.SandboxImage).HasMaxLength(200);
         b.Property(r => r.TestCommand).HasMaxLength(1000);
+        b.Property(r => r.LintCommand).HasMaxLength(1000);
         b.HasIndex(r => new { r.ProjectId, r.Name }).IsUnique();
         b.HasOne<Project>().WithMany().HasForeignKey(r => r.ProjectId).OnDelete(DeleteBehavior.Cascade);
     }
@@ -35,6 +36,7 @@ internal class TestRunConfig : IEntityTypeConfiguration<TestRun>
         b.Property(t => t.Image).HasMaxLength(200);
         b.Property(t => t.Command).HasMaxLength(1000);
         b.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(t => t.Kind).HasConversion<string>().HasMaxLength(10);
         b.HasIndex(t => new { t.RepositoryId, t.Branch, t.StartedAt });
         b.HasIndex(t => t.TaskId);
         b.HasOne<CodeRepository>().WithMany().HasForeignKey(t => t.RepositoryId).OnDelete(DeleteBehavior.Cascade);

@@ -231,7 +231,8 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
   }, projectId);
   useRealtime("approvalsChanged", () => void reload());
   useRealtime("agentRunChanged", () => void reload());
-  const [form, setForm] = useState<{ name: string; sandboxImage: string; testCommand: string; importUrl: string; remoteTokenEnvVar: string } | null>(null);
+  const [form, setForm] = useState<{ name: string; sandboxImage: string; testCommand: string; lintCommand: string; importUrl: string; remoteTokenEnvVar: string } | null>(null);
+  const [checks, setChecks] = useState<{ sandboxImage: string; testCommand: string; lintCommand: string; version: number } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [remoteForm, setRemoteForm] = useState<{ remoteUrl: string; remoteTokenEnvVar: string } | null>(null);
   const [pushing, setPushing] = useState(false);
@@ -248,7 +249,7 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
           <Typography color="text.secondary">{t.noRepository}</Typography>
           {can("project.manage") && (
             <Button variant="contained" startIcon={<AddIcon />}
-              onClick={() => setForm({ name: "app", sandboxImage: data.sandbox.allowedImages[0] ?? "", testCommand: "dotnet test", importUrl: "", remoteTokenEnvVar: "" })}>
+              onClick={() => setForm({ name: "app", sandboxImage: data.sandbox.allowedImages[0] ?? "", testCommand: "dotnet test", lintCommand: "", importUrl: "", remoteTokenEnvVar: "" })}>
               {t.newRepository}
             </Button>
           )}
@@ -261,6 +262,10 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
                 <Typography variant="h6" sx={{ flex: 1 }}>📦 {repo.name}</Typography>
                 <Chip size="small" label={`${t.image}: ${repo.sandboxImage}`} />
                 <Chip size="small" label={`${t.testCommand}: ${repo.testCommand}`} sx={{ fontFamily: "monospace" }} />
+                <Chip size="small" variant={repo.lintCommand ? "filled" : "outlined"} label={`${t.lintCommand}: ${repo.lintCommand ?? t.lintNone}`} sx={{ fontFamily: "monospace" }} />
+                {can("project.manage") && (
+                  <Button size="small" onClick={() => setChecks({ sandboxImage: repo.sandboxImage, testCommand: repo.testCommand, lintCommand: repo.lintCommand ?? "", version: repo.version })}>{t.editChecks}</Button>
+                )}
               </Stack>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5, alignItems: { sm: "center" } }}>
                 <Typography variant="body2" sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
@@ -297,6 +302,32 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
           <TestRunsList repo={repo} canRun={can("project.manage") && data.sandbox.isAvailable} onError={(e) => setMessage(errorMessage(e))} />
         </Stack>
       )}
+      <Dialog open={!!checks} onClose={() => setChecks(null)} fullWidth maxWidth="sm">
+        <DialogTitle>{t.editChecks}</DialogTitle>
+        {checks && (
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField select label={t.image} value={checks.sandboxImage} onChange={(e) => setChecks({ ...checks, sandboxImage: e.target.value })}>
+                {data.sandbox.allowedImages.map((i) => <MenuItem key={i} value={i}>{i}</MenuItem>)}
+              </TextField>
+              <TextField label={t.testCommand} value={checks.testCommand} onChange={(e) => setChecks({ ...checks, testCommand: e.target.value })}
+                slotProps={{ htmlInput: { style: { fontFamily: "monospace" } } }} />
+              <TextField label={t.lintCommand} value={checks.lintCommand} onChange={(e) => setChecks({ ...checks, lintCommand: e.target.value })} helperText={t.lintHint}
+                slotProps={{ htmlInput: { style: { fontFamily: "monospace" } } }} />
+            </Stack>
+          </DialogContent>
+        )}
+        <DialogActions>
+          <Button onClick={() => setChecks(null)}>{t.cancel}</Button>
+          <Button variant="contained" disabled={!checks?.testCommand.trim()} onClick={async () => {
+            try {
+              await api.put(`/api/repositories/${repo!.id}`, { ...checks, lintCommand: checks!.lintCommand || null });
+              setChecks(null);
+            } catch (e) { setMessage(errorMessage(e)); }
+            await reload();
+          }}>{t.save}</Button>
+        </DialogActions>
+      </Dialog>
       <Dialog open={!!form} onClose={() => setForm(null)} fullWidth maxWidth="sm">
         <DialogTitle>{t.newRepository}</DialogTitle>
         {form && (
@@ -307,6 +338,8 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
                 {data.sandbox.allowedImages.map((i) => <MenuItem key={i} value={i}>{i}</MenuItem>)}
               </TextField>
               <TextField label={t.testCommand} value={form.testCommand} onChange={(e) => setForm({ ...form, testCommand: e.target.value })}
+                slotProps={{ htmlInput: { style: { fontFamily: "monospace" } } }} />
+              <TextField label={t.lintCommand} value={form.lintCommand} onChange={(e) => setForm({ ...form, lintCommand: e.target.value })} helperText={t.lintHint}
                 slotProps={{ htmlInput: { style: { fontFamily: "monospace" } } }} />
               {can("security.manage") && (
                 <>
@@ -326,7 +359,7 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
           <Button variant="contained" onClick={async () => {
             const { importUrl, remoteTokenEnvVar, ...rest } = form!;
             try {
-              await api.post(`/api/projects/${projectId}/repositories`, { ...rest, importUrl: importUrl || null, remoteTokenEnvVar: importUrl && remoteTokenEnvVar ? remoteTokenEnvVar : null });
+              await api.post(`/api/projects/${projectId}/repositories`, { ...rest, lintCommand: rest.lintCommand || null, importUrl: importUrl || null, remoteTokenEnvVar: importUrl && remoteTokenEnvVar ? remoteTokenEnvVar : null });
               setForm(null);
             } catch (e) { setMessage(errorMessage(e)); }
             await reload();
@@ -443,23 +476,24 @@ function TestRunsList({ repo, canRun, onError }: { repo: Repository; canRun: boo
     <Box>
       <Stack direction="row" sx={{ alignItems: "center", mb: 1 }}>
         <Typography variant="h6" sx={{ flex: 1 }}>{t.testRuns}</Typography>
-        {canRun && (
-          <Button size="small" variant="outlined" startIcon={<PlayArrowIcon />} disabled={busy}
+        {canRun && (["Test", "Lint"] as const).filter((k) => k === "Test" || repo.lintCommand).map((kind) => (
+          <Button key={kind} size="small" variant="outlined" startIcon={<PlayArrowIcon />} disabled={busy} sx={{ ml: 1 }}
             onClick={async () => {
               setBusy(true);
-              try { await api.post(`/api/repositories/${repo.id}/test-runs`, { branch: repo.defaultBranch }); } catch (e) { onError(e); }
+              try { await api.post(`/api/repositories/${repo.id}/test-runs`, { branch: repo.defaultBranch, kind }); } catch (e) { onError(e); }
               setBusy(false);
               await reload();
             }}>
-            {t.runTests} ({repo.defaultBranch})
+            {kind === "Lint" ? t.runLint : t.runTests} ({repo.defaultBranch})
           </Button>
-        )}
+        ))}
       </Stack>
       <Stack spacing={1}>
         {(data ?? []).map((r) => (
           <Paper key={r.id} variant="outlined" sx={{ p: 1.5 }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: "center", cursor: "pointer" }} onClick={() => setOpen(open === r.id ? null : r.id)}>
               <StatusChip value={r.status} />
+              <Chip size="small" variant="outlined" label={r.kind === "Lint" ? t.checkLint : t.checkTest} />
               <Typography variant="body2" sx={{ fontFamily: "monospace", flex: 1 }}>{r.branch}{r.commitSha ? ` @ ${r.commitSha.slice(0, 8)}` : " (uncommitted)"}</Typography>
               <Typography variant="caption" color="text.secondary">{(r.durationMs / 1000).toFixed(1)}s · {new Date(r.startedAt).toLocaleString(lang === "th" ? "th-TH" : "en-GB")}</Typography>
             </Stack>

@@ -122,7 +122,7 @@ public class ReleaseService(IAppDbContext db, ICurrentUser current, ICodeReposit
         if (repo is not null)
         {
             head = await DefaultHeadAsync(code, repo, ct);
-            var test = head is null ? null : await db.TestRuns.AsNoTracking().Where(t => t.RepositoryId == repo.Id && t.CommitSha == head)
+            var test = head is null ? null : await db.TestRuns.AsNoTracking().Where(t => t.RepositoryId == repo.Id && t.Kind == CheckKind.Test && t.CommitSha == head)
                 .OrderByDescending(t => t.StartedAt).Select(t => new { t.Id, t.Status }).FirstOrDefaultAsync(ct);
             testRunId = test?.Status == TestRunStatus.Passed ? test.Id : null;
             checks.Add(new("testsPassOnCommit", testRunId is not null, true, test is null ? "none" : test.Status.ToString()));

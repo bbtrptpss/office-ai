@@ -257,3 +257,16 @@ Fix tasks are ordinary tasks, not part of a workflow, so the engine does not sta
 
 210 tests.
 
+## Phase 19 — Lint, static analysis and secret scanning ✅ (2026-10-19)
+
+| Item | Status |
+| --- | --- |
+| §6 “lint/format/static analysis” tools: `CodeRepository.LintCommand` (people only, via `PUT /repositories/{id}` or create); `TestRun.Kind` Test/Lint (existing rows default Test) | done |
+| AI tool `sandbox.run_lint` (same sandbox and evidence as `sandbox.run_tests`; refused when no lint command); people run it with `POST /repositories/{id}/test-runs {kind: "Lint"}` | done |
+| AI tool `repo.scan_secrets`: deterministic scan of added lines (committed + uncommitted + new files) for private keys, AWS/Anthropic/OpenAI/GitHub/GitLab/Google/Slack tokens and hard-coded credentials; placeholders and env lookups skipped; reports file:line (rule), never the value | done |
+| `repo.open_merge_request` also requires a passing lint run on the head commit when a lint command is set, and no credentials in the committed diff | done |
+| Stage gates, release readiness, closeout and quality reports count `Kind == Test` only | done |
+| Both tools granted with the code-read tool set (seed marker `v0.23.0-lint-tools`); Repository tab: lint command chip, “Edit checks” dialog, “Run lint”, kind chip on runs | done (typecheck/lint clean; browser walkthrough not done) |
+
+213 tests. `Sandbox_has_no_network_and_cannot_modify_the_workspace` failed once in a full run and passed on 3 reruns (timing-sensitive network check); its assertion now prints the sandbox output.
+

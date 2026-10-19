@@ -76,7 +76,8 @@ public static class AgentDefaults
         [Communication.ReadChatTool.ToolId, Communication.PostChatTool.ToolId, Communication.ListMeetingsTool.ToolId];
 
     public static readonly string[] CodeReadTools =
-        [Code.ListFilesTool.ToolId, Code.ReadFileTool.ToolId, Code.SearchCodeTool.ToolId, Code.DiffTool.ToolId, Code.RunTestsTool.ToolId];
+        [Code.ListFilesTool.ToolId, Code.ReadFileTool.ToolId, Code.SearchCodeTool.ToolId, Code.DiffTool.ToolId, Code.RunTestsTool.ToolId,
+            Code.RunLintTool.ToolId, Code.ScanSecretsTool.ToolId];
     public static readonly string[] CodeWriteTools =
         [Code.WriteFileTool.ToolId, Code.DeleteFileTool.ToolId, Code.CommitTool.ToolId, Code.OpenMergeRequestTool.ToolId];
 
