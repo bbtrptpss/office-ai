@@ -155,6 +155,24 @@ function NowRunningCard() {
 /** `mono`: terminal output, shown as-is in a monospace font. */
 type Bubble = { question?: string; answer?: string; typing?: boolean; from?: string; mono?: boolean };
 
+/** The stage's chat history per person and per assistant (Terminal, Claude, each AI employee), kept in this browser. */
+const HISTORY = "dashboard.history.";
+const HISTORY_MAX = 40;
+const HISTORY_CHARS = 8000;
+type History = Record<string, Bubble[]>;
+const NO_TURNS: Bubble[] = [];
+
+function loadHistory(userId: string): History {
+  try { return JSON.parse(localStorage.getItem(HISTORY + userId) ?? "{}"); } catch { return {}; }
+}
+
+function saveHistory(userId: string, history: History) {
+  // Answers still on their way are not kept; long terminal output keeps its end.
+  const kept = Object.fromEntries(Object.entries(history).map(([k, list]) => [k, list.filter((b) => !b.typing).slice(-HISTORY_MAX)
+    .map((b) => (b.answer && b.answer.length > HISTORY_CHARS ? { ...b, answer: "…" + b.answer.slice(-HISTORY_CHARS) } : b))]));
+  try { localStorage.setItem(HISTORY + userId, JSON.stringify(kept)); } catch { /* storage unavailable or full */ }
+}
+
 /** Chat answers use light markdown: show **bold** as bold, keep the rest (line breaks are kept by the bubble's CSS). */
 function Rich({ text }: { text: string }) {
   return <>{text.split(/(\*\*[^*\n]+\*\*)/g).map((part, i) =>
@@ -182,9 +200,24 @@ function Stage() {
   useRealtime("organizationChanged", () => void reload());
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [input, setInput] = useState("");
-  const [bubble, setBubble] = useState<Bubble | null>(null);
+  // A passing note (an assistant's status, "new chat started") above the history; cleared by the next question.
+  const [note, setNote] = useState<Bubble | null>(null);
+  const userId = me?.userId;
+  // Loaded again when the signed-in person changes (adjusted while rendering, not in an effect).
+  const [stored, setStored] = useState<{ userId?: string; history: History }>({ history: {} });
+  if (stored.userId !== userId) setStored({ userId, history: userId ? loadHistory(userId) : {} });
+  const history = stored.history;
+  const update = (key: string, change: (list: Bubble[]) => Bubble[]) => setStored((st) => {
+    const next = { ...st.history, [key]: change(st.history[key] ?? []) };
+    if (st.userId) saveHistory(st.userId, next);
+    return { ...st, history: next };
+  });
+  /** The answer for the last question of `key`: takes the place of its typing dots. */
+  const settle = (key: string, b: Bubble) =>
+    update(key, (list) => (list.at(-1)?.typing ? [...list.slice(0, -1), { question: list.at(-1)!.question, ...b }] : [...list, b]));
   const waiting = useRef<{ after: string; employeeId: string } | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState(false);
 
   const [newChat, setNewChat] = useState(false);
@@ -200,6 +233,13 @@ function Stage() {
   const current = members.find((m) => m.employeeId === pickedId) ?? members[0];
   const isClaude = current?.employeeId === CLAUDE_ID;
   const canAsk = !!current && !!assistant && (isClaude || can("comms.post"));
+  // The Claude card keeps the terminal and the Claude chat apart.
+  const key = isClaude ? (terminal ? "terminal" : CLAUDE_ID) : current?.employeeId ?? "";
+  const shown = history[key] ?? NO_TURNS;
+  useEffect(() => {
+    const el = bubbleRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [shown, note]);
 
   const checkReply = async () => {
     const w = waiting.current;
@@ -209,7 +249,7 @@ function Stage() {
     if (!reply) return;
     waiting.current = null;
     setPending(false);
-    setBubble((b) => ({ question: b?.question, answer: reply.body ?? "", from: reply.authorName }));
+    settle(w.employeeId, { answer: reply.body ?? "", from: reply.authorName });
   };
   useRealtime("chatMessage", () => void checkReply());
   useEffect(() => {
@@ -220,7 +260,7 @@ function Stage() {
       if (Date.now() - Date.parse(w.after) > 120_000) {
         waiting.current = null;
         setPending(false);
-        setBubble((b) => ({ question: b?.question, answer: t.dashNoAnswer }));
+        settle(w.employeeId, { answer: t.dashNoAnswer });
       } else void checkReply();
     }, 2500);
     return () => clearInterval(id);
@@ -231,17 +271,21 @@ function Stage() {
     const question = input.trim();
     if (!question || !canAsk) return;
     setInput("");
-    setBubble({ question, typing: true });
-    if (isClaude && terminal) {
+    setNote(null);
+    const at = key;
+    const isTerminal = isClaude && terminal;
+    update(at, (list) => [...list, { question: isTerminal ? `PS> ${question}` : question, typing: true }]);
+    const failed = (err: unknown, from?: string) => settle(at, { answer: err instanceof Error ? err.message : String(err), from });
+    if (isTerminal) {
       setPending(true);
       try {
         const res = await api.post<TerminalResult>("/api/assistant/terminal", { command: question });
         const footer = res.timedOut ? t.dashTerminalTimedOut : `exit ${res.exitCode} · ${(res.ms / 1000).toFixed(1)}s`;
-        setBubble({ question: `PS> ${question}`, answer: `${res.output || t.dashTerminalNoOutput}
+        settle(at, { answer: `${res.output || t.dashTerminalNoOutput}
 
 ${footer}`, from: "Terminal", mono: true });
       } catch (err) {
-        setBubble({ question: `PS> ${question}`, answer: err instanceof Error ? err.message : String(err), from: "Terminal" });
+        failed(err, "Terminal");
       } finally {
         setPending(false);
       }
@@ -252,9 +296,9 @@ ${footer}`, from: "Terminal", mono: true });
       try {
         const res = await api.post<ClaudeReply>("/api/assistant/claude", { message: question, newChat });
         setNewChat(false);
-        setBubble({ question, answer: res.reply, from: "Claude" });
+        settle(at, { answer: res.reply, from: "Claude" });
       } catch (err) {
-        setBubble({ question, answer: err instanceof Error ? err.message : String(err), from: "Claude" });
+        failed(err, "Claude");
       } finally {
         setPending(false);
       }
@@ -267,7 +311,7 @@ ${footer}`, from: "Terminal", mono: true });
       waiting.current = { after: sent.createdAt, employeeId: current!.employeeId };
       setPending(true);
     } catch (err) {
-      setBubble({ question, answer: err instanceof Error ? err.message : String(err) });
+      failed(err);
     }
   };
 
@@ -288,32 +332,33 @@ ${footer}`, from: "Terminal", mono: true });
           </>
         )}
 
-        <div className={s.bubble} aria-live="polite">
-          {!bubble ? (
+        <div ref={bubbleRef} className={s.bubble} aria-live="polite">
+          {shown.length === 0 && !note && (
             <>
               <b>{t.hello} {me?.displayName}! {current ? `${t.dashIAm} ${current.displayName}` : ""}</b>
               {current ? t.dashAskHelp : t.dashNoAssistant}
             </>
-          ) : (
-            <>
-              {bubble.question && <div className={s.you}>{t.dashYou}: {bubble.question}</div>}
-              {bubble.typing ? (
+          )}
+          {[...shown, ...(note ? [note] : [])].map((b, i) => (
+            <div key={i} className={s.turn}>
+              {b.question && <div className={s.you}>{t.dashYou}: {b.question}</div>}
+              {b.typing ? (
                 <div className={s.typing}><span /><span /><span /></div>
               ) : (
                 <>
-                  <b>{bubble.from ?? current?.displayName}</b>
-                  {bubble.mono ? <pre className={s.mono}>{bubble.answer}</pre> : <Rich text={bubble.answer ?? ""} />}
+                  <b>{b.from ?? current?.displayName}</b>
+                  {b.mono ? <pre className={s.mono}>{b.answer}</pre> : <Rich text={b.answer ?? ""} />}
                 </>
               )}
-            </>
-          )}
+            </div>
+          ))}
         </div>
 
         {members.length > 0 && (
           <div className={s.friends}>
             {members.map((m, i) => (
               <button key={m.employeeId} className={cx(s.friend, s[`friend${i % 4}`], m.employeeId === current?.employeeId && s.active)}
-                onClick={() => { setPickedId(m.employeeId); setBubble({ answer: `${m.jobTitle} — ${status(m)}`, from: m.displayName }); }}>
+                onClick={() => { setPickedId(m.employeeId); setNote({ answer: `${m.jobTitle} — ${status(m)}`, from: m.displayName }); }}>
                 <Art name={m.employeeId === CLAUDE_ID ? "logo" : FRIEND_ART[(i - (claudeOn ? 1 : 0)) % FRIEND_ART.length]} size={32} round />
                 <span style={{ minWidth: 0 }}>
                   <b>{m.displayName}</b>
@@ -336,13 +381,18 @@ ${footer}`, from: "Terminal", mono: true });
             <button key={key} className={s.chip} onClick={() => setInput(t[prompt])}><Icon />{t[key]}</button>
           ))}
           {isClaude && !terminal && (
-            <button className={s.chip} onClick={() => { setNewChat(true); setBubble({ answer: t.dashClaudeNew, from: "Claude" }); }}>
+            <button className={s.chip} onClick={() => { setNewChat(true); setNote(null); update(key, (list) => [...list, { answer: t.dashClaudeNew, from: "Claude" }]); }}>
               <Sparkle />{t.dashChipNewChat}
             </button>
           )}
           {isClaude && isCeo && (
-            <button className={s.chip} onClick={() => { setChatMode(!chatMode); setBubble(null); }}>
+            <button className={s.chip} onClick={() => { setChatMode(!chatMode); setNote(null); }}>
               <Sparkle />{terminal ? t.dashChipToClaude : t.dashChipToTerminal}
+            </button>
+          )}
+          {shown.length > 0 && !pending && (
+            <button className={s.chip} onClick={() => { setNote(null); update(key, () => []); }}>
+              <Doc />{t.dashChipClearHistory}
             </button>
           )}
           <Link href={assistant ? `/chat?channel=${assistant.channelId}` : "/chat"} className={s.chip}><Dots />{t.dashChipChat}</Link>

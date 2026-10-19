@@ -1,11 +1,16 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
-import { Html, OrbitControls, RoundedBox } from "@react-three/drei";
+import { Html, OrbitControls, RoundedBox, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import type { EmployeeKind, EmployeeStatus } from "@/lib/api";
+import { art } from "@/lib/characters";
 import { brand } from "@/theme";
+
+/** Cut-out figure from the character pack; when set, people are this picture (always facing the camera) instead of chibis. */
+const SPRITE = art("kuromi_3d");
+const SPRITE_H = 1.15;
 
 /** One person in the 3D office. Status and task come from the live API; everything else is decoration. */
 export interface OfficePerson {
@@ -322,6 +327,9 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
   const root = useRef<THREE.Group>(null);
   const armL = useRef<THREE.Mesh>(null);
   const armR = useRef<THREE.Mesh>(null);
+  const facing = useRef<THREE.Group>(null); // sprite: turned toward the camera every frame
+  const pose = useRef<THREE.Group>(null); // sprite: lean / hop / squash standing in for the arm poses
+  const [q] = useState(() => new THREE.Quaternion());
   const [hover, setHover] = useState(false);
   const [activity, setActivity] = useState<"lounge" | "visit" | null>(null);
   const seed = useMemo(() => hash(person.name), [person.name]);
@@ -363,6 +371,10 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
     g.scale.setScalar(1);
     armL.current?.rotation.set(0, 0, 0);
     armR.current?.rotation.set(0, 0, 0);
+    const p = pose.current;
+    p?.position.set(0, 0, 0);
+    p?.rotation.set(0, 0, 0);
+    p?.scale.set(1, 1, 1);
 
     if (s.mode === "walk") {
       const target = s.path[0];
@@ -384,6 +396,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
       g.rotation.y = s.heading;
       if (armL.current) armL.current.rotation.x = swing * 0.6;
       if (armR.current) armR.current.rotation.x = -swing * 0.6;
+      if (p) p.rotation.z = swing * 0.12; // waddle
       return;
     }
 
@@ -391,6 +404,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
       g.position.set(s.seat.x, s.seat.y, s.seat.z);
       g.rotation.y = Math.atan2(-s.seat.face[0], -s.seat.face[1]);
       if (armR.current) armR.current.rotation.x = Math.sin(t * 0.8) > 0.6 ? -2.2 : -0.6; // a sip now and then
+      if (p) { p.rotation.z = Math.sin(t * 0.8) > 0.6 ? 0.12 : Math.sin(t * 0.5) * 0.04; p.scale.y = 1 + Math.sin(t * 1.5) * 0.015; }
       if (now > s.until) {
         const seat = s.seat;
         taken.delete(seat.key);
@@ -405,6 +419,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
       g.position.set(s.x, Math.abs(Math.sin(t * 2.5)) * 0.04, s.z);
       g.rotation.y = s.heading + Math.sin(t * 0.7) * 0.6;
       if (armL.current) armL.current.rotation.x = -0.5 + Math.sin(t * 3) * 0.4; // talking with their hands
+      if (p) p.rotation.z = Math.sin(t * 3) * 0.08;
       if (now > s.until) walkTo(route(L, s.cell, [s.x, s.z], homeCell, stand), homeCell, "home");
       return;
     }
@@ -417,6 +432,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
       g.position.y += Math.abs(Math.sin(t * 6)) * 0.03;
       if (armL.current) armL.current.rotation.x = -1.2 + Math.sin(t * 14) * 0.25;
       if (armR.current) armR.current.rotation.x = -1.2 + Math.sin(t * 14 + 1.6) * 0.25;
+      if (p) p.rotation.z = Math.sin(t * 14) * 0.03; // busy typing jitter
     } else if (available) {
       // strolls a small loop beside the desk, then now and then heads out
       const a = t * 0.6;
@@ -426,6 +442,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
       g.rotation.y = -a + Math.PI;
       if (armL.current) armL.current.rotation.x = Math.sin(t * 5) * 0.5;
       if (armR.current) armR.current.rotation.x = -Math.sin(t * 5) * 0.5;
+      if (p) p.rotation.z = Math.sin(t * 5) * 0.1;
       if (now > s.until) {
         const roll = s.random();
         const free = L.seats.filter((x) => !taken.has(x.key));
@@ -446,17 +463,29 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
     } else if (status === "WaitingForApproval") {
       g.position.y = Math.abs(Math.sin(t * 3)) * 0.08;
       if (armR.current) { armR.current.rotation.x = -2.8; armR.current.rotation.z = Math.sin(t * 6) * 0.35; }
+      if (p) p.rotation.z = Math.sin(t * 6) * 0.15; // waving for attention
     } else if (status === "Failed") {
       g.position.x += Math.sin(t * 30) * 0.02;
       if (armL.current) armL.current.rotation.x = -0.4;
       if (armR.current) armR.current.rotation.x = -0.4;
+      if (p) p.scale.y = 0.94;
     } else {
       // blocked / inactive: slumped over the desk, slow breathing
       g.rotation.x = status === "Inactive" ? 0.5 : 0.2; // Euler XYZ: the tilt is about world X, so + leans toward the desk
       g.scale.setScalar(1 + Math.sin(t * 1.5) * 0.015);
       if (armL.current) armL.current.rotation.x = -0.9;
       if (armR.current) armR.current.rotation.x = -0.9;
+      // the sprite ignores the group's tilt (it faces the camera), so it droops sideways instead
+      if (p) { p.rotation.z = status === "Inactive" ? 0.35 : 0.18; p.scale.y = (status === "Inactive" ? 0.88 : 0.94) + Math.sin(t * 1.5) * 0.015; }
     }
+  });
+
+  // Runs after the pose above: undo the group's turn so the sprite always looks at the camera.
+  useFrame(({ camera }) => {
+    if (!facing.current || !root.current) return;
+    root.current.updateWorldMatrix(true, false);
+    root.current.getWorldQuaternion(q);
+    facing.current.quaternion.copy(q.invert().multiply(camera.quaternion));
   });
 
   const bubble = BUBBLE[status] ?? (activity ? ACTIVITY_BUBBLE[activity] : undefined);
@@ -472,6 +501,22 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
           <meshBasicMaterial color={selected ? brand.pink : brand.purple} />
         </mesh>
       )}
+      {SPRITE ? (
+        <>
+          <mesh rotation-x={-Math.PI / 2} position-y={0.012}>
+            <circleGeometry args={[0.28, 24]} />
+            <meshBasicMaterial color="#3A3150" transparent opacity={0.16} depthWrite={false} />
+          </mesh>
+          <group ref={facing}>
+            <group ref={pose}>
+              <Suspense fallback={null}>
+                <SpriteBody src={SPRITE} dim={dim} glow={person.kind === "AI" ? (status === "Working" ? 1 : 0.2) : null} />
+              </Suspense>
+            </group>
+          </group>
+        </>
+      ) : (
+      <>
       <mesh position-y={0.32} castShadow>
         <capsuleGeometry args={[0.2, 0.2, 6, 16]} />
         {mat(sp.body)}
@@ -493,8 +538,10 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
           </group>
         )}
       </group>
+      </>
+      )}
       {(bubble || hover || selected) && (
-        <Html position={[0, 1.45, 0]} center distanceFactor={12} zIndexRange={[20, 0]}>
+        <Html position={[0, SPRITE ? SPRITE_H + 0.35 : 1.45, 0]} center distanceFactor={12} zIndexRange={[20, 0]}>
           <div style={{ pointerEvents: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
             {(hover || selected) && (
               <div style={{ whiteSpace: "nowrap", padding: "3px 10px", borderRadius: 10, background: "rgba(255,255,255,.95)", fontSize: 12, color: brand.ink, boxShadow: "0 3px 10px rgba(0,0,0,.12)" }}>
@@ -506,6 +553,27 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
         </Html>
       )}
     </group>
+  );
+}
+
+/** The pack picture on a plane, pivoting at the feet; AI employees get a little glowing star by the head. */
+function SpriteBody({ src, dim, glow }: { src: string; dim: boolean; glow: number | null }) {
+  const texture = useTexture(src, (t) => { (t as THREE.Texture).colorSpace = THREE.SRGBColorSpace; });
+  const img = texture.image as { width: number; height: number };
+  const w = SPRITE_H * (img.width / img.height);
+  return (
+    <>
+      <mesh position-y={SPRITE_H / 2}>
+        <planeGeometry args={[w, SPRITE_H]} />
+        <meshBasicMaterial map={texture} alphaTest={0.4} transparent={dim} opacity={dim ? 0.55 : 1} toneMapped={false} side={THREE.DoubleSide} />
+      </mesh>
+      {glow !== null && (
+        <mesh position={[w * 0.42, SPRITE_H * 0.98, 0.02]}>
+          <sphereGeometry args={[0.05, 12, 12]} />
+          <meshStandardMaterial color={brand.star} emissive={brand.star} emissiveIntensity={glow} />
+        </mesh>
+      )}
+    </>
   );
 }
 

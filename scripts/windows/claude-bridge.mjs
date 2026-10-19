@@ -65,8 +65,57 @@ function ask({ prompt, system, sessionId }) {
 const RUN_TIMEOUT_MS = 10 * 60_000;
 const MAX_OUTPUT = 20_000;
 
+const CLAUDE_USAGE = [
+  "claude <ข้อความ>   ถาม Claude Code ในโฟลเดอร์โปรเจกต์ (คุยต่อเนื่องจนกว่าจะพิมพ์ claude /new) แก้ไฟล์ได้เลยโดยไม่ต้องอนุมัติ",
+  "claude /new        เริ่มบทสนทนาใหม่",
+  "claude -<flag> ... ส่งต่อให้ claude.cmd ตามที่พิมพ์ เช่น claude --version",
+  "(ในหน้าเว็บใช้ claude แบบโต้ตอบเต็มจอไม่ได้ จึงใช้แบบถามทีละข้อความแทน)",
+].join("\n");
+
+// The terminal's own Claude Code conversation (the CEO is the only terminal user), kept until "claude /new" or a bridge restart.
+let terminalSession = null;
+
+// "claude" typed in the terminal: the interactive TUI cannot work here, and PowerShell picks claude.ps1, which the execution policy blocks.
+function runClaude(command) {
+  const rest = command.slice("claude".length).trim();
+  if (!rest) return Promise.resolve({ output: CLAUDE_USAGE, exitCode: 0, timedOut: false, ms: 0 });
+  if (rest === "/new") {
+    terminalSession = null;
+    return Promise.resolve({ output: "เริ่มบทสนทนา Claude ใหม่แล้ว", exitCode: 0, timedOut: false, ms: 0 });
+  }
+  if (rest.startsWith("-")) return run({ command: "claude.cmd " + rest });
+  return new Promise((resolve) => {
+    // acceptEdits: file edits in the project go through without a prompt (-p has no one to approve them); other tools still need approval, so they are denied.
+    const args = ["-p", "--output-format", "json", "--permission-mode", "acceptEdits"];
+    if (terminalSession) args.push("--resume", terminalSession);
+    // claude is an npm shim (.cmd) on Windows, so it needs a shell; the arguments are fixed and the message goes on stdin.
+    const child = spawn("claude", args, { cwd: root, shell: true, windowsHide: true });
+    let out = "", err = "";
+    const started = Date.now();
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill(); }, RUN_TIMEOUT_MS);
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (err += d));
+    child.on("error", (e) => { clearTimeout(timer); resolve({ output: e.message, exitCode: -1, timedOut: false, ms: Date.now() - started }); });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      const ms = Date.now() - started;
+      try {
+        const json = JSON.parse(out.trim().split(/\r?\n/).pop());
+        if (json.session_id) terminalSession = json.session_id;
+        resolve({ output: String(json.result ?? "").slice(-MAX_OUTPUT), exitCode: json.is_error ? 1 : 0, timedOut, ms });
+      } catch {
+        terminalSession = null; // a broken or vanished conversation: the next message starts a new one
+        resolve({ output: (err || out || `claude exited with ${code}`).slice(-MAX_OUTPUT).replace(/\s+$/, ""), exitCode: code ?? -1, timedOut, ms });
+      }
+    });
+    child.stdin.end(rest, "utf8");
+  });
+}
+
 // The dashboard terminal (the API allows it for the CEO only): one PowerShell command in the project folder, output and exit code back.
 function run({ command }) {
+  if (/^claude(\s|$)/i.test(command.trim())) return runClaude(command.trim());
   return new Promise((resolve) => {
     // -EncodedCommand (UTF-16LE base64): needs no quoting, and keeps Thai text intact, which PowerShell reading stdin does not.
     // Errors are merged into the output as plain text (otherwise PowerShell writes them as CLIXML); the exit code is the last program's.

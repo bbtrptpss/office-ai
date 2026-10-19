@@ -31,6 +31,25 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.13.2",
+    date: "2026-10-19",
+    title: { th: "ตัวละครในออฟฟิศ 3D ใช้รูปจากชุดตัวละคร", en: "3D office people use the character pack figure" },
+    changes: [
+      { type: "changed", th: "เมื่อตั้ง CHARACTER_PACK และมี kuromi_3d.png คนในออฟฟิศ 3D จะเป็นรูปนี้ หันหาคนดูเสมอ ยังเดิน ไปเลาจน์ แวะคุย และเปลี่ยนท่าตามสถานะเหมือนเดิม (โยก กระโดด เอียงตัว ฟุบ) — ไม่ตั้ง = ตัว chibi เดิม", en: "With CHARACTER_PACK set and kuromi_3d.png present, 3D office people are that picture, always facing the viewer; they still walk, visit the lounge, chat and pose by status (waddle, hop, lean, slump) — unset = the original chibis" },
+    ],
+  },
+  {
+    version: "0.13.1",
+    date: "2026-10-19",
+    title: { th: "พิมพ์ claude ใน Terminal ได้", en: "Type claude in the terminal" },
+    changes: [
+      { type: "added", th: "ใน Terminal พิมพ์ “claude <ข้อความ>” เพื่อถาม Claude Code ในโฟลเดอร์โปรเจกต์ได้ คุยต่อเนื่องจนกว่าจะพิมพ์ “claude /new” ถ้าพิมพ์ “claude -...” จะส่ง flag ต่อให้ claude.cmd ตรงๆ และพิมพ์ “claude” เฉยๆ เพื่อดูวิธีใช้", en: "In the terminal, “claude <message>” asks Claude Code in the project folder and keeps the conversation until “claude /new”; “claude -...” passes the flags straight to claude.cmd, and “claude” alone shows how to use it" },
+      { type: "changed", th: "claude ใน Terminal แก้ไฟล์ในโฟลเดอร์โปรเจกต์ได้เอง (โหมด acceptEdits) ส่วนการรันคำสั่งอื่นยังถูกปฏิเสธ", en: "claude in the terminal can edit files in the project folder on its own (acceptEdits mode); running other commands is still denied" },
+      { type: "added", th: "การ์ดกลางหน้าภาพรวมมีประวัติแชทแล้ว เลื่อนดูคำถาม-คำตอบย้อนหลังได้ แยกกันระหว่าง Terminal, Claude และพนักงาน AI แต่ละคน (เก็บในเบราว์เซอร์นี้ ล่าสุด 40 รายการต่อช่อง) และกด “ล้างประวัติ” ได้", en: "The dashboard stage keeps a chat history: scroll back through questions and answers, kept apart for the Terminal, Claude and each AI employee (stored in this browser, the latest 40 per assistant), with “Clear history”" },
+      { type: "fixed", th: "พิมพ์ claude แล้วไม่ขึ้น error “running scripts is disabled” แล้ว เพราะ Terminal เรียก claude.cmd แทน claude.ps1 (ไม่ต้องเปลี่ยน execution policy ของเครื่อง)", en: "Typing claude no longer fails with “running scripts is disabled”: the terminal calls claude.cmd instead of claude.ps1 (the PC's execution policy is unchanged)" },
+    ],
+  },
+  {
     version: "0.13.0",
     date: "2026-10-19",
     title: { th: "Terminal บนหน้า dashboard", en: "Terminal on the dashboard" },
