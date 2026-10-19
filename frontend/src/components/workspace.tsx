@@ -7,7 +7,7 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import { api, Decision, Estimate, MergeRequest, ProjectDocument, Repository, Requirement, TestRun, thb } from "@/lib/api";
+import { api, Closeout, Decision, Estimate, MergeRequest, ProjectDocument, Repository, Requirement, TestRun, thb } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -522,5 +522,145 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
         )}
       </Grid>
     </Grid>
+  );
+}
+
+// ---------------- Closeout ----------------
+
+/** Delivery stage 8: plan versus recorded figures, and a completion report draft written from them. */
+export function CloseoutPanel({ projectId, onOpenDocuments }: { projectId: string; onOpenDocuments: () => void }) {
+  const { t, lang, label } = useI18n();
+  const { can } = useAuth();
+  const errorMessage = useErrorMessage();
+  const { data, error, reload } = useLoad(() => api.get<Closeout>(`/api/projects/${projectId}/closeout`), projectId);
+  useRealtime("taskChanged", () => void reload());
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ severity: "success" | "warning"; text: string } | null>(null);
+  if (!data) return <Loading error={error} />;
+  const m = data.money;
+  const n = (v: number) => v.toLocaleString(lang === "th" ? "th-TH" : "en-US", { maximumFractionDigits: 2 });
+  const pct = (v: number) => `${n(v)}%`;
+
+  const writeReport = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const doc = await api.post<ProjectDocument>(`/api/projects/${projectId}/closeout/report`, { lang });
+      setMessage({ severity: "success", text: `${t.completionReportDone} · ${doc.title} v${doc.version}` });
+    } catch (e) { setMessage({ severity: "warning", text: errorMessage(e) }); }
+    setBusy(false);
+  };
+
+  const stat = (label: string, value: React.ReactNode) => (
+    <Stack direction="row" sx={{ justifyContent: "space-between", py: 0.5 }}>
+      <Typography color="text.secondary">{label}</Typography>
+      <Typography fontWeight={600}>{value}</Typography>
+    </Stack>
+  );
+
+  return (
+    <Stack spacing={2}>
+      <Typography variant="body2" color="text.secondary">{t.closeoutNote}</Typography>
+      {data.warnings.length > 0 && (
+        <Alert severity="info">
+          <Typography fontWeight={600}>{t.closeoutWarnings}</Typography>
+          {data.warnings.map((w) => <Box key={w}>• {t[`cw_${w}`]}</Box>)}
+        </Alert>
+      )}
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Card sx={{ height: "100%" }}><CardContent>
+            <Typography variant="h6" sx={{ mb: 1 }}>{t.closeoutTasks}</Typography>
+            {stat(label("Done"), `${data.tasks.done}/${data.tasks.total}`)}
+            {stat(t.overdue, data.tasks.overdue)}
+            {data.milestones.map((ms) => stat(`🏁 ${ms.name}${ms.dueDate ? ` · ${ms.dueDate}` : ""}`, `${ms.done}/${ms.tasks}`))}
+          </CardContent></Card>
+        </Grid>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Card sx={{ height: "100%" }}><CardContent>
+            <Typography variant="h6" sx={{ mb: 1 }}>{t.closeoutQuality}</Typography>
+            {stat(t.testsPassedLabel, `${data.quality.testsPassed}/${data.quality.testRuns}`)}
+            {stat(t.mrMerged, data.quality.mergeRequestsMerged)}
+            {stat(t.mrOpen, data.quality.mergeRequestsOpen)}
+            {stat(t.reviewsApprovedLabel, data.quality.reviewsApproved)}
+            {stat(t.changesRequestedLabel, data.quality.changesRequested)}
+            {stat(t.deliverablesAcceptedLabel, data.quality.deliverablesAccepted)}
+          </CardContent></Card>
+        </Grid>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Card sx={{ height: "100%" }}><CardContent>
+            <Typography variant="h6" sx={{ mb: 1 }}>{t.closeoutLessons}</Typography>
+            {stat(t.lessonsValidated, data.knowledge.lessonsValidated)}
+            {stat(t.lessonsProposed, data.knowledge.lessonsProposed)}
+            <Button size="small" href="/knowledge" sx={{ mt: 1 }}>{t.proposeLesson}</Button>
+          </CardContent></Card>
+        </Grid>
+      </Grid>
+
+      <Card><CardContent>
+        <Typography variant="h6" sx={{ mb: 1 }}>{t.closeoutEffortCost}</Typography>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell />
+                <TableCell align="right">{t.plannedCol}{m ? ` (rev ${m.estimateRevision})` : ""}</TableCell>
+                <TableCell align="right">{t.actualCol}</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              <TableRow>
+                <TableCell>{t.hoursLabel}</TableCell>
+                <TableCell align="right">{data.effort.plannedHours != null ? n(data.effort.plannedHours) : "—"}</TableCell>
+                <TableCell align="right"><Typography variant="body2" color="text.secondary">{t.notRecorded}</Typography></TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>{t.aiCostLabel}</TableCell>
+                <TableCell align="right">{m ? thb(m.plannedAiThb) : "—"}</TableCell>
+                <TableCell align="right">{m ? thb(m.actualAiThb) : `$${n(data.actualAiUsd)}`}</TableCell>
+              </TableRow>
+              {m && <>
+                <TableRow>
+                  <TableCell>{t.totalCostLabel}</TableCell>
+                  <TableCell align="right">{thb(m.plannedCostThb)}</TableCell>
+                  <TableCell align="right">{thb(m.forecastCostThb)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>{t.priceLabel}</TableCell>
+                  <TableCell align="right">{thb(m.priceThb)}</TableCell>
+                  <TableCell align="right">{thb(m.priceThb)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>{t.marginLabel}</TableCell>
+                  <TableCell align="right">{thb(m.plannedMarginThb)} ({pct(m.plannedMarginPercent)})</TableCell>
+                  <TableCell align="right" sx={{ color: m.atRisk ? "error.main" : undefined, fontWeight: 600 }}>
+                    {m.atRisk ? "⚠ " : ""}{thb(m.forecastMarginThb)} ({pct(m.forecastMarginPercent)})
+                  </TableCell>
+                </TableRow>
+              </>}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+          {t.aiRunsLabel}: {data.effort.aiRuns} · {t.aiRunHours}: {n(data.effort.aiRunHours)} · {n(data.effort.tokens)} tokens
+          {data.effort.simulatedRuns > 0 && ` · 🧪 ${t.simulatedRunsLabel}: ${data.effort.simulatedRuns}`}
+        </Typography>
+      </CardContent></Card>
+
+      {can("knowledge.manage") && (
+        <Card><CardContent>
+          {message && (
+            <Alert severity={message.severity} sx={{ mb: 1.5 }}
+              action={message.severity === "success" ? <Button color="inherit" size="small" onClick={onOpenDocuments}>{t.openDocuments}</Button> : undefined}>
+              {message.text}
+            </Alert>
+          )}
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "center" } }}>
+            <Button variant="contained" disabled={busy} onClick={writeReport}>{t.writeCompletionReport}</Button>
+            <Typography variant="body2" color="text.secondary">{t.completionReportHint}</Typography>
+          </Stack>
+        </CardContent></Card>
+      )}
+    </Stack>
   );
 }

@@ -18,7 +18,7 @@ import { useRealtime } from "@/lib/realtime";
 import { KindIcon, Loading, PageHeader, StatusChip, useErrorMessage, useLoad } from "@/components/common";
 import { DeliverableList, RunList } from "@/components/agents";
 import { ObjectivesPanel } from "@/components/objectives";
-import { DecisionsPanel, DocumentsPanel, EstimatesPanel, RepositoryPanel, RequirementsPanel } from "@/components/workspace";
+import { CloseoutPanel, DecisionsPanel, DocumentsPanel, EstimatesPanel, RepositoryPanel, RequirementsPanel } from "@/components/workspace";
 
 const COLUMNS: TaskStatus[] = ["Todo", "Assigned", "InProgress", "Blocked", "InReview", "WaitingApproval", "Done", "Failed"];
 const PRIORITIES: TaskPriority[] = ["Low", "Medium", "High", "Critical"];
@@ -71,7 +71,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   const [milestoneName, setMilestoneName] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showCancelled, setShowCancelled] = useState(false);
-  const [tab, setTab] = useState<"board" | "requirements" | "decisions" | "estimates" | "repository" | "documents">("board");
+  const [tab, setTab] = useState<"board" | "requirements" | "decisions" | "estimates" | "repository" | "documents" | "closeout">("board");
   // ?task=<id> (from the company task board) opens that task once the board has loaded.
   const linkedTaskId = useSearchParams().get("task");
   const [linkHandled, setLinkHandled] = useState(false);
@@ -146,12 +146,14 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
         <Tab value="estimates" label={t.estimates} />
         <Tab value="repository" label={t.repository} />
         <Tab value="documents" label={t.documents} />
+        {can("finance.read") && <Tab value="closeout" label={t.closeout} />}
       </Tabs>
       {tab === "requirements" && <RequirementsPanel projectId={id} />}
       {tab === "decisions" && <DecisionsPanel projectId={id} />}
       {tab === "estimates" && <EstimatesPanel projectId={id} />}
       {tab === "repository" && <RepositoryPanel projectId={id} />}
       {tab === "documents" && <DocumentsPanel projectId={id} />}
+      {tab === "closeout" && <CloseoutPanel projectId={id} onOpenDocuments={() => setTab("documents")} />}
 
       {tab === "board" && <>
       {data.milestones.length > 0 && (

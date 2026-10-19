@@ -135,6 +135,7 @@ public static class DependencyInjection
         services.AddScoped<DeliveryService>();
         services.AddScoped<CodeService>();
         services.AddScoped<OfficeAI.Application.Reports.ReportsService>();
+        services.AddScoped<OfficeAI.Application.Reports.CloseoutService>();
         services.AddScoped<OfficeAI.Application.Knowledge.KnowledgeService>();
         services.AddScoped<OfficeAI.Application.Communication.ChatService>();
         services.AddScoped<OfficeAI.Application.Communication.AnnouncementService>();

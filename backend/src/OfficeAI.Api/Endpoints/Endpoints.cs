@@ -251,7 +251,11 @@ public static class Endpoints
         api.MapGet("/reports/finance", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.FinanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
         api.MapGet("/reports/profitability", (OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.ProfitabilityAsync(ct)).RequirePermission(Permissions.FinanceRead);
         api.MapPost("/reports/scenario", (OfficeAI.Application.Reports.ScenarioRequest req, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.ScenarioAsync(req, ct)).RequirePermission(Permissions.FinanceRead);
-        api.MapGet("/reports/performance", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.PerformanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
+        api.MapGet("/projects/{id:guid}/closeout", (Guid id, OfficeAI.Application.Reports.CloseoutService s, CancellationToken ct) => s.GetAsync(id, ct)).RequirePermission(Permissions.FinanceRead);
+        // Writes project money figures into a project document, so it needs both finance access and the right to manage documents.
+        api.MapPost("/projects/{id:guid}/closeout/report", (Guid id, OfficeAI.Application.Reports.CompletionReportRequest req, OfficeAI.Application.Reports.CloseoutService s, CancellationToken ct) => s.WriteCompletionReportAsync(id, req, ct))
+            .RequirePermission(Permissions.FinanceRead).RequirePermission(Permissions.KnowledgeManage);
+        api.MapGet("/reports/performance",(DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.PerformanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
         api.MapGet("/reports/quality-security", (int? days, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.QualitySecurityAsync(days ?? 30, ct)).RequirePermission(Permissions.AuditRead);
         api.MapGet("/budgets", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.ListBudgetsAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
         api.MapPut("/budgets", (OfficeAI.Application.Reports.SetBudgetRequest r, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.SetBudgetAsync(r, ct)).RequirePermission(Permissions.FinanceManage);

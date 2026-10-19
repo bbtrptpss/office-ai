@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.15.0",
+    date: "2026-10-19",
+    title: { th: "สรุปปิดโปรเจกต์และร่างรายงานปิดโปรเจกต์", en: "Project closeout and completion report draft" },
+    changes: [
+      { type: "added", th: "หน้าโปรเจกต์มีแท็บ “สรุปปิดโปรเจกต์” (สำหรับคนที่ดูการเงินได้): เทียบแผนจากใบประเมินกับข้อมูลที่บันทึกจริง — งานเสร็จ/เลยกำหนดตาม milestone, ค่า AI และกำไรคาดการณ์, เทสต์ MR รีวิว ผลงาน และบทเรียน พร้อมรายการประเด็นที่ยังค้าง", en: "Projects have a “Project closeout” tab (for people who can see finance): the approved estimate's plan against recorded data — tasks done/overdue by milestone, AI cost and forecast margin, tests, MRs, reviews, deliverables and lessons, with a list of open issues" },
+      { type: "added", th: "ปุ่ม “สร้างร่างรายงานปิดโปรเจกต์” เขียนรายงานจากตัวเลขเหล่านี้ (ภาษาตามที่ใช้อยู่) เป็นเอกสารฉบับร่างเวอร์ชันใหม่ในแท็บเอกสาร ตัวเลขไม่ได้ให้ AI แต่ง และไม่ใส่ชั่วโมงทำงานจริงของคนเพราะระบบไม่ได้บันทึก", en: "“Draft completion report” writes a report from these figures (in the current language) as a new draft version in Documents; the numbers are calculated, not written by AI, and people's actual hours are left out because the system doesn't record them" },
+    ],
+  },
+  {
     version: "0.14.5",
     date: "2026-10-19",
     title: { th: "กระดานงานอยู่ในแถบบน", en: "Task board in the top bar" },

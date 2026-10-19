@@ -155,3 +155,13 @@ Items from the Master Prompt that were not built yet, each with an Update log en
 | §15 Caching where safe: automatic prompt caching on Anthropic calls | done (not yet exercised against the real API) |
 
 187 tests. Not changed on purpose: the dashboard keeps its one-screen layout; profitability and quality live on the Finance and Quality pages.
+
+## Phase 10 — Delivery stage 8: project closeout ✅ (2026-10-19)
+
+| Item | Status |
+| --- | --- |
+| §7 Stage 8 “compare planned and actual effort and costs”: `GET /projects/{id}/closeout` (finance.read) — tasks/milestones, AI runs and hours, planned vs actual AI cost and forecast margin (same formula as Profitability), tests/MRs/reviews/deliverables, lessons, warning codes | done (project page → “Project closeout” tab) |
+| §7 Stage 8 “generate a project completion report”: `POST /projects/{id}/closeout/report` (finance.read + knowledge.manage) writes a deterministic Markdown report as a new draft `CompletionReport` version, Thai or English | done |
+
+Human working hours are not recorded anywhere, so the report shows them as “not recorded” rather than inventing an actual. 189 tests.
+

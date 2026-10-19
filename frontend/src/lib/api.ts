@@ -595,6 +595,27 @@ export interface ProfitabilityRow {
   atRisk: boolean;
 }
 
+/** Planned versus recorded figures for one project (delivery stage 8). Warnings are codes the UI translates. */
+export interface Closeout {
+  projectId: string;
+  code: string;
+  name: string;
+  status: ProjectStatus;
+  startDate: string | null;
+  dueDate: string | null;
+  generatedAt: string;
+  tasks: { total: number; done: number; open: number; overdue: number; failed: number; cancelled: number };
+  milestones: { name: string; dueDate: string | null; tasks: number; done: number }[];
+  effort: { plannedHours: number | null; aiRuns: number; aiRunsSucceeded: number; aiRunsFailed: number; simulatedRuns: number; aiRunHours: number; tokens: number };
+  money: ProfitabilityRow | null;
+  actualAiUsd: number;
+  quality: { testRuns: number; testsPassed: number; mergeRequestsMerged: number; mergeRequestsOpen: number; reviewsApproved: number; changesRequested: number; deliverablesAccepted: number; deliverablesRejected: number };
+  knowledge: { lessonsProposed: number; lessonsValidated: number; documents: number; finalDocuments: number };
+  warnings: CloseoutWarning[];
+}
+
+export type CloseoutWarning = "noEstimate" | "openTasks" | "overdueTasks" | "simulatedRuns" | "openMergeRequests" | "noLessons" | "marginAtRisk";
+
 export interface ProfitabilityReport {
   usdToThb: number;
   totalPriceThb: number;

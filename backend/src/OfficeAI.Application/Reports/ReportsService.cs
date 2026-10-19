@@ -178,20 +178,22 @@ public class ReportsService(IAppDbContext db, TimeProvider clock)
         var projects = await db.Projects.AsNoTracking().Where(p => p.Status != ProjectStatus.Cancelled && estimates.Keys.Contains(p.Id))
             .OrderBy(p => p.Code).ToListAsync(ct);
 
-        var rows = projects.Select(p =>
-        {
-            var e = estimates[p.Id];
-            var actualThb = Math.Round(actual.GetValueOrDefault(p.Id) * settings.UsdToThb, 2, MidpointRounding.AwayFromZero);
-            var overrun = Math.Max(0m, actualThb - e.AiCost);
-            var forecastCost = e.TotalCost + overrun;
-            var forecastMargin = e.Price - forecastCost;
-            var forecastPct = e.Price == 0 ? 0 : Math.Round(forecastMargin / e.Price * 100m, 2, MidpointRounding.AwayFromZero);
-            // At risk once the forecast margin has lost more than half of the planned margin, or turned negative.
-            var atRisk = forecastMargin < 0 || forecastMargin < e.GrossMargin / 2;
-            return new ProfitabilityRowDto(p.Id, p.Code, p.Name, e.Revision, e.Price, e.TotalCost, e.GrossMargin, e.GrossMarginPercent,
-                e.AiCost, actualThb, overrun, forecastCost, forecastMargin, forecastPct, atRisk);
-        }).ToList();
+        var rows = projects.Select(p => Forecast(p, estimates[p.Id], actual.GetValueOrDefault(p.Id), settings.UsdToThb)).ToList();
         return new ProfitabilityReportDto(settings.UsdToThb, rows.Sum(r => r.PriceThb), rows.Sum(r => r.PlannedMarginThb), rows.Sum(r => r.ForecastMarginThb), rows);
+    }
+
+    /// <summary>Planned figures from the approved estimate; forecast cost adds any actual AI spend above the planned AI cost.</summary>
+    internal static ProfitabilityRowDto Forecast(Project p, ProjectEstimate e, decimal actualAiUsd, decimal usdToThb)
+    {
+        var actualThb = Math.Round(actualAiUsd * usdToThb, 2, MidpointRounding.AwayFromZero);
+        var overrun = Math.Max(0m, actualThb - e.AiCost);
+        var forecastCost = e.TotalCost + overrun;
+        var forecastMargin = e.Price - forecastCost;
+        var forecastPct = e.Price == 0 ? 0 : Math.Round(forecastMargin / e.Price * 100m, 2, MidpointRounding.AwayFromZero);
+        // At risk once the forecast margin has lost more than half of the planned margin, or turned negative.
+        var atRisk = forecastMargin < 0 || forecastMargin < e.GrossMargin / 2;
+        return new ProfitabilityRowDto(p.Id, p.Code, p.Name, e.Revision, e.Price, e.TotalCost, e.GrossMargin, e.GrossMarginPercent,
+            e.AiCost, actualThb, overrun, forecastCost, forecastMargin, forecastPct, atRisk);
     }
 
     /// <summary>What-if planning on the latest approved estimate. Read-only: nothing is stored or changed.</summary>
