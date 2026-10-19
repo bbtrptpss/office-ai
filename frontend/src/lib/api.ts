@@ -251,6 +251,13 @@ export interface AgentConfig {
   version: number;
 }
 
+export interface BoardTask {
+  task: Task;
+  projectCode: string;
+  projectName: string;
+  isOverdue: boolean;
+}
+
 export interface RecentTask {
   id: string;
   projectId: string;

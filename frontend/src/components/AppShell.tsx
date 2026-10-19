@@ -13,6 +13,7 @@ import ViewInArIcon from "@mui/icons-material/ViewInArOutlined";
 import AccountTreeIcon from "@mui/icons-material/AccountTreeOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleAltOutlined";
 import ApartmentIcon from "@mui/icons-material/ApartmentOutlined";
+import ChecklistIcon from "@mui/icons-material/ChecklistOutlined";
 import ViewKanbanIcon from "@mui/icons-material/ViewKanbanOutlined";
 import TimelineIcon from "@mui/icons-material/TimelineOutlined";
 import TaskAltIcon from "@mui/icons-material/TaskAltOutlined";
@@ -57,7 +58,7 @@ const glassPanel = (th: import("@mui/material/styles").Theme) => ({
 });
 
 type NavKey =
-  | "navDashboard" | "navOffice" | "navOrganization" | "navEmployees" | "navDepartments" | "navProjects" | "navActivity"
+  | "navDashboard" | "navOffice" | "navOrganization" | "navEmployees" | "navDepartments" | "navProjects" | "navTaskBoard" | "navActivity"
   | "navApprovals" | "navChat" | "navAnnouncements" | "navMeetings" | "navKnowledge" | "navFinance" | "navQuality" | "navIntegrations"
   | "navSecurity" | "navAudit" | "aiSettings" | "companySettings" | "navUpdates";
 
@@ -77,6 +78,7 @@ const NAV: NavItem[] = [
   { key: "navEmployees", href: "/employees", icon: <PeopleIcon />, permission: "org.read" },
   { key: "navDepartments", href: "/departments", icon: <ApartmentIcon />, permission: "org.read" },
   { key: "navProjects", href: "/projects", icon: <ViewKanbanIcon />, permission: "project.read" },
+  { key: "navTaskBoard", href: "/tasks", icon: <ChecklistIcon />, permission: "task.read" },
   { key: "navActivity", href: "/agents", icon: <TimelineIcon />, permission: "agent.read" },
   { key: "navApprovals", href: "/approvals", icon: <TaskAltIcon />, permission: "task.read" },
   { key: "navChat", href: "/chat", icon: <ForumIcon />, permission: "org.read" },

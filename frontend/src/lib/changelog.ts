@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.14.2",
+    date: "2026-10-19",
+    title: { th: "กระดานงานทั้งบริษัท", en: "Company task board" },
+    changes: [
+      { type: "added", th: "เมนูใหม่ “กระดานงานทั้งบริษัท” (/tasks): งานจากทุกโปรเจกต์ที่ยังเปิดอยู่ในกระดานเดียว แยกตามสถานะ กรองตามโปรเจกต์ ผู้รับผิดชอบ ความสำคัญ หรือเฉพาะงานเลยกำหนด อัปเดตสด กดการ์ดเพื่อเปิดงานนั้นในโปรเจกต์", en: "New “Company task board” menu (/tasks): tasks from every open project on one board by status, filtered by project, assignee, priority or overdue only, live; a card opens that task in its project" },
+      { type: "changed", th: "ลิงก์ “ดูทั้งหมด” ในการ์ดงานบนหน้าภาพรวมไปที่กระดานงานทั้งบริษัท", en: "The dashboard task card's “See all” goes to the company task board" },
+    ],
+  },
+  {
     version: "0.14.1",
     date: "2026-10-19",
     title: { th: "เลือกโมเดลตามความซับซ้อนของงาน", en: "Model choice by task complexity" },

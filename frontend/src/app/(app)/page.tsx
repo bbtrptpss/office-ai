@@ -70,7 +70,7 @@ function TaskListCard({ dashboard }: { dashboard: Dashboard }) {
       <div className={s.cardHead}>
         <span className={s.badgeIcon}><CheckSquare /></span>
         <h2>{t.dashTasks}</h2>
-        <Link href="/projects" className={s.right} title={t.dashSeeAll}>
+        <Link href="/tasks" className={s.right} title={t.dashSeeAll}>
           {dashboard.completedTasks}/{dashboard.totalTasks} · {t.dashSeeAll}<ChevronRight style={{ width: 14, height: 14 }} />
         </Link>
       </div>

@@ -7,6 +7,7 @@ import {
 } from "@mui/material";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import AddIcon from "@mui/icons-material/Add";
 import ForumIcon from "@mui/icons-material/ForumOutlined";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
@@ -71,9 +72,18 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   const [message, setMessage] = useState<string | null>(null);
   const [showCancelled, setShowCancelled] = useState(false);
   const [tab, setTab] = useState<"board" | "requirements" | "decisions" | "estimates" | "repository" | "documents">("board");
+  // ?task=<id> (from the company task board) opens that task once the board has loaded.
+  const linkedTaskId = useSearchParams().get("task");
+  const [linkHandled, setLinkHandled] = useState(false);
 
   const titles = useMemo(() => new Map(data?.tasks.map((x) => [x.id, x.title])), [data]);
   if (!data) return <Loading error={error} />;
+
+  if (linkedTaskId && !linkHandled) {
+    setLinkHandled(true);
+    const linked = data.tasks.find((x) => x.id === linkedTaskId);
+    if (linked) openTask(linked);
+  }
 
   const current = data.tasks.find((x) => x.id === openTaskId) ?? null;
   const columns = showCancelled ? [...COLUMNS, "Cancelled" as TaskStatus] : COLUMNS;

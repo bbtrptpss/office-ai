@@ -124,6 +124,8 @@ public static class Endpoints
     private static void MapWork(RouteGroupBuilder api)
     {
         api.MapGet("/dashboard", (WorkService s, CancellationToken ct) => s.GetDashboardAsync(ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapGet("/tasks/board", (Guid? projectId, Guid? employeeId, OfficeAI.Domain.Work.TaskPriority? priority, bool? overdue, WorkService s, CancellationToken ct) =>
+            s.BoardAsync(new TaskBoardQuery(projectId, employeeId, priority, overdue ?? false), ct)).RequirePermission(Permissions.TaskRead);
         api.MapGet("/tasks/recent", (int? take, WorkService s, CancellationToken ct) => s.RecentTasksAsync(take ?? 8, ct)).RequirePermission(Permissions.TaskRead);
         api.MapGet("/assistant", (OfficeAI.Application.Communication.AssistantService s, CancellationToken ct) => s.GetAsync(ct)).RequirePermission(Permissions.OrgRead);
         // The owner's own Claude Code session on the host; agent.manage only (people who run the AI setup, never AI identities).

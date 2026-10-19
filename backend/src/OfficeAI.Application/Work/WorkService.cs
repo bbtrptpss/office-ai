@@ -34,6 +34,8 @@ public record DashboardDto(
 public record WorkloadDto(Guid EmployeeId, string DisplayName, EmployeeKind Kind, int OpenTasks);
 public record RecentTaskDto(Guid Id, Guid ProjectId, string ProjectName, string Title, WorkTaskStatus Status, TaskPriority Priority,
     string? AssigneeName, DateOnly? DueDate, DateTimeOffset ChangedAt);
+public record BoardTaskDto(TaskDto Task, string ProjectCode, string ProjectName, bool IsOverdue);
+public record TaskBoardQuery(Guid? ProjectId = null, Guid? EmployeeId = null, TaskPriority? Priority = null, bool OverdueOnly = false);
 
 public class WorkService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvider clock)
 {
@@ -283,6 +285,36 @@ public class WorkService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvi
         var task = await db.Tasks.FirstOrDefaultAsync(t => t.Id == id, ct) ?? throw new NotFoundException("Task", id);
         if (version is { } v) db.ExpectVersion(task, v);
         return task;
+    }
+
+    // ---------- Company task board ----------
+
+    public const int BoardLimit = 500;
+    public const int BoardDoneDays = 14;
+
+    /// <summary>
+    /// Tasks across all open projects for the company-wide board: cancelled tasks are left out and done tasks only
+    /// show for the last <see cref="BoardDoneDays"/> days. Overdue = past the due date and not done.
+    /// </summary>
+    public async Task<List<BoardTaskDto>> BoardAsync(TaskBoardQuery q, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var doneSince = now.AddDays(-BoardDoneDays);
+        var tasks = db.Tasks.AsNoTracking()
+            .Where(t => db.Projects.Any(p => p.Id == t.ProjectId && p.Status != ProjectStatus.Cancelled && p.Status != ProjectStatus.Completed))
+            .Where(t => t.Status != WorkTaskStatus.Cancelled && (t.Status != WorkTaskStatus.Done || (t.UpdatedAt ?? t.CreatedAt) >= doneSince));
+        if (q.ProjectId is { } pid) tasks = tasks.Where(t => t.ProjectId == pid);
+        if (q.EmployeeId is { } eid) tasks = tasks.Where(t => db.TaskAssignments.Any(a => a.TaskId == t.Id && a.EmployeeId == eid && a.UnassignedAt == null));
+        if (q.Priority is { } pr) tasks = tasks.Where(t => t.Priority == pr);
+        if (q.OverdueOnly) tasks = tasks.Where(t => t.DueDate != null && t.DueDate < today && t.Status != WorkTaskStatus.Done);
+
+        var list = await tasks.OrderByDescending(t => t.Priority).ThenBy(t => t.DueDate == null).ThenBy(t => t.DueDate).ThenBy(t => t.CreatedAt)
+            .Take(BoardLimit).ToListAsync(ct);
+        var projectIds = list.Select(t => t.ProjectId).Distinct().ToList();
+        var projects = await db.Projects.AsNoTracking().Where(p => projectIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => new { p.Code, p.Name }, ct);
+        return (await ToDtosAsync(list, ct)).Select(t => new BoardTaskDto(t, projects[t.ProjectId].Code, projects[t.ProjectId].Name,
+            t.DueDate is { } d && d < today && t.Status != WorkTaskStatus.Done)).ToList();
     }
 
     // ---------- Dashboard ----------
