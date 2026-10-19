@@ -380,6 +380,12 @@ public static class Endpoints
         sec.MapGet("/users", (SecurityAdminService s, CancellationToken ct) => s.ListUsersAsync(ct)).RequirePermission(Permissions.SecurityManage);
         sec.MapPost("/users", (CreateUserRequest r, SecurityAdminService s, CancellationToken ct) => s.CreateUserAsync(r, ct)).RequirePermission(Permissions.SecurityManage);
         sec.MapPut("/users/{id:guid}/roles", (Guid id, SetUserRolesRequest r, SecurityAdminService s, CancellationToken ct) => s.SetUserRolesAsync(id, r, ct)).RequirePermission(Permissions.SecurityManage);
+        sec.MapGet("/retention", (RetentionService s, CancellationToken ct) => s.GetAsync(ct)).RequirePermission(Permissions.SecurityManage);
+        sec.MapPut("/retention", (SaveRetentionRequest r, RetentionService s, CancellationToken ct) => s.SaveAsync(r, ct)).RequirePermission(Permissions.SecurityManage);
+        sec.MapGet("/retention/preview", (RetentionService s, CancellationToken ct) => s.PreviewAsync(ct)).RequirePermission(Permissions.SecurityManage);
+        // Removes data: the UI shows the preview counts and asks for confirmation first.
+        sec.MapPost("/retention/apply", async (RetentionService s, CancellationToken ct) =>
+            await s.ApplyAsync("manual", ct) is { } counts ? Results.Ok(counts) : Results.Ok(new RetentionCounts(0, 0, 0, 0, 0, 0, 0))).RequirePermission(Permissions.SecurityManage);
 
         api.MapGet("/audit", (string? entityType, string? entityId, int? take, SecurityAdminService s, CancellationToken ct) =>
             s.ListAuditAsync(entityType, entityId, take ?? 100, ct)).RequirePermission(Permissions.AuditRead);

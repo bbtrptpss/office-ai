@@ -2548,6 +2548,56 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                     b.ToTable("EmployeeRoleDefinitions", (string)null);
                 });
 
+            modelBuilder.Entity("OfficeAI.Domain.Security.RetentionPolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("ChatMessageDays")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("IntegrationDeliveryDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LastResultJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("LastRunAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("NotificationDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RunTranscriptDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TestOutputDays")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("RetentionPolicies", (string)null);
+                });
+
             modelBuilder.Entity("OfficeAI.Domain.Work.Milestone", b =>
                 {
                     b.Property<Guid>("Id")

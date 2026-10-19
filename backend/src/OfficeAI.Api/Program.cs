@@ -52,6 +52,7 @@ builder.Services.AddSingleton<IChatReplyQueue>(sp => sp.GetRequiredService<ChatR
 builder.Services.AddHostedService<ChatReplyWorker>();
 builder.Services.AddHostedService<WorkflowEngineWorker>();
 builder.Services.AddHostedService<IntegrationWorker>();
+builder.Services.AddHostedService<RetentionWorker>();
 
 // ---------- Identity + cookie auth ----------
 builder.Services

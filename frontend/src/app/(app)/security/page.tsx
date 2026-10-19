@@ -9,6 +9,7 @@ import AddIcon from "@mui/icons-material/Add";
 import { api, Role, User } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { Loading, PageHeader, useErrorMessage, useLoad } from "@/components/common";
+import { RetentionPanel } from "@/components/retention";
 
 export default function SecurityPage() {
   const { t } = useI18n();
@@ -118,6 +119,8 @@ export default function SecurityPage() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <RetentionPanel />
 
       <Dialog open={!!newUser} onClose={() => setNewUser(null)} fullWidth maxWidth="sm">
         <DialogTitle>{t.newUser}</DialogTitle>

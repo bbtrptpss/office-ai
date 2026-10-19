@@ -861,3 +861,27 @@ export interface NotificationList {
   unread: number;
   items: AppNotification[];
 }
+
+// ---------- data retention ----------
+
+export interface RetentionCounts {
+  runTranscripts: number;
+  runSteps: number;
+  toolOutputs: number;
+  testOutputs: number;
+  notifications: number;
+  integrationDeliveries: number;
+  chatMessages: number;
+}
+
+/** Days to keep each kind of data; null keeps it forever. */
+export interface Retention {
+  runTranscriptDays: number | null;
+  testOutputDays: number | null;
+  notificationDays: number | null;
+  integrationDeliveryDays: number | null;
+  chatMessageDays: number | null;
+  lastRunAt: string | null;
+  lastResult: RetentionCounts | null;
+  version: number;
+}

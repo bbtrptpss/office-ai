@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<WorkService>();
         services.AddScoped<PermissionService>();
         services.AddScoped<SecurityAdminService>();
+        services.AddScoped<RetentionService>();
         services.AddScoped<SecurityAuditWriter>();
 
         // AI providers: keys come from configuration/environment only, never from the database.

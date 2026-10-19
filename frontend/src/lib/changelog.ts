@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.17.0",
+    date: "2026-10-19",
+    title: { th: "นโยบายการเก็บรักษาข้อมูล", en: "Data retention policy" },
+    changes: [
+      { type: "security", th: "หน้าสิทธิ์และผู้ใช้มีส่วน “การเก็บรักษาข้อมูล”: ตั้งจำนวนวันเก็บบันทึกการทำงานของ AI, log เทสต์, การแจ้งเตือน, ประวัติ webhook และข้อความแชตแยกกัน (30–3650 วัน) ระบบล้างข้อมูลที่เก่ากว่ากำหนดวันละครั้ง และบันทึกจำนวนที่ลบใน audit log", en: "Security page has a “Data retention” section: separate periods for AI run transcripts, test logs, notifications, webhook records and chat messages (30–3650 days); older data is cleaned up daily and the counts go to the audit log" },
+      { type: "added", th: "ค่าเริ่มต้นคือเก็บทุกอย่างตลอด ไม่มีอะไรถูกลบจนกว่าจะตั้งค่า ปุ่ม “ล้างข้อมูลตอนนี้” แสดงจำนวนที่จะลบก่อนแล้วให้ยืนยัน ข้อมูลการเงิน เอกสาร ความรู้ ใบประเมิน และ audit log ไม่ถูกลบเลย", en: "By default everything is kept; nothing is removed until a period is set. “Clean up now” shows what would go and asks first. Money, documents, knowledge, estimates and the audit log are never removed" },
+    ],
+  },
+  {
     version: "0.16.0",
     date: "2026-10-19",
     title: { th: "จำกัดสิทธิ์การมองเห็นรายโปรเจกต์", en: "Per-project access control" },

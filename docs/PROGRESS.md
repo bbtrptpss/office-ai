@@ -175,3 +175,13 @@ Human working hours are not recorded anywhere, so the report shows them as “no
 
 Not filtered on purpose: chat channels and meetings keep their own membership rules; realtime events carry ids only and clients re-read through the filtered API. 191 tests.
 
+## Phase 12 — Data retention ✅ (2026-10-19)
+
+| Item | Status |
+| --- | --- |
+| §14 “Data retention and deletion policies”: `RetentionPolicy` (one row) with per-kind periods — AI run transcripts (steps, saved conversation, tool output/input), test output text, notifications, webhook delivery log, chat message text. Null = keep forever (default) | done |
+| `RetentionWorker` applies it daily (`Retention:Enabled`, `Retention:IntervalHours`); `GET/PUT /security/retention`, `GET /security/retention/preview`, `POST /security/retention/apply` (security.manage); every clean-up writes a `RetentionApplied` audit entry with counts | done |
+| Security page “Data retention” section with preview + confirmation before removing | done |
+
+Never removed: costs/usage, documents, knowledge, estimates, the audit log (append-only by trigger). 193 tests.
+

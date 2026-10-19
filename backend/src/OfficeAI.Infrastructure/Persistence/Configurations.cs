@@ -189,3 +189,12 @@ internal class AppRoleConfig : IEntityTypeConfiguration<AppRole>
 {
     public void Configure(EntityTypeBuilder<AppRole> b) => b.ToTable("Roles");
 }
+
+internal class RetentionPolicyConfig : IEntityTypeConfiguration<Domain.Security.RetentionPolicy>
+{
+    public void Configure(EntityTypeBuilder<Domain.Security.RetentionPolicy> b)
+    {
+        EntityConfig.Base(b);
+        b.ToTable("RetentionPolicies");
+    }
+}
