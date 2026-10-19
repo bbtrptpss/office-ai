@@ -185,3 +185,13 @@ Not filtered on purpose: chat channels and meetings keep their own membership ru
 
 Never removed: costs/usage, documents, knowledge, estimates, the audit log (append-only by trigger). 193 tests.
 
+## Phase 13 — Delivery stage gates ✅ (2026-10-19)
+
+| Item | Status |
+| --- | --- |
+| §7 “Each stage must have explicit entry criteria, exit criteria, deliverables, and approval requirements”: `StageGateService` evaluates the eight stages from recorded data; `GET /projects/{id}/stages` (project.read). Stage done = entry + exit + approval met; current = first not done; later stages need the previous one done | done |
+| Approvals map to existing human gates: requirements approved, estimate approved, ADR accepted, merge requests approved and merged, tasks Done (approver only), release notes / completion report made final | done |
+| Project page “Delivery stages” tab | done |
+
+Read-only: gates report, they don't block actions (blocking stays where it already is: estimate/merge/plan approvals, Done needs task.approve). Production deployment is still outside the system. 194 tests.
+

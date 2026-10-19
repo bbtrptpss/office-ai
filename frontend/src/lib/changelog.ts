@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.18.0",
+    date: "2026-10-19",
+    title: { th: "ขั้นตอนส่งมอบงาน 8 ขั้นพร้อมเกณฑ์", en: "Eight delivery stages with gates" },
+    changes: [
+      { type: "added", th: "หน้าโปรเจกต์มีแท็บ “ขั้นตอนส่งมอบ”: 8 ขั้นตั้งแต่รับเรื่องลูกค้าจนส่งมอบและสรุปบทเรียน แต่ละขั้นมีเกณฑ์เข้า เกณฑ์ออก สิ่งที่ต้องส่ง และการอนุมัติ ตรวจจากข้อมูลจริง (requirements ที่อนุมัติ ใบประเมิน ADR merge request เทสต์ เอกสารฉบับจริง บทเรียน) ขั้นปัจจุบันคือขั้นแรกที่ยังไม่ผ่าน", en: "Projects have a “Delivery stages” tab: eight stages from lead intake to delivery and retrospective, each with entry and exit criteria, deliverables and the approval it needs, checked against recorded data (approved requirements, estimate, ADRs, merge requests, tests, final documents, lessons). The current stage is the first one not yet met" },
+      { type: "added", th: "ขั้นพัฒนาต้องมีใบประเมินที่อนุมัติและ ADR ที่ยอมรับก่อน (เกณฑ์เข้า) ส่วนการ deploy ขึ้น production ยังทำนอกระบบตามเดิม", en: "Development needs an approved estimate and an accepted architecture decision first (entry criteria); production deployment still happens outside the system" },
+    ],
+  },
+  {
     version: "0.17.0",
     date: "2026-10-19",
     title: { th: "นโยบายการเก็บรักษาข้อมูล", en: "Data retention policy" },

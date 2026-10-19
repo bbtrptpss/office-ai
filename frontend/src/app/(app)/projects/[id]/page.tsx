@@ -20,6 +20,7 @@ import { KindIcon, Loading, PageHeader, StatusChip, useErrorMessage, useLoad } f
 import { DeliverableList, RunList } from "@/components/agents";
 import { ObjectivesPanel } from "@/components/objectives";
 import { ProjectMembersDialog } from "@/components/members";
+import { StagesPanel } from "@/components/stages";
 import { CloseoutPanel, DecisionsPanel, DocumentsPanel, EstimatesPanel, RepositoryPanel, RequirementsPanel } from "@/components/workspace";
 
 const COLUMNS: TaskStatus[] = ["Todo", "Assigned", "InProgress", "Blocked", "InReview", "WaitingApproval", "Done", "Failed"];
@@ -74,7 +75,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   const [message, setMessage] = useState<string | null>(null);
   const [showCancelled, setShowCancelled] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
-  const [tab, setTab] = useState<"board" | "requirements" | "decisions" | "estimates" | "repository" | "documents" | "closeout">("board");
+  const [tab, setTab] = useState<"board" | "stages" | "requirements" | "decisions" | "estimates" | "repository" | "documents" | "closeout">("board");
   // ?task=<id> (from the company task board) opens that task once the board has loaded.
   const linkedTaskId = useSearchParams().get("task");
   const [linkHandled, setLinkHandled] = useState(false);
@@ -146,6 +147,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
       {membersOpen && <ProjectMembersDialog projectId={id} title={data.project.name} onClose={() => setMembersOpen(false)} />}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile sx={{ mb: 2 }}>
         <Tab value="board" label={t.board} />
+        <Tab value="stages" label={t.stages} />
         <Tab value="requirements" label={t.requirements} />
         <Tab value="decisions" label={t.decisionsTab} />
         <Tab value="estimates" label={t.estimates} />
@@ -153,6 +155,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
         <Tab value="documents" label={t.documents} />
         {can("finance.read") && <Tab value="closeout" label={t.closeout} />}
       </Tabs>
+      {tab === "stages" && <StagesPanel projectId={id} />}
       {tab === "requirements" && <RequirementsPanel projectId={id} />}
       {tab === "decisions" && <DecisionsPanel projectId={id} />}
       {tab === "estimates" && <EstimatesPanel projectId={id} />}

@@ -885,3 +885,28 @@ export interface Retention {
   lastResult: RetentionCounts | null;
   version: number;
 }
+
+// ---------- delivery stage gates ----------
+
+export interface StageCheck {
+  code: string;
+  met: boolean;
+  detail: string | null;
+}
+
+export interface Stage {
+  number: number;
+  code: "intake" | "discovery" | "proposal" | "architecture" | "development" | "qa" | "release" | "delivery";
+  status: "done" | "current" | "upcoming";
+  entry: StageCheck[];
+  exit: StageCheck[];
+  deliverables: string[];
+  approval: StageCheck;
+}
+
+export interface DeliveryStages {
+  projectId: string;
+  currentStage: number;
+  stages: Stage[];
+}
+

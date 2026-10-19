@@ -214,6 +214,7 @@ public static class Endpoints
         api.MapPost("/requirements/{id:guid}/status", (Guid id, SetReviewStateRequest r, DeliveryService s, CancellationToken ct) => s.SetRequirementStatusAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapGet("/projects/{id:guid}/decisions", (Guid id, DeliveryService s, CancellationToken ct) => s.ListDecisionsAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapPost("/decisions/{id:guid}/status", (Guid id, SetDecisionStatusRequest r, DeliveryService s, CancellationToken ct) => s.SetDecisionStatusAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapGet("/projects/{id:guid}/stages", (Guid id, StageGateService s, CancellationToken ct) => s.GetAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/projects/{id:guid}/estimates", (Guid id, DeliveryService s, CancellationToken ct) => s.ListEstimatesAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/rate-card", (DeliveryService s, CancellationToken ct) => s.ListRatesAsync(ct)).RequirePermission(Permissions.ProjectRead);
         api.MapPut("/rate-card/{roleDefinitionId:guid}", (Guid roleDefinitionId, SetRoleRateRequest r, DeliveryService s, CancellationToken ct) => s.SetRateAsync(roleDefinitionId, r, ct)).RequirePermission(Permissions.ProjectManage);
