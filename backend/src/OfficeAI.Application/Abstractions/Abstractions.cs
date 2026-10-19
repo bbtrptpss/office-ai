@@ -42,6 +42,7 @@ public interface IAppDbContext
     DbSet<ProjectRequirement> Requirements { get; }
     DbSet<ArchitectureDecision> ArchitectureDecisions { get; }
     DbSet<Defect> Defects { get; }
+    DbSet<Release> Releases { get; }
     DbSet<RoleRate> RoleRates { get; }
     DbSet<CompanySettings> CompanySettings { get; }
     DbSet<ProjectEstimate> Estimates { get; }

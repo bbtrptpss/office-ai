@@ -93,6 +93,7 @@ public static class DependencyInjection
         services.AddSingleton<IAgentTool, DelegateTaskTool>();
         services.AddSingleton<IAgentTool, ReadRequirementsTool>();
         services.AddSingleton<IAgentTool, ReportDefectTool>();
+        services.AddSingleton<IAgentTool, PrepareReleaseTool>();
         services.AddSingleton<IAgentTool, AddRequirementTool>();
         services.AddSingleton<IAgentTool, ProposeDecisionTool>();
         services.AddSingleton<IAgentTool, SubmitEstimateTool>();
@@ -139,6 +140,7 @@ public static class DependencyInjection
         services.AddScoped<DeliveryService>();
         services.AddScoped<StageGateService>();
         services.AddScoped<DefectService>();
+        services.AddScoped<ReleaseService>();
         services.AddScoped<CodeService>();
         services.AddScoped<OfficeAI.Application.Reports.ReportsService>();
         services.AddScoped<OfficeAI.Application.Reports.CloseoutService>();

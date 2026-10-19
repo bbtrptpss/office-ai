@@ -13,8 +13,9 @@ import { useRealtime } from "@/lib/realtime";
 import { Loading, PageHeader, StatusChip, useErrorMessage, useLoad } from "@/components/common";
 import { Avatar, Mascot } from "@/components/cute";
 import { DeliverableList, SimulatedBadge } from "@/components/agents";
+import { IssueList, ReleasePlans } from "@/components/releases";
 
-const KIND_EMOJI: Record<string, string> = { Plan: "🗺️", TaskCompletion: "🎀", ToolAction: "🔧", Escalation: "🚨", Estimate: "💰", Merge: "🔀" };
+const KIND_EMOJI: Record<string, string> = { Plan: "🗺️", TaskCompletion: "🎀", ToolAction: "🔧", Escalation: "🚨", Estimate: "💰", Merge: "🔀", ProductionDeployment: "🚀" };
 
 export default function ApprovalsPage() {
   const { t } = useI18n();
@@ -64,7 +65,7 @@ function ApprovalCard({ approval: a, onDone }: { approval: Approval; onDone: () 
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const kindLabel = { Plan: t.kindPlan, TaskCompletion: t.kindTaskCompletion, ToolAction: t.kindToolAction, Escalation: t.kindEscalation, Estimate: t.kindEstimate, Merge: t.kindMerge }[a.kind];
+  const kindLabel = { Plan: t.kindPlan, TaskCompletion: t.kindTaskCompletion, ToolAction: t.kindToolAction, Escalation: t.kindEscalation, Estimate: t.kindEstimate, Merge: t.kindMerge, ProductionDeployment: t.kindProductionDeployment }[a.kind];
   const allowed = can(a.requiredPermission);
   // A workflow-level escalation (no task) is the budget cap: approving raises the budget.
   const budgetEscalation = a.kind === "Escalation" && !a.taskId && !!a.workflowExecutionId;
@@ -187,6 +188,19 @@ function Payload({ approval: a }: { approval: Approval }) {
     return (
       <Stack direction="row" spacing={3} sx={{ flexWrap: "wrap", rowGap: 1 }}>
         {rows.map(([k, v]) => <Box key={k}><Typography variant="caption" color="text.secondary">{k}</Typography><Typography fontWeight={600}>{v}</Typography></Box>)}
+      </Stack>
+    );
+  }
+  if (a.kind === "ProductionDeployment") {
+    return (
+      <Stack spacing={1.5}>
+        <Typography variant="body2">
+          <b>{payload.tag}</b>{payload.title ? ` · ${payload.title}` : ""}
+          {payload.commitSha && <> · {payload.repository} {payload.branch} @ <code>{String(payload.commitSha).slice(0, 8)}</code></>}
+          {payload.testRunId && <> · {t.rc_testsPassOnCommit} ✓</>}
+        </Typography>
+        <ReleasePlans notes={payload.notes} deploymentPlan={payload.deploymentPlan} rollbackPlan={payload.rollbackPlan} knownIssues={payload.knownIssues} />
+        <IssueList issues={payload.unresolvedIssues ?? []} />
       </Stack>
     );
   }

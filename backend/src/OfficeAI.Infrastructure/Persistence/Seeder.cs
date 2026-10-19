@@ -111,6 +111,7 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
             [.. AgentDefaults.CommsTools, OfficeAI.Application.Communication.DraftMinutesTool.ToolId, OfficeAI.Application.Communication.DraftAnnouncementTool.ToolId], now, ct);
         await GrantRoleToolOnceAsync("v0.10.4-operations-planner", "OPERATIONS", PlanSubmitTool.ToolId, now, ct);
         await GrantNewToolsOnceAsync("v0.19.0-defect-tool", [ReportDefectTool.ToolId], now, ct);
+        await GrantNewToolsOnceAsync("v0.20.0-release-tool", [PrepareReleaseTool.ToolId], now, ct);
 
         if (!await db.ChatChannels.AnyAsync(c => c.Kind == ChannelKind.Company && c.Name == ChatService.GeneralChannel, ct))
         {

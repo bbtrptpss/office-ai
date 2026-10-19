@@ -361,7 +361,7 @@ export const usd = (n: number) =>
 
 // ---------- Phase 3: orchestration ----------
 
-export type ApprovalKind = "Plan" | "TaskCompletion" | "ToolAction" | "Escalation" | "Estimate" | "Merge";
+export type ApprovalKind = "Plan" | "TaskCompletion" | "ToolAction" | "Escalation" | "Estimate" | "Merge" | "ProductionDeployment";
 export type ApprovalStatus = "Pending" | "Approved" | "Rejected" | "Expired" | "Cancelled";
 export type WorkflowStatus = "Planning" | "AwaitingPlanApproval" | "Executing" | "Completed" | "Failed" | "Cancelled";
 
@@ -957,4 +957,40 @@ export interface Defect {
   createdAt: string;
   resolvedAt: string | null;
   version: number;
+}
+
+// ---------- releases ----------
+
+export type ReleaseStatus = "Draft" | "PendingApproval" | "Approved" | "Deployed" | "RolledBack" | "Cancelled";
+
+export interface Release {
+  id: string;
+  tag: string;
+  title: string | null;
+  notes: string | null;
+  deploymentPlan: string | null;
+  rollbackPlan: string | null;
+  knownIssues: string | null;
+  status: ReleaseStatus;
+  commitSha: string | null;
+  testRunId: string | null;
+  unresolvedIssues: string[];
+  approvalRequestId: string | null;
+  authorName: string | null;
+  createdAt: string;
+  approvedAt: string | null;
+  deployedAt: string | null;
+  rolledBackAt: string | null;
+  outcomeNote: string | null;
+  version: number;
+}
+
+export interface ReleaseReadiness {
+  ready: boolean;
+  repositoryName: string | null;
+  branch: string | null;
+  commitSha: string | null;
+  testRunId: string | null;
+  checks: { code: string; met: boolean; blocking: boolean; detail: string | null }[];
+  unresolvedIssues: string[];
 }

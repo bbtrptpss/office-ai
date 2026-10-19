@@ -74,6 +74,7 @@ public enum ApprovalKind
     Escalation = 4,
     Estimate = 5,
     Merge = 6,
+    ProductionDeployment = 7,
 }
 
 public enum ApprovalStatus

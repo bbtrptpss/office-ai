@@ -216,3 +216,16 @@ Read-only: gates report, they don't block actions (blocking stays where it alrea
 | Project page “Defects” tab | done (typecheck/lint clean; browser walkthrough not done — Chrome extension was not connected; API smoke-tested on the running stack) |
 
 Fix tasks are ordinary tasks, not part of a workflow, so the engine does not start them by itself; run them with AI from the task dialog. 200 tests.
+
+## Phase 16 — Release preparation ✅ (2026-10-19)
+
+| Item | Status |
+| --- | --- |
+| §7 Stage 7 “Prepare release notes, deployment instructions, and rollback plans”: `Release` per project (tag unique, notes, deployment plan, rollback plan, known issues); `GET/POST /projects/{id}/releases`, `PUT /releases/{id}` (drafts only) | done |
+| §7 Stage 7 “Verify build artifacts and test evidence” / “Identify unresolved issues”: `GET /releases/{id}/readiness` — blocking: plans written, latest test run on the current default-branch commit passed, no critical defects; warnings: open defects, blocked/failed tasks, open merge requests (listed as unresolved issues) | done |
+| §7 Stage 7 / §14 “Require human approval for production deployment”: `POST /releases/{id}/submit` freezes commit + test run + issues into a `ProductionDeployment` approval (project.manage, requester cannot approve). Approval is refused if the default branch moved since; rejection returns the release to Draft | done |
+| Deployment stays outside the system: people record `deployed` / `rolled-back` (note required) / `cancel` (cancels a pending approval); agents cannot | done |
+| AI tool `release.prepare` (RELEASE, DEVOPS) drafts releases only; stage 7 approval = an approved/deployed release, plus “deployment and rollback plans written” | done |
+| Project page “Releases” tab; approval inbox shows tag, commit, plans and unresolved issues | done (typecheck/lint clean; browser walkthrough not done — Chrome extension not connected; API smoke-tested on the running stack) |
+
+208 tests.

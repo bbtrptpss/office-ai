@@ -36,6 +36,7 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
         ApprovalKind.ToolAction => Permissions.AgentManage,
         ApprovalKind.Estimate => Permissions.ProjectManage,
         ApprovalKind.Merge => Permissions.ProjectManage,
+        ApprovalKind.ProductionDeployment => Permissions.ProjectManage,
         _ => Permissions.TaskManage,
     };
 
@@ -101,6 +102,9 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
                 break;
             case ApprovalKind.Merge:
                 await ApplyMergeDecisionAsync(approval, req.Approve, now, ct);
+                break;
+            case ApprovalKind.ProductionDeployment:
+                await ReleaseService.ApplyDecisionAsync(db, code, approval, req.Approve, now, ct);
                 break;
             case ApprovalKind.ToolAction:
                 // Executed by the workflow engine (exactly once) on its next tick.

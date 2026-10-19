@@ -113,3 +113,18 @@ internal class DefectConfig : IEntityTypeConfiguration<Defect>
         b.HasOne<WorkTask>().WithMany().HasForeignKey(d => d.FixTaskId).OnDelete(DeleteBehavior.SetNull);
     }
 }
+
+internal class ReleaseConfig : IEntityTypeConfiguration<Release>
+{
+    public void Configure(EntityTypeBuilder<Release> b)
+    {
+        EntityConfig.Base(b);
+        b.ToTable("Releases");
+        b.Property(r => r.Tag).HasMaxLength(40);
+        b.Property(r => r.Title).HasMaxLength(200);
+        b.Property(r => r.CommitSha).HasMaxLength(64);
+        b.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
+        b.HasIndex(r => new { r.ProjectId, r.Tag }).IsUnique();
+        b.HasOne<Project>().WithMany().HasForeignKey(r => r.ProjectId).OnDelete(DeleteBehavior.Cascade);
+    }
+}

@@ -61,6 +61,8 @@ public static class AgentDefaults
         ["PM"] = [Delivery.AddRequirementTool.ToolId],
         ["CTO"] = [Delivery.ProposeDecisionTool.ToolId],
         ["ARCH"] = [Delivery.ProposeDecisionTool.ToolId],
+        ["RELEASE"] = [Delivery.PrepareReleaseTool.ToolId],
+        ["DEVOPS"] = [Delivery.PrepareReleaseTool.ToolId],
         // Corporate Operations has no head position; its operations lead plans the department's objectives.
         ["OPERATIONS"] = [Workflows.PlanSubmitTool.ToolId],
     };

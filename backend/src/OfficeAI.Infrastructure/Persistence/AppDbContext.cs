@@ -51,6 +51,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<ProjectRequirement> Requirements => Set<ProjectRequirement>();
     public DbSet<ArchitectureDecision> ArchitectureDecisions => Set<ArchitectureDecision>();
     public DbSet<Defect> Defects => Set<Defect>();
+    public DbSet<Release> Releases => Set<Release>();
     public DbSet<RoleRate> RoleRates => Set<RoleRate>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
     public DbSet<ProjectEstimate> Estimates => Set<ProjectEstimate>();
@@ -113,6 +114,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         b.Entity<ProjectRequirement>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
         b.Entity<ArchitectureDecision>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
         b.Entity<Defect>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+        b.Entity<Release>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
         b.Entity<ProjectEstimate>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
         b.Entity<CodeRepository>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
         b.Entity<MergeRequest>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));

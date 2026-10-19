@@ -222,6 +222,14 @@ public static class Endpoints
         api.MapPost("/defects/{id:guid}/verify", (Guid id, ResolveDefectRequest r, DefectService s, CancellationToken ct) => s.VerifyAsync(id, r, ct)).RequirePermission(Permissions.TaskApprove);
         api.MapPost("/defects/{id:guid}/reject", (Guid id, ResolveDefectRequest r, DefectService s, CancellationToken ct) => s.RejectAsync(id, r, ct)).RequirePermission(Permissions.TaskApprove);
         api.MapPost("/defects/{id:guid}/reopen", (Guid id, ResolveDefectRequest r, DefectService s, CancellationToken ct) => s.ReopenAsync(id, r, ct)).RequirePermission(Permissions.TaskApprove);
+        api.MapGet("/projects/{id:guid}/releases", (Guid id, ReleaseService s, CancellationToken ct) => s.ListAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapPost("/projects/{id:guid}/releases", (Guid id, SaveReleaseRequest r, ReleaseService s, CancellationToken ct) => s.CreateAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPut("/releases/{id:guid}", (Guid id, SaveReleaseRequest r, ReleaseService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapGet("/releases/{id:guid}/readiness", (Guid id, ReleaseService s, CancellationToken ct) => s.ReadinessAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapPost("/releases/{id:guid}/submit", (Guid id, ReleaseService s, CancellationToken ct) => s.SubmitAsync(id, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/releases/{id:guid}/cancel", (Guid id, ReleaseOutcomeRequest r, ReleaseService s, CancellationToken ct) => s.CancelAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/releases/{id:guid}/deployed", (Guid id, ReleaseOutcomeRequest r, ReleaseService s, CancellationToken ct) => s.RecordDeployedAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/releases/{id:guid}/rolled-back", (Guid id, ReleaseOutcomeRequest r, ReleaseService s, CancellationToken ct) => s.RecordRolledBackAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapGet("/projects/{id:guid}/estimates", (Guid id, DeliveryService s, CancellationToken ct) => s.ListEstimatesAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/rate-card", (DeliveryService s, CancellationToken ct) => s.ListRatesAsync(ct)).RequirePermission(Permissions.ProjectRead);
         api.MapPut("/rate-card/{roleDefinitionId:guid}", (Guid roleDefinitionId, SetRoleRateRequest r, DeliveryService s, CancellationToken ct) => s.SetRateAsync(roleDefinitionId, r, ct)).RequirePermission(Permissions.ProjectManage);

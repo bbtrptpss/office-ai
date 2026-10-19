@@ -31,6 +31,18 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.20.0",
+    date: "2026-10-19",
+    title: { th: "เตรียม release และอนุมัติก่อนขึ้น production", en: "Release preparation and approval before production" },
+    changes: [
+      { type: "added", th: "แท็บ “Release” ในหน้าโปรเจกต์: release notes ขั้นตอน deploy แผน rollback และปัญหาที่รู้อยู่แล้ว ต่อเวอร์ชัน", en: "Project “Releases” tab: release notes, deployment instructions, rollback plan and known issues per version" },
+      { type: "added", th: "ตรวจความพร้อมอัตโนมัติ: ต้องมีแผนครบ เทสต์ผ่านบน commit ล่าสุดของ branch หลัก และไม่มีข้อบกพร่องระดับวิกฤต; ข้อบกพร่องค้าง งานติดขัด และ MR ที่เปิดอยู่แสดงเป็นคำเตือนและรายการปัญหาที่ยังค้าง", en: "Automatic readiness check: plans written, tests passing on the current commit of the main branch, no critical defects; open defects, blocked tasks and open merge requests show as warnings and unresolved issues" },
+      { type: "added", th: "ส่งขออนุมัติขึ้น production ในกล่องอนุมัติ (ผูกกับ commit ที่ตรวจ ถ้า branch ขยับหลังส่งจะอนุมัติไม่ได้ และคนที่ส่งอนุมัติเองไม่ได้); หลังอนุมัติ คนบันทึกว่า deploy แล้วหรือ rollback — ระบบไม่ deploy เอง", en: "Submit for production approval in the approval inbox (bound to the checked commit: refused if the branch moved, and the requester cannot approve); afterwards people record the deployment or a rollback — the system never deploys by itself" },
+      { type: "added", th: "เครื่องมือ AI `release.prepare` สำหรับ Release Manager และ DevOps เขียนร่าง release ได้ แต่ส่งอนุมัติไม่ได้", en: "AI tool `release.prepare` for Release Manager and DevOps: drafts releases, cannot submit them" },
+      { type: "changed", th: "ขั้นตอนส่งมอบขั้น 7 ใช้ release ที่ได้รับอนุมัติเป็นเกณฑ์อนุมัติ และเพิ่มเกณฑ์ “มีขั้นตอน deploy และแผน rollback”", en: "Delivery stage 7 now uses an approved release as its approval, and adds the “deployment and rollback plans written” check" },
+    ],
+  },
+  {
     version: "0.19.0",
     date: "2026-10-19",
     title: { th: "บันทึกข้อบกพร่อง (QA) ส่งงานแก้กลับให้นักพัฒนา", en: "Defect log (QA) that sends fixes back to the developer" },

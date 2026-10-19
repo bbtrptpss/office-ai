@@ -37,6 +37,9 @@ public class StageGateService(IAppDbContext db)
             .GroupBy(t => t.RepositoryId).Select(g => g.OrderByDescending(t => t.StartedAt).Select(t => t.Status).First()).ToListAsync(ct);
         var taskIds = tasks.Select(t => t.Id).ToList();
         var pendingDeliverables = await db.Deliverables.CountAsync(d => taskIds.Contains(d.TaskId) && d.Status == DeliverableStatus.Submitted, ct);
+        // Newest first, so the detail names the latest approved release.
+        var releases = await db.Releases.AsNoTracking().Where(r => r.ProjectId == projectId).OrderByDescending(r => r.CreatedAt)
+            .Select(r => new { r.Tag, r.Status, HasNotes = r.Notes != null && r.Notes != "", Prepared = r.DeploymentPlan != null && r.DeploymentPlan != "" && r.RollbackPlan != null && r.RollbackPlan != "" }).ToListAsync(ct);
         var openDefects = await db.Defects.CountAsync(d => d.ProjectId == projectId && d.Status == DefectStatus.Open, ct);
         var lessons = await db.KnowledgeEntries.CountAsync(k => k.ProjectId == projectId && k.Kind == KnowledgeKind.Lesson && k.Status == KnowledgeStatus.Validated, ct);
 
@@ -53,7 +56,9 @@ public class StageGateService(IAppDbContext db)
         var openMrs = mrs.Count(s => s is Domain.Code.MergeRequestStatus.Open or Domain.Code.MergeRequestStatus.Conflict);
         var merged = mrs.Count(s => s == Domain.Code.MergeRequestStatus.Merged);
         var mergesApproved = new StageCheckDto("mergesApproved", merged > 0 && openMrs == 0, $"{merged} / {openMrs}");
-        var releaseNotesFinal = new StageCheckDto("releaseNotesFinal", Final(DocumentKind.ReleaseNotes));
+        var releasePrepared = releases.Any(r => r.Status != ReleaseStatus.Cancelled && r.Prepared);
+        var releaseApproved = new StageCheckDto("releaseApproved", releases.Any(r => r.Status is ReleaseStatus.Approved or ReleaseStatus.Deployed),
+            releases.FirstOrDefault(r => r.Status is ReleaseStatus.Approved or ReleaseStatus.Deployed)?.Tag);
         var completionFinal = new StageCheckDto("completionReportFinal", Final(DocumentKind.CompletionReport));
 
         var defs = new (string Code, List<StageCheckDto> Entry, List<StageCheckDto> Exit, List<string> Deliverables, StageCheckDto Approval)[]
@@ -83,8 +88,9 @@ public class StageGateService(IAppDbContext db)
                     new("noOpenDefects", openDefects == 0, $"{openDefects}")],
                 ["testReports", "defectLog"], tasksDone),
             ("release", [],
-                [new("releaseNotesDoc", Doc(DocumentKind.ReleaseNotes)), new("noBlockedTasks", tasks.All(t => t.Status is not (WorkTaskStatus.Blocked or WorkTaskStatus.Failed)))],
-                ["releaseNotes", "deploymentPlan", "rollbackPlan"], releaseNotesFinal),
+                [new("releaseNotesDoc", Doc(DocumentKind.ReleaseNotes) || releases.Any(r => r.Status != ReleaseStatus.Cancelled && r.HasNotes)),
+                    new("releasePlans", releasePrepared), new("noBlockedTasks", tasks.All(t => t.Status is not (WorkTaskStatus.Blocked or WorkTaskStatus.Failed)))],
+                ["releaseNotes", "deploymentPlan", "rollbackPlan"], releaseApproved),
             ("delivery", [],
                 [new("completionReportDoc", Doc(DocumentKind.CompletionReport)), new("lessonValidated", lessons > 0, $"{lessons}"), new("projectCompleted", p.Status == ProjectStatus.Completed)],
                 ["completionReport", "lessonsLearned"], completionFinal),
