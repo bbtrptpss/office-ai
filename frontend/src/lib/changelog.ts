@@ -31,6 +31,14 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.14.4",
+    date: "2026-10-19",
+    title: { th: "ซ่อนช่องเดือนในแท็บกำไร", en: "Month picker hidden on the profitability tab" },
+    changes: [
+      { type: "fixed", th: "หน้าการเงิน: แท็บกำไรและสถานการณ์จำลองไม่แสดงช่องเลือกเดือนแล้ว เพราะตัวเลขในแท็บนี้ไม่ได้ขึ้นกับเดือน", en: "Finance: the profitability and scenario tab no longer shows the month picker, since its figures don't depend on the month" },
+    ],
+  },
+  {
     version: "0.14.3",
     date: "2026-10-19",
     title: { th: "Claude ใช้ prompt caching", en: "Prompt caching for Claude" },

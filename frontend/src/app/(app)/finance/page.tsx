@@ -27,7 +27,7 @@ export default function FinancePage() {
     <>
       <PageHeader
         title={t.navFinance}
-        actions={<TextField type="month" size="small" label={t.month} value={month} onChange={(e) => setMonth(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />}
+        actions={tab !== "profitability" && <TextField type="month" size="small" label={t.month} value={month} onChange={(e) => setMonth(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />}
       />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab value="finance" label={t.finance} />
