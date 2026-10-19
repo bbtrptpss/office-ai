@@ -6,6 +6,9 @@ using OfficeAI.Application.Organization;
 using OfficeAI.Application.Reports;
 using OfficeAI.Application.Work;
 using OfficeAI.Domain.Agents;
+using Microsoft.EntityFrameworkCore;
+using OfficeAI.Domain.Common;
+using OfficeAI.Domain.Delivery;
 using OfficeAI.Domain.Finance;
 using OfficeAI.Infrastructure.Persistence;
 
@@ -137,5 +140,83 @@ public class QualitySecurityTests(ApiFixture fx)
 
         var manager = await fx.UserWithRolesAsync("Manager");
         Assert.Equal(System.Net.HttpStatusCode.Forbidden, (await manager.GetAsync("/api/reports/quality-security")).StatusCode);
+    }
+}
+
+[Collection(ApiCollection.Name)]
+public class ProfitabilityTests(ApiFixture fx)
+{
+    private static ProjectEstimate Sample(Guid projectId, Guid roleId)
+    {
+        var e = new ProjectEstimate
+        {
+            ProjectId = projectId, Revision = 1, Status = EstimateStatus.Approved, Assumptions = "fixed scope",
+            ContingencyPercent = 10m, TargetMarginPercent = 30m, AiCostUsd = 10m, UsdToThb = 36m,
+            Items = [new EstimateLineItem { Description = "API", RoleDefinitionId = roleId, RoleTitle = "Dev", Hours = 100m, RateThb = 1000m, Evidence = "past project" }],
+        };
+        EstimateCalculator.Compute(e);
+        return e;
+    }
+
+    [Fact]
+    public void Scenario_keeps_the_agreed_price_unless_asked_to_reprice()
+    {
+        var e = Sample(Guid.NewGuid(), Guid.NewGuid());
+        // 100h × 1000 = 100,000 + AI 360 = 100,360; +10% = 110,396; price = ceil(110,396 / 0.7 / 100) × 100 = 157,800
+        Assert.Equal(110_396m, e.TotalCost);
+        Assert.Equal(157_800m, e.Price);
+
+        var same = ScenarioCalculator.Run(e, new ScenarioInput());
+        Assert.Equal(ScenarioCalculator.Baseline(e), same);
+
+        var slower = ScenarioCalculator.Run(e, new ScenarioInput(HoursChangePercent: 20m));
+        Assert.Equal(120m, slower.TotalHours);
+        Assert.Equal(157_800m, slower.Price); // the price was agreed; extra hours eat the margin
+        Assert.Equal(157_800m - (120_000m + 360m) * 1.1m, slower.GrossMargin);
+
+        var repriced = ScenarioCalculator.Run(e, new ScenarioInput(HoursChangePercent: 20m, RepriceAtTargetMargin: true));
+        Assert.True(repriced.Price > e.Price);
+        Assert.True(repriced.GrossMarginPercent >= 29.9m);
+
+        Assert.Throws<DomainException>(() => ScenarioCalculator.Run(e, new ScenarioInput(HoursChangePercent: -150m)));
+        Assert.Throws<DomainException>(() => ScenarioCalculator.Run(e, new ScenarioInput(UsdToThb: 0m)));
+    }
+
+    [Fact]
+    public async Task Profitability_forecast_adds_ai_overrun_and_scenarios_are_read_only()
+    {
+        var ceo = await fx.CeoAsync();
+        var role = (await ceo.GetAsync<List<RoleDefinitionDto>>("/api/role-definitions")).First(r => r.Code == "BACKEND");
+        var project = await ceo.PostAsync<ProjectDto>("/api/projects", new { code = $"PR-{Guid.NewGuid():N}"[..14], name = "Profit project", status = "Active" });
+        await using (var scope = fx.Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var e = Sample(project.Id, role.Id);
+            e.UsdToThb = (await db.CompanySettings.FirstOrDefaultAsync())?.UsdToThb ?? 36m;
+            EstimateCalculator.Compute(e);
+            db.Estimates.Add(e);
+            // Actual AI spend: planned AI cost plus 1,000 THB worth of overrun.
+            db.CostRecords.Add(new CostRecord { Kind = CostKind.Actual, Category = "ai", ProjectId = project.Id, AmountUsd = e.AiCostUsd + 1000m / e.UsdToThb, OccurredAt = DateTimeOffset.UtcNow });
+            await db.SaveChangesAsync();
+        }
+
+        var report = await ceo.GetAsync<ProfitabilityReportDto>("/api/reports/profitability");
+        var row = Assert.Single(report.Projects, p => p.ProjectId == project.Id);
+        Assert.Equal(1000m, Math.Round(row.AiOverrunThb));
+        Assert.Equal(row.PlannedCostThb + row.AiOverrunThb, row.ForecastCostThb);
+        Assert.Equal(row.PriceThb - row.ForecastCostThb, row.ForecastMarginThb);
+        Assert.False(row.AtRisk);
+
+        var s = await ceo.PostAsync<ScenarioDto>("/api/reports/scenario", new { projectId = project.Id, hoursChangePercent = 50 });
+        Assert.Equal(150m, s.Scenario.TotalHours);
+        Assert.True(s.MarginChangeThb < 0);
+        var again = await ceo.GetAsync<ProfitabilityReportDto>("/api/reports/profitability");
+        Assert.Equal(row, Assert.Single(again.Projects, p => p.ProjectId == project.Id)); // nothing was stored
+
+        var other = await ceo.PostAsync<ProjectDto>("/api/projects", new { code = $"PN-{Guid.NewGuid():N}"[..14], name = "No estimate", status = "Active" });
+        Assert.Equal(HttpStatusCode.BadRequest, (await ceo.PostAsJsonAsync("/api/reports/scenario", new { projectId = other.Id })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await ceo.PostAsJsonAsync("/api/reports/scenario", new { projectId = project.Id, rateChangePercent = 900 })).StatusCode);
+        var member = await fx.UserWithRolesAsync("Member");
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync("/api/reports/profitability")).StatusCode);
     }
 }

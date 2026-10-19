@@ -161,3 +161,50 @@ public static class EstimateCalculator
         e.Warnings = warnings;
     }
 }
+
+/// <summary>What-if changes applied to an approved estimate. Null keeps the estimate's own value.</summary>
+public record ScenarioInput(decimal HoursChangePercent = 0m, decimal RateChangePercent = 0m, decimal? AiCostUsd = null, decimal? UsdToThb = null,
+    decimal? ContingencyPercent = null, decimal? PriceThb = null, bool RepriceAtTargetMargin = false);
+
+public record ScenarioResult(decimal TotalHours, decimal LaborCost, decimal AiCost, decimal Contingency, decimal TotalCost, decimal Price,
+    decimal GrossMargin, decimal GrossMarginPercent);
+
+/// <summary>
+/// Deterministic scenario planning on top of an approved estimate. Nothing is saved: the agreed price stays
+/// unless the scenario sets a new one or asks to re-price at the estimate's target margin.
+/// </summary>
+public static class ScenarioCalculator
+{
+    public const decimal MaxChangePercent = 500m;
+
+    public static ScenarioResult Baseline(ProjectEstimate e) =>
+        new(e.TotalHours, e.LaborCost, e.AiCost, e.Contingency, e.TotalCost, e.Price, e.GrossMargin, e.GrossMarginPercent);
+
+    public static ScenarioResult Run(ProjectEstimate baseline, ScenarioInput s)
+    {
+        if (s.HoursChangePercent is < -100m or > MaxChangePercent || s.RateChangePercent is < -100m or > MaxChangePercent)
+            throw new DomainException("scenario.invalid", $"Changes must be between -100% and {MaxChangePercent}%.");
+        if (s.AiCostUsd < 0 || s.UsdToThb <= 0 || s.ContingencyPercent is < 0m or > 100m || s.PriceThb < 0)
+            throw new DomainException("scenario.invalid", "AI cost, price and contingency must be zero or more; the exchange rate must be above zero.");
+
+        var est = new ProjectEstimate
+        {
+            ContingencyPercent = s.ContingencyPercent ?? baseline.ContingencyPercent,
+            TargetMarginPercent = baseline.TargetMarginPercent,
+            AiCostUsd = s.AiCostUsd ?? baseline.AiCostUsd,
+            UsdToThb = s.UsdToThb ?? baseline.UsdToThb,
+            Assumptions = baseline.Assumptions,
+            Items = baseline.Items.Select(i => new EstimateLineItem
+            {
+                Description = i.Description, RoleTitle = i.RoleTitle, RoleDefinitionId = i.RoleDefinitionId, Evidence = i.Evidence,
+                Hours = Math.Round(i.Hours * (1 + s.HoursChangePercent / 100m), 2, MidpointRounding.AwayFromZero),
+                RateThb = Math.Round(i.RateThb * (1 + s.RateChangePercent / 100m), 2, MidpointRounding.AwayFromZero),
+            }).ToList(),
+        };
+        EstimateCalculator.Compute(est);
+        var price = s.RepriceAtTargetMargin ? est.Price : s.PriceThb ?? baseline.Price;
+        var margin = price - est.TotalCost;
+        var pct = price == 0 ? 0 : Math.Round(margin / price * 100m, 2, MidpointRounding.AwayFromZero);
+        return new ScenarioResult(est.TotalHours, est.LaborCost, est.AiCost, est.Contingency, est.TotalCost, price, margin, pct);
+    }
+}

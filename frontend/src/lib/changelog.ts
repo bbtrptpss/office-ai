@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.14.0",
+    date: "2026-10-19",
+    title: { th: "กำไรโดยประมาณและสถานการณ์จำลอง", en: "Profitability and scenario planning" },
+    changes: [
+      { type: "added", th: "หน้าการเงินมีแท็บ “กำไรและสถานการณ์จำลอง”: กำไรตามแผนและกำไรคาดการณ์ของทุกโปรเจกต์ที่มีใบประเมินที่อนุมัติแล้ว (คาดการณ์ = ต้นทุนตามแผน + ค่า AI จริงที่เกินแผน) ขึ้น ⚠ เมื่อกำไรคาดการณ์หายไปเกินครึ่งหรือติดลบ", en: "Finance has a “Profitability & scenarios” tab: planned and forecast margin for every project with an approved estimate (forecast = planned cost + actual AI spend above plan), flagged ⚠ when the forecast loses more than half the planned margin or goes negative" },
+      { type: "added", th: "สถานการณ์จำลอง (what-if): ปรับชั่วโมง ค่าแรง ค่า AI เผื่อความเสี่ยง หรือราคา แล้วเทียบกับแผน คำนวณแบบ deterministic และไม่บันทึกหรือแก้ใบประเมินจริง", en: "Scenario planning (what-if): change hours, rates, AI cost, contingency or price and compare with the plan; deterministic, and nothing is saved or changed on the real estimate" },
+    ],
+  },
+  {
     version: "0.13.2",
     date: "2026-10-19",
     title: { th: "ตัวละครในออฟฟิศ 3D ใช้รูปจากชุดตัวละคร", en: "3D office people use the character pack figure" },

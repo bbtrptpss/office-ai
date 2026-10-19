@@ -567,6 +567,51 @@ export interface Budget {
   version: number;
 }
 
+export interface ProfitabilityRow {
+  projectId: string;
+  code: string;
+  name: string;
+  estimateRevision: number;
+  priceThb: number;
+  plannedCostThb: number;
+  plannedMarginThb: number;
+  plannedMarginPercent: number;
+  plannedAiThb: number;
+  actualAiThb: number;
+  aiOverrunThb: number;
+  forecastCostThb: number;
+  forecastMarginThb: number;
+  forecastMarginPercent: number;
+  atRisk: boolean;
+}
+
+export interface ProfitabilityReport {
+  usdToThb: number;
+  totalPriceThb: number;
+  totalPlannedMarginThb: number;
+  totalForecastMarginThb: number;
+  projects: ProfitabilityRow[];
+}
+
+export interface ScenarioResult {
+  totalHours: number;
+  laborCost: number;
+  aiCost: number;
+  contingency: number;
+  totalCost: number;
+  price: number;
+  grossMargin: number;
+  grossMarginPercent: number;
+}
+
+export interface Scenario {
+  projectId: string;
+  estimateRevision: number;
+  baseline: ScenarioResult;
+  scenario: ScenarioResult;
+  marginChangeThb: number;
+}
+
 export interface FinanceReport {
   month: string;
   usdToThb: number;

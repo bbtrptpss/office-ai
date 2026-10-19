@@ -20,6 +20,14 @@ public record SpendRowDto(Guid Id, string Name, decimal CostUsd, long Tokens, in
 public record FinanceReportDto(DateOnly Month, decimal UsdToThb, decimal TotalUsd, decimal TotalThb, decimal SimulatedUsd,
     List<ProjectFinanceDto> Projects, List<SpendRowDto> Departments, List<SpendRowDto> Employees, List<BudgetDto> Budgets);
 
+public record ProfitabilityRowDto(Guid ProjectId, string Code, string Name, int EstimateRevision, decimal PriceThb, decimal PlannedCostThb,
+    decimal PlannedMarginThb, decimal PlannedMarginPercent, decimal PlannedAiThb, decimal ActualAiThb, decimal AiOverrunThb,
+    decimal ForecastCostThb, decimal ForecastMarginThb, decimal ForecastMarginPercent, bool AtRisk);
+public record ProfitabilityReportDto(decimal UsdToThb, decimal TotalPriceThb, decimal TotalPlannedMarginThb, decimal TotalForecastMarginThb, List<ProfitabilityRowDto> Projects);
+public record ScenarioRequest(Guid ProjectId, decimal HoursChangePercent = 0m, decimal RateChangePercent = 0m, decimal? AiCostUsd = null,
+    decimal? UsdToThb = null, decimal? ContingencyPercent = null, decimal? PriceThb = null, bool RepriceAtTargetMargin = false);
+public record ScenarioDto(Guid ProjectId, int EstimateRevision, ScenarioResult Baseline, ScenarioResult Scenario, decimal MarginChangeThb);
+
 public record PerformanceRowDto(Guid EmployeeId, string Name, string JobTitle, string Department, int Runs, int Succeeded, int Failed, int LimitReached,
     decimal SuccessRate, decimal CostUsd, decimal CostPerRunUsd, double AvgTurns, int ToolCalls, int ToolDenied, int TasksDone, int ReviewsApproved,
     int ChangesRequested, decimal FirstPassApprovalRate);
@@ -152,6 +160,50 @@ public class ReportsService(IAppDbContext db, TimeProvider clock)
         return new FinanceReportDto(m, settings.UsdToThb, total, Math.Round(total * settings.UsdToThb, 2),
             monthCosts.Where(c => c.RunId is { } r && simulatedRuns.Contains(r)).Sum(c => c.AmountUsd),
             projectRows, byDept, byEmployee.Take(50).ToList(), await ListBudgetsAsync(m, ct));
+    }
+
+    // ---------------- profitability & scenarios ----------------
+
+    /// <summary>
+    /// Estimated profitability per project from its latest approved estimate. The forecast keeps the estimate's
+    /// labor and contingency and adds any AI spend above the planned AI cost; it is an estimate, not an actual result.
+    /// </summary>
+    public async Task<ProfitabilityReportDto> ProfitabilityAsync(CancellationToken ct)
+    {
+        var settings = await DeliveryService.SettingsAsync(db, ct);
+        var estimates = (await db.Estimates.AsNoTracking().Where(e => e.Status == EstimateStatus.Approved).ToListAsync(ct))
+            .GroupBy(e => e.ProjectId).ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.Revision).First());
+        var actual = await db.CostRecords.AsNoTracking().Where(c => c.Kind == CostKind.Actual && c.ProjectId != null)
+            .GroupBy(c => c.ProjectId!.Value).Select(g => new { ProjectId = g.Key, Usd = g.Sum(c => c.AmountUsd) }).ToDictionaryAsync(x => x.ProjectId, x => x.Usd, ct);
+        var projects = await db.Projects.AsNoTracking().Where(p => p.Status != ProjectStatus.Cancelled && estimates.Keys.Contains(p.Id))
+            .OrderBy(p => p.Code).ToListAsync(ct);
+
+        var rows = projects.Select(p =>
+        {
+            var e = estimates[p.Id];
+            var actualThb = Math.Round(actual.GetValueOrDefault(p.Id) * settings.UsdToThb, 2, MidpointRounding.AwayFromZero);
+            var overrun = Math.Max(0m, actualThb - e.AiCost);
+            var forecastCost = e.TotalCost + overrun;
+            var forecastMargin = e.Price - forecastCost;
+            var forecastPct = e.Price == 0 ? 0 : Math.Round(forecastMargin / e.Price * 100m, 2, MidpointRounding.AwayFromZero);
+            // At risk once the forecast margin has lost more than half of the planned margin, or turned negative.
+            var atRisk = forecastMargin < 0 || forecastMargin < e.GrossMargin / 2;
+            return new ProfitabilityRowDto(p.Id, p.Code, p.Name, e.Revision, e.Price, e.TotalCost, e.GrossMargin, e.GrossMarginPercent,
+                e.AiCost, actualThb, overrun, forecastCost, forecastMargin, forecastPct, atRisk);
+        }).ToList();
+        return new ProfitabilityReportDto(settings.UsdToThb, rows.Sum(r => r.PriceThb), rows.Sum(r => r.PlannedMarginThb), rows.Sum(r => r.ForecastMarginThb), rows);
+    }
+
+    /// <summary>What-if planning on the latest approved estimate. Read-only: nothing is stored or changed.</summary>
+    public async Task<ScenarioDto> ScenarioAsync(ScenarioRequest req, CancellationToken ct)
+    {
+        var e = await db.Estimates.AsNoTracking().Include(x => x.Items)
+            .Where(x => x.ProjectId == req.ProjectId && x.Status == EstimateStatus.Approved).OrderByDescending(x => x.Revision).FirstOrDefaultAsync(ct)
+            ?? throw new DomainException("scenario.no_estimate", "This project has no approved estimate to plan from.");
+        var baseline = ScenarioCalculator.Baseline(e);
+        var scenario = ScenarioCalculator.Run(e, new ScenarioInput(req.HoursChangePercent, req.RateChangePercent, req.AiCostUsd, req.UsdToThb,
+            req.ContingencyPercent, req.PriceThb, req.RepriceAtTargetMargin));
+        return new ScenarioDto(req.ProjectId, e.Revision, baseline, scenario, scenario.GrossMargin - baseline.GrossMargin);
     }
 
     // ---------------- quality & security ----------------

@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import {
-  Alert, Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, Grid, LinearProgress, MenuItem, Paper, Stack, Tab,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography,
+  Alert, Box, Button, Card, CardContent, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Grid, LinearProgress,
+  MenuItem, Paper, Stack, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography,
 } from "@mui/material";
-import { api, Budget, BudgetScope, Department, FinanceReport, PerformanceRow, Project, thb, usd } from "@/lib/api";
+import {
+  api, Budget, BudgetScope, Department, FinanceReport, PerformanceRow, ProfitabilityReport, Project, Scenario, ScenarioResult, thb, usd,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -19,7 +21,7 @@ const thisMonth = () => {
 
 export default function FinancePage() {
   const { t } = useI18n();
-  const [tab, setTab] = useState<"finance" | "performance">("finance");
+  const [tab, setTab] = useState<"finance" | "profitability" | "performance">("finance");
   const [month, setMonth] = useState(thisMonth());
   return (
     <>
@@ -29,9 +31,10 @@ export default function FinancePage() {
       />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab value="finance" label={t.finance} />
+        <Tab value="profitability" label={t.profitability} />
         <Tab value="performance" label={t.performance} />
       </Tabs>
-      {tab === "finance" ? <Finance month={month} /> : <Performance month={month} />}
+      {tab === "finance" ? <Finance month={month} /> : tab === "profitability" ? <Profitability /> : <Performance month={month} />}
     </>
   );
 }
@@ -181,6 +184,156 @@ function Finance({ month }: { month: string }) {
         </DialogActions>
       </Dialog>
     </Stack>
+  );
+}
+
+function Profitability() {
+  const { t } = useI18n();
+  const { data, error, reload } = useLoad(() => api.get<ProfitabilityReport>("/api/reports/profitability"));
+  useRealtime("agentRunChanged", () => void reload());
+  if (!data) return <Loading error={error} />;
+  if (data.projects.length === 0) return <Typography color="text.secondary">{t.noApprovedEstimate}</Typography>;
+  return (
+    <Stack spacing={3}>
+      <Box>
+        <Typography variant="h6">{t.profitTitle}</Typography>
+        <Typography variant="body2" color="text.secondary" gutterBottom>{t.profitNote}</Typography>
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>{t.projects}</TableCell>
+                <TableCell align="right">{t.priceLabel}</TableCell>
+                <TableCell align="right">{t.plannedMargin}</TableCell>
+                <TableCell align="right">{t.planned} AI</TableCell>
+                <TableCell align="right">{t.actual} AI</TableCell>
+                <TableCell align="right">{t.aiOverrun}</TableCell>
+                <TableCell align="right">{t.forecastMargin}</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {data.projects.map((p) => (
+                <TableRow key={p.projectId}>
+                  <TableCell>
+                    <b>{p.code}</b> {p.name} <Typography component="span" variant="caption" color="text.secondary">r{p.estimateRevision}</Typography>
+                    {p.atRisk && <Typography component="span" variant="caption" color="error.main" sx={{ ml: 1, fontWeight: 700 }}>⚠ {t.atRisk}</Typography>}
+                  </TableCell>
+                  <TableCell align="right">{thb(p.priceThb)}</TableCell>
+                  <TableCell align="right">{thb(p.plannedMarginThb)} · {p.plannedMarginPercent}%</TableCell>
+                  <TableCell align="right">{thb(p.plannedAiThb)}</TableCell>
+                  <TableCell align="right">{thb(p.actualAiThb)}</TableCell>
+                  <TableCell align="right" sx={{ color: p.aiOverrunThb > 0 ? "error.main" : undefined }}>{p.aiOverrunThb > 0 ? `+${thb(p.aiOverrunThb)}` : "—"}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700, color: p.forecastMarginThb < 0 ? "error.main" : p.atRisk ? "warning.main" : "success.main" }}>
+                    {thb(p.forecastMarginThb)} · {p.forecastMarginPercent}%
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow>
+                <TableCell><b>{t.totalLabel}</b></TableCell>
+                <TableCell align="right"><b>{thb(data.totalPriceThb)}</b></TableCell>
+                <TableCell align="right"><b>{thb(data.totalPlannedMarginThb)}</b></TableCell>
+                <TableCell colSpan={3} />
+                <TableCell align="right"><b>{thb(data.totalForecastMarginThb)}</b></TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Box>
+      <ScenarioPanel projects={data.projects.map((p) => ({ id: p.projectId, label: `${p.code} ${p.name}` }))} />
+    </Stack>
+  );
+}
+
+function ScenarioPanel({ projects }: { projects: { id: string; label: string }[] }) {
+  const { t } = useI18n();
+  const errorMessage = useErrorMessage();
+  const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
+  const [form, setForm] = useState({ hours: "0", rate: "0", aiUsd: "", contingency: "", price: "", reprice: false });
+  const [result, setResult] = useState<Scenario | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const num = (v: string) => (v.trim() === "" ? null : Number(v));
+
+  const calculate = async () => {
+    try {
+      setResult(await api.post<Scenario>("/api/reports/scenario", {
+        projectId, hoursChangePercent: num(form.hours) ?? 0, rateChangePercent: num(form.rate) ?? 0, aiCostUsd: num(form.aiUsd),
+        contingencyPercent: num(form.contingency), priceThb: form.reprice ? null : num(form.price), repriceAtTargetMargin: form.reprice,
+      }));
+      setMessage(null);
+    } catch (e) {
+      setMessage(errorMessage(e));
+      setResult(null);
+    }
+  };
+
+  const rows: [string, (r: ScenarioResult) => string][] = [
+    [t.hoursLabel, (r) => r.totalHours.toLocaleString()],
+    [t.laborCost, (r) => thb(r.laborCost)],
+    ["AI", (r) => thb(r.aiCost)],
+    [t.contingencyLabel, (r) => thb(r.contingency)],
+    [t.totalCost, (r) => thb(r.totalCost)],
+    [t.priceLabel, (r) => thb(r.price)],
+    [t.marginLabel, (r) => `${thb(r.grossMargin)} · ${r.grossMarginPercent}%`],
+  ];
+  const field = (key: "hours" | "rate" | "aiUsd" | "contingency", label: string) => (
+    <TextField fullWidth size="small" type="number" label={label} value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
+  );
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Typography variant="h6">{t.scenarioTitle}</Typography>
+      <Typography variant="body2" color="text.secondary" gutterBottom>{t.scenarioNote}</Typography>
+      <Grid container spacing={2} sx={{ mt: 0.5, alignItems: "center" }}>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <TextField select fullWidth size="small" label={t.projects} value={projectId} onChange={(e) => { setProjectId(e.target.value); setResult(null); }}>
+            {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.label}</MenuItem>)}
+          </TextField>
+        </Grid>
+        <Grid size={{ xs: 6, md: 2 }}>{field("hours", t.hoursChange)}</Grid>
+        <Grid size={{ xs: 6, md: 2 }}>{field("rate", t.rateChange)}</Grid>
+        <Grid size={{ xs: 6, md: 2 }}>{field("aiUsd", t.aiCostUsdLabel)}</Grid>
+        <Grid size={{ xs: 6, md: 2 }}>{field("contingency", t.contingencyLabel)}</Grid>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <TextField fullWidth size="small" type="number" label={t.priceOverride} value={form.price} disabled={form.reprice} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+        </Grid>
+        <Grid size={{ xs: 12, md: 5 }}>
+          <FormControlLabel control={<Checkbox checked={form.reprice} onChange={(e) => setForm({ ...form, reprice: e.target.checked })} />} label={t.repriceAtTarget} />
+        </Grid>
+        <Grid size={{ xs: 12, md: 3 }}>
+          <Button fullWidth variant="contained" disabled={!projectId} onClick={() => void calculate()}>{t.runScenario}</Button>
+        </Grid>
+      </Grid>
+      {message && <Alert severity="warning" sx={{ mt: 2 }}>{message}</Alert>}
+      {result && (
+        <TableContainer sx={{ mt: 2 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell />
+                <TableCell align="right">{t.baseline} (r{result.estimateRevision})</TableCell>
+                <TableCell align="right">{t.scenario}</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map(([label, f]) => (
+                <TableRow key={label}>
+                  <TableCell>{label}</TableCell>
+                  <TableCell align="right">{f(result.baseline)}</TableCell>
+                  <TableCell align="right">{f(result.scenario)}</TableCell>
+                </TableRow>
+              ))}
+              <TableRow>
+                <TableCell><b>{t.marginChange}</b></TableCell>
+                <TableCell />
+                <TableCell align="right" sx={{ fontWeight: 700, color: result.marginChangeThb < 0 ? "error.main" : "success.main" }}>
+                  {result.marginChangeThb > 0 ? "+" : ""}{thb(result.marginChangeThb)}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </Paper>
   );
 }
 

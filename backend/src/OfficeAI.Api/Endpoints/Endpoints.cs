@@ -247,6 +247,8 @@ public static class Endpoints
     private static void MapReports(RouteGroupBuilder api)
     {
         api.MapGet("/reports/finance", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.FinanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
+        api.MapGet("/reports/profitability", (OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.ProfitabilityAsync(ct)).RequirePermission(Permissions.FinanceRead);
+        api.MapPost("/reports/scenario", (OfficeAI.Application.Reports.ScenarioRequest req, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.ScenarioAsync(req, ct)).RequirePermission(Permissions.FinanceRead);
         api.MapGet("/reports/performance", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.PerformanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
         api.MapGet("/reports/quality-security", (int? days, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.QualitySecurityAsync(days ?? 30, ct)).RequirePermission(Permissions.AuditRead);
         api.MapGet("/budgets", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.ListBudgetsAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
