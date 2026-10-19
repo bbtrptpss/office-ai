@@ -44,6 +44,7 @@ public interface IAppDbContext
     DbSet<Defect> Defects { get; }
     DbSet<Release> Releases { get; }
     DbSet<Lead> Leads { get; }
+    DbSet<DeliveryPackage> DeliveryPackages { get; }
     DbSet<LeadQuestion> LeadQuestions { get; }
     DbSet<RoleRate> RoleRates { get; }
     DbSet<CompanySettings> CompanySettings { get; }

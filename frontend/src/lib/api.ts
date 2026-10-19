@@ -1036,3 +1036,31 @@ export interface Lead {
   createdAt: string;
   version: number;
 }
+
+// ---------- customer delivery ----------
+
+export type DeliveryPackageStatus = "Draft" | "Delivered" | "Accepted" | "ChangesRequested";
+
+export interface DeliveryPackage {
+  id: string;
+  code: string;
+  title: string;
+  releaseId: string;
+  releaseTag: string;
+  releaseStatus: ReleaseStatus;
+  commitSha: string | null;
+  testRunId: string | null;
+  testRunStatus: "Passed" | "Failed" | "TimedOut" | "Error" | null;
+  documents: { id: string; kind: string; title: string; revision: number; status: "Draft" | "Final" }[];
+  handoverNotes: string | null;
+  status: DeliveryPackageStatus;
+  checks: { code: string; met: boolean; blocking: boolean; detail: string | null }[];
+  ready: boolean;
+  createdAt: string;
+  deliveredAt: string | null;
+  deliveryNote: string | null;
+  customerFeedback: string | null;
+  respondedAt: string | null;
+  changeTaskId: string | null;
+  version: number;
+}

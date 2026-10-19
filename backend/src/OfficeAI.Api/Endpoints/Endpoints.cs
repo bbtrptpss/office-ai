@@ -230,6 +230,16 @@ public static class Endpoints
         api.MapPost("/releases/{id:guid}/cancel", (Guid id, ReleaseOutcomeRequest r, ReleaseService s, CancellationToken ct) => s.CancelAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapPost("/releases/{id:guid}/deployed", (Guid id, ReleaseOutcomeRequest r, ReleaseService s, CancellationToken ct) => s.RecordDeployedAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapPost("/releases/{id:guid}/rolled-back", (Guid id, ReleaseOutcomeRequest r, ReleaseService s, CancellationToken ct) => s.RecordRolledBackAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapGet("/projects/{id:guid}/delivery-packages", (Guid id, DeliveryPackageService s, CancellationToken ct) => s.ListAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
+        api.MapPost("/projects/{id:guid}/delivery-packages", (Guid id, SavePackageRequest r, DeliveryPackageService s, CancellationToken ct) => s.CreateAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPut("/delivery-packages/{id:guid}", (Guid id, SavePackageRequest r, DeliveryPackageService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/delivery-packages/{id:guid}/delivered", (Guid id, PackageDeliveredRequest r, DeliveryPackageService s, CancellationToken ct) => s.MarkDeliveredAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/delivery-packages/{id:guid}/response", (Guid id, PackageResponseRequest r, DeliveryPackageService s, CancellationToken ct) => s.RecordResponseAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapGet("/delivery-packages/{id:guid}/export", async (Guid id, DeliveryPackageService s, CancellationToken ct) =>
+        {
+            var (name, content) = await s.ExportAsync(id, ct);
+            return Results.File(System.Text.Encoding.UTF8.GetBytes(content), "text/markdown; charset=utf-8", name);
+        }).RequirePermission(Permissions.ProjectRead);
         // Customer intake: company-wide, so reading needs project.all as well as the project area.
         api.MapGet("/leads", (LeadService s, CancellationToken ct) => s.ListAsync(ct)).RequirePermission(Permissions.ProjectAll);
         api.MapGet("/leads/{id:guid}", (Guid id, LeadService s, CancellationToken ct) => s.GetAsync(id, ct)).RequirePermission(Permissions.ProjectAll);

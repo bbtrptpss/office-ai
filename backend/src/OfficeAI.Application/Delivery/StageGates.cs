@@ -43,6 +43,7 @@ public class StageGateService(IAppDbContext db)
         var openDefects = await db.Defects.CountAsync(d => d.ProjectId == projectId && d.Status == DefectStatus.Open, ct);
         // Follow-up questions to the customer stay part of intake after the lead became this project.
         var lead = await db.Leads.AsNoTracking().Where(l => l.ProjectId == projectId).Select(l => new { l.Code, Open = l.Questions.Count(q => q.AnsweredAt == null) }).FirstOrDefaultAsync(ct);
+        var packages = await db.DeliveryPackages.AsNoTracking().Where(x => x.ProjectId == projectId).Select(x => x.Status).ToListAsync(ct);
         var lessons = await db.KnowledgeEntries.CountAsync(k => k.ProjectId == projectId && k.Kind == KnowledgeKind.Lesson && k.Status == KnowledgeStatus.Validated, ct);
 
         bool Doc(DocumentKind k) => docs.Any(d => d.Kind == k);
@@ -95,8 +96,11 @@ public class StageGateService(IAppDbContext db)
                     new("releasePlans", releasePrepared), new("noBlockedTasks", tasks.All(t => t.Status is not (WorkTaskStatus.Blocked or WorkTaskStatus.Failed)))],
                 ["releaseNotes", "deploymentPlan", "rollbackPlan"], releaseApproved),
             ("delivery", [],
-                [new("completionReportDoc", Doc(DocumentKind.CompletionReport)), new("lessonValidated", lessons > 0, $"{lessons}"), new("projectCompleted", p.Status == ProjectStatus.Completed)],
-                ["completionReport", "lessonsLearned"], completionFinal),
+                [new("completionReportDoc", Doc(DocumentKind.CompletionReport)),
+                    new("packageDelivered", packages.Any(s => s is DeliveryPackageStatus.Delivered or DeliveryPackageStatus.Accepted), $"{packages.Count}"),
+                    new("customerAccepted", packages.Contains(DeliveryPackageStatus.Accepted)),
+                    new("lessonValidated", lessons > 0, $"{lessons}"), new("projectCompleted", p.Status == ProjectStatus.Completed)],
+                ["deliveryPackage", "completionReport", "lessonsLearned"], completionFinal),
         };
 
         var stages = new List<StageDto>();

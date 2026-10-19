@@ -161,3 +161,19 @@ internal class LeadQuestionConfig : IEntityTypeConfiguration<LeadQuestion>
         b.Property(q => q.Question).HasMaxLength(2000);
     }
 }
+
+internal class DeliveryPackageConfig : IEntityTypeConfiguration<DeliveryPackage>
+{
+    public void Configure(EntityTypeBuilder<DeliveryPackage> b)
+    {
+        EntityConfig.Base(b);
+        b.ToTable("DeliveryPackages");
+        b.Property(p => p.Code).HasMaxLength(20);
+        b.Property(p => p.Title).HasMaxLength(200);
+        b.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
+        b.HasIndex(p => new { p.ProjectId, p.Code }).IsUnique();
+        b.HasOne<Project>().WithMany().HasForeignKey(p => p.ProjectId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne<Release>().WithMany().HasForeignKey(p => p.ReleaseId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<WorkTask>().WithMany().HasForeignKey(p => p.ChangeTaskId).OnDelete(DeleteBehavior.SetNull);
+    }
+}

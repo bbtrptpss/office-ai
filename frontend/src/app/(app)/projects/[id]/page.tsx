@@ -23,6 +23,7 @@ import { ProjectMembersDialog } from "@/components/members";
 import { StagesPanel } from "@/components/stages";
 import { DefectsPanel } from "@/components/defects";
 import { ReleasesPanel } from "@/components/releases";
+import { DeliveryPackagesPanel } from "@/components/deliveryPackages";
 import { CloseoutPanel, DecisionsPanel, DocumentsPanel, EstimatesPanel, RepositoryPanel, RequirementsPanel } from "@/components/workspace";
 
 const COLUMNS: TaskStatus[] = ["Todo", "Assigned", "InProgress", "Blocked", "InReview", "WaitingApproval", "Done", "Failed"];
@@ -77,7 +78,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   const [message, setMessage] = useState<string | null>(null);
   const [showCancelled, setShowCancelled] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
-  const [tab, setTab] = useState<"board" | "stages" | "defects" | "releases" | "requirements" | "decisions" | "estimates" | "repository" | "documents" | "closeout">("board");
+  const [tab, setTab] = useState<"board" | "stages" | "defects" | "releases" | "delivery" | "requirements" | "decisions" | "estimates" | "repository" | "documents" | "closeout">("board");
   // ?task=<id> (from the company task board) opens that task once the board has loaded.
   const linkedTaskId = useSearchParams().get("task");
   const [linkHandled, setLinkHandled] = useState(false);
@@ -152,6 +153,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
         <Tab value="stages" label={t.stages} />
         <Tab value="defects" label={t.defects} />
         <Tab value="releases" label={t.releases} />
+        <Tab value="delivery" label={t.packagesTab} />
         <Tab value="requirements" label={t.requirements} />
         <Tab value="decisions" label={t.decisionsTab} />
         <Tab value="estimates" label={t.estimates} />
@@ -162,6 +164,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
       {tab === "stages" && <StagesPanel projectId={id} />}
       {tab === "defects" && <DefectsPanel projectId={id} tasks={data.tasks} onOpenTask={(taskId) => { setTab("board"); setOpenTaskId(taskId); }} />}
       {tab === "releases" && <ReleasesPanel projectId={id} />}
+      {tab === "delivery" && <DeliveryPackagesPanel projectId={id} onOpenTask={(taskId) => { setTab("board"); setOpenTaskId(taskId); }} />}
       {tab === "requirements" && <RequirementsPanel projectId={id} />}
       {tab === "decisions" && <DecisionsPanel projectId={id} />}
       {tab === "estimates" && <EstimatesPanel projectId={id} />}

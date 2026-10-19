@@ -244,3 +244,16 @@ Fix tasks are ordinary tasks, not part of a workflow, so the engine does not sta
 
 207 tests.
 
+## Phase 18 — Customer delivery package ✅ (2026-10-19)
+
+| Item | Status |
+| --- | --- |
+| §7 Stage 8 “Deliver to customer / provide documentation”: `DeliveryPackage` per project (PKG-001…, release, pinned document-version ids, handover notes); `GET/POST /projects/{id}/delivery-packages`, `PUT /delivery-packages/{id}` (drafts only) | done |
+| Readiness (blocking): release Deployed, release test run Passed, completion report included, handover notes; warnings: documents not Final, open defects | done |
+| `GET /delivery-packages/{id}/export`: one Markdown file (manifest, handover, release notes, deployment/rollback, known issues, test evidence, every document's content); `Content-Disposition` exposed via CORS | done |
+| People only: `POST /delivery-packages/{id}/delivered` (needs readiness), `/response` (accepted, or changes requested with required feedback → High-priority change-request task linked as `ChangeTaskId`) | done |
+| Stage 8 exit adds “packageDelivered” and “customerAccepted”; deliverable “deliveryPackage” | done |
+| Project page “Customer delivery” tab | done (typecheck/lint clean; browser walkthrough not done — Chrome extension not connected) |
+
+210 tests.
+

@@ -100,7 +100,7 @@ builder.Services.AddRateLimiter(o =>
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .WithOrigins(config.GetSection("Cors:Origins").Get<string[]>() ?? [])
     .WithHeaders("Content-Type", SecurityMiddleware.CsrfHeader, CorrelationIdMiddleware.Header, "X-SignalR-User-Agent").AllowAnyMethod().AllowCredentials()
-    .WithExposedHeaders(CorrelationIdMiddleware.Header)));
+    .WithExposedHeaders(CorrelationIdMiddleware.Header, "Content-Disposition")));
 
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSignalR();

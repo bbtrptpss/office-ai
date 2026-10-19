@@ -31,6 +31,18 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.22.0",
+    date: "2026-10-19",
+    title: { th: "ชุดส่งมอบลูกค้า และบันทึกการรับงาน", en: "Customer delivery package and acceptance" },
+    changes: [
+      { type: "added", th: "แท็บ “ส่งมอบลูกค้า” ในหน้าโปรเจกต์: รวม release เอกสารฉบับที่ส่ง (ล็อกตามเวอร์ชัน) ผลเทสต์ และบันทึกการส่งมอบเป็นชุด (รหัส PKG-001…)", en: "Project “Customer delivery” tab: bundle a release, the exact document versions handed over, the test evidence and handover notes into a package (codes PKG-001…)" },
+      { type: "added", th: "ตรวจความพร้อมก่อนส่ง: release ต้องขึ้น production แล้ว เทสต์ของ release ผ่าน มีรายงานปิดโปรเจกต์และบันทึกการส่งมอบ; เอกสารฉบับร่างและข้อบกพร่องค้างแสดงเป็นคำเตือน", en: "Readiness before delivery: release in production, its tests passed, completion report and handover notes included; draft documents and open defects show as warnings" },
+      { type: "added", th: "ดาวน์โหลดชุดส่งมอบเป็นไฟล์ Markdown ไฟล์เดียว (รายการเอกสาร บันทึกส่งมอบ release notes ขั้นตอน deploy/rollback ผลเทสต์ และเนื้อหาเอกสารทั้งหมด)", en: "Download the package as one Markdown file (contents, handover, release notes, deployment/rollback, test evidence and every document's text)" },
+      { type: "added", th: "คนบันทึกว่าส่งแล้ว และลูกค้ารับงานหรือขอแก้ ถ้าขอแก้ระบบสร้างงานความสำคัญสูงพร้อมรายละเอียดให้อัตโนมัติ (AI บันทึกขั้นตอนนี้ไม่ได้)", en: "People record the delivery and whether the customer accepted or asked for changes; a change request creates a High-priority task with the details (AI cannot record these steps)" },
+      { type: "changed", th: "ขั้นตอนส่งมอบขั้น 8 เพิ่มเกณฑ์ “ส่งชุดส่งมอบให้ลูกค้าแล้ว” และ “ลูกค้ารับงานแล้ว”", en: "Delivery stage 8 adds “delivery package sent” and “customer accepted the delivery”" },
+    ],
+  },
+  {
     version: "0.21.0",
     date: "2026-10-19",
     title: { th: "รับงานลูกค้า: ตรวจข้อมูลที่ขาดและถามกลับก่อนเปิดโปรเจกต์", en: "Customer intake: find what is missing and ask before opening a project" },
@@ -535,7 +547,6 @@ export const TODO: Todo[] = [
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
-  { status: "planned", area: { th: "ส่งมอบ", en: "Delivery" }, th: "ขั้น 8: ชุดส่งมอบลูกค้า รวม release ที่ deploy แล้ว เอกสาร และผลเทสต์ไว้ในที่เดียว", en: "Stage 8: customer delivery package bringing the deployed release, documents and test evidence together" },
   { status: "planned", area: { th: "เครื่องมือ AI", en: "AI tools" }, th: "เครื่องมือ lint / format / static analysis สำหรับ AI (ตอนนี้ใส่ไว้ในคำสั่งเทสต์ของ repository ได้)", en: "Lint / format / static-analysis tools for AI (for now they can go in the repository test command)" },
   { status: "planned", area: { th: "เชื่อมต่อ", en: "Integrations" }, th: "เชื่อมอีเมลและปฏิทิน (ตอนนี้แจ้งออกภายนอกผ่าน webhook)", en: "Email and calendar integrations (outbound notices use webhooks today)" },
   { status: "planned", area: { th: "โครงสร้าง", en: "Infrastructure" }, th: "Redis และที่เก็บไฟล์แบบ S3 — ทำเมื่อเลือกที่ deploy แล้ว", en: "Redis and S3-compatible storage — once the deploy target is chosen" },
