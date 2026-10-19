@@ -994,3 +994,45 @@ export interface ReleaseReadiness {
   checks: { code: string; met: boolean; blocking: boolean; detail: string | null }[];
   unresolvedIssues: string[];
 }
+
+// ---------- customer intake ----------
+
+export type LeadStatus = "New" | "Clarifying" | "Qualified" | "Converted" | "Lost";
+
+export interface LeadQuestion {
+  id: string;
+  topic: string;
+  question: string;
+  answer: string | null;
+  askedAt: string;
+  answeredAt: string | null;
+  version: number;
+}
+
+export interface Lead {
+  id: string;
+  code: string;
+  title: string;
+  customerName: string;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  source: string | null;
+  need: string;
+  businessGoal: string | null;
+  targetUsers: string | null;
+  platforms: string | null;
+  constraints: string | null;
+  budget: number | null;
+  desiredDueDate: string | null;
+  status: LeadStatus;
+  projectId: string | null;
+  projectCode: string | null;
+  convertedAt: string | null;
+  lostReason: string | null;
+  checks: { code: string; met: boolean; blocking: boolean }[];
+  ready: boolean;
+  questions: LeadQuestion[];
+  createdAt: string;
+  version: number;
+}

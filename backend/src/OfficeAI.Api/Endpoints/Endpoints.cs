@@ -230,6 +230,17 @@ public static class Endpoints
         api.MapPost("/releases/{id:guid}/cancel", (Guid id, ReleaseOutcomeRequest r, ReleaseService s, CancellationToken ct) => s.CancelAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapPost("/releases/{id:guid}/deployed", (Guid id, ReleaseOutcomeRequest r, ReleaseService s, CancellationToken ct) => s.RecordDeployedAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapPost("/releases/{id:guid}/rolled-back", (Guid id, ReleaseOutcomeRequest r, ReleaseService s, CancellationToken ct) => s.RecordRolledBackAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        // Customer intake: company-wide, so reading needs project.all as well as the project area.
+        api.MapGet("/leads", (LeadService s, CancellationToken ct) => s.ListAsync(ct)).RequirePermission(Permissions.ProjectAll);
+        api.MapGet("/leads/{id:guid}", (Guid id, LeadService s, CancellationToken ct) => s.GetAsync(id, ct)).RequirePermission(Permissions.ProjectAll);
+        api.MapPost("/leads", (SaveLeadRequest r, LeadService s, CancellationToken ct) => s.CreateAsync(r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPut("/leads/{id:guid}", (Guid id, SaveLeadRequest r, LeadService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/leads/{id:guid}/questions", (Guid id, AskLeadQuestionRequest r, LeadService s, CancellationToken ct) => s.AskAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/leads/{id:guid}/questions/suggest", (Guid id, SuggestLeadQuestionsRequest r, LeadService s, CancellationToken ct) => s.SuggestQuestionsAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/leads/{id:guid}/questions/{questionId:guid}/answer", (Guid id, Guid questionId, AnswerLeadQuestionRequest r, LeadService s, CancellationToken ct) => s.AnswerAsync(id, questionId, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/leads/{id:guid}/qualify", (Guid id, LeadDecisionRequest r, LeadService s, CancellationToken ct) => s.QualifyAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/leads/{id:guid}/lost", (Guid id, LeadDecisionRequest r, LeadService s, CancellationToken ct) => s.MarkLostAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
+        api.MapPost("/leads/{id:guid}/convert", (Guid id, ConvertLeadRequest r, LeadService s, CancellationToken ct) => s.ConvertAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapGet("/projects/{id:guid}/estimates", (Guid id, DeliveryService s, CancellationToken ct) => s.ListEstimatesAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/rate-card", (DeliveryService s, CancellationToken ct) => s.ListRatesAsync(ct)).RequirePermission(Permissions.ProjectRead);
         api.MapPut("/rate-card/{roleDefinitionId:guid}", (Guid roleDefinitionId, SetRoleRateRequest r, DeliveryService s, CancellationToken ct) => s.SetRateAsync(roleDefinitionId, r, ct)).RequirePermission(Permissions.ProjectManage);

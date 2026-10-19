@@ -52,6 +52,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<ArchitectureDecision> ArchitectureDecisions => Set<ArchitectureDecision>();
     public DbSet<Defect> Defects => Set<Defect>();
     public DbSet<Release> Releases => Set<Release>();
+    public DbSet<Lead> Leads => Set<Lead>();
+    public DbSet<LeadQuestion> LeadQuestions => Set<LeadQuestion>();
     public DbSet<RoleRate> RoleRates => Set<RoleRate>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
     public DbSet<ProjectEstimate> Estimates => Set<ProjectEstimate>();

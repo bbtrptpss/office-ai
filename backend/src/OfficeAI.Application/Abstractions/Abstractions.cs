@@ -43,6 +43,8 @@ public interface IAppDbContext
     DbSet<ArchitectureDecision> ArchitectureDecisions { get; }
     DbSet<Defect> Defects { get; }
     DbSet<Release> Releases { get; }
+    DbSet<Lead> Leads { get; }
+    DbSet<LeadQuestion> LeadQuestions { get; }
     DbSet<RoleRate> RoleRates { get; }
     DbSet<CompanySettings> CompanySettings { get; }
     DbSet<ProjectEstimate> Estimates { get; }

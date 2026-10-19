@@ -31,6 +31,18 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.21.0",
+    date: "2026-10-19",
+    title: { th: "รับงานลูกค้า: ตรวจข้อมูลที่ขาดและถามกลับก่อนเปิดโปรเจกต์", en: "Customer intake: find what is missing and ask before opening a project" },
+    changes: [
+      { type: "added", th: "หน้า “รับงานลูกค้า” ใหม่: บันทึกคำขอพร้อมลูกค้า ผู้ติดต่อ ความต้องการ เป้าหมาย ผู้ใช้ แพลตฟอร์ม ข้อจำกัด งบ และวันที่ต้องการ (รหัส LEAD-001…)", en: "New “Customer intake” page: record a request with customer, contact, need, goal, users, platforms, constraints, budget and desired date (codes LEAD-001…)" },
+      { type: "added", th: "ระบบบอกว่ายังขาดข้อมูลอะไร และร่างคำถามถามกลับให้ทีละเรื่องเป็นภาษาที่เลือก ผู้ดูแลส่งคำถามให้ลูกค้าเองแล้วนำคำตอบกลับมาบันทึก (ระบบไม่ติดต่อลูกค้าเอง)", en: "The system lists what is still missing and drafts one question per gap in the chosen language; a person relays them and records the customer's answers (the system never contacts the customer)" },
+      { type: "added", th: "ยืนยันว่าข้อมูลครบได้เมื่อข้อมูลจำเป็นครบและทุกคำถามได้คำตอบ แล้วเปิดเป็นโปรเจกต์สถานะร่างได้ในคลิกเดียว พร้อมงบ กำหนดส่ง และเอกสาร Project brief ที่รวมคำขอและคำตอบทั้งหมด หรือปิดว่าไม่ได้งานพร้อมเหตุผล", en: "Confirm it is complete once the essentials are known and every question is answered, then open it as a Draft project in one step with budget, due date and a Project brief holding the request and all answers; or close it as lost with a reason" },
+      { type: "changed", th: "ขั้นตอนส่งมอบขั้น 1 เพิ่มเกณฑ์ “คำถามถึงลูกค้าได้คำตอบครบ” — คำถามเพิ่มเติมหลังเปิดโปรเจกต์แล้วจะทำให้ขั้นนี้กลับมาค้างจนกว่าจะได้คำตอบ", en: "Delivery stage 1 adds “customer questions all answered” — a follow-up question after the project opened holds the stage until it is answered" },
+      { type: "security", th: "ข้อมูลลูกค้าเห็นได้เฉพาะคนที่เห็นทุกโปรเจกต์ (project.all) และแก้ได้เฉพาะคนที่จัดการโปรเจกต์ได้", en: "Customer data is visible only to people who can see every project (project.all) and editable only by people who manage projects" },
+    ],
+  },
+  {
     version: "0.20.0",
     date: "2026-10-19",
     title: { th: "เตรียม release และอนุมัติก่อนขึ้น production", en: "Release preparation and approval before production" },
@@ -523,6 +535,10 @@ export const TODO: Todo[] = [
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
+  { status: "planned", area: { th: "ส่งมอบ", en: "Delivery" }, th: "ขั้น 8: ชุดส่งมอบลูกค้า รวม release ที่ deploy แล้ว เอกสาร และผลเทสต์ไว้ในที่เดียว", en: "Stage 8: customer delivery package bringing the deployed release, documents and test evidence together" },
+  { status: "planned", area: { th: "เครื่องมือ AI", en: "AI tools" }, th: "เครื่องมือ lint / format / static analysis สำหรับ AI (ตอนนี้ใส่ไว้ในคำสั่งเทสต์ของ repository ได้)", en: "Lint / format / static-analysis tools for AI (for now they can go in the repository test command)" },
+  { status: "planned", area: { th: "เชื่อมต่อ", en: "Integrations" }, th: "เชื่อมอีเมลและปฏิทิน (ตอนนี้แจ้งออกภายนอกผ่าน webhook)", en: "Email and calendar integrations (outbound notices use webhooks today)" },
+  { status: "planned", area: { th: "โครงสร้าง", en: "Infrastructure" }, th: "Redis และที่เก็บไฟล์แบบ S3 — ทำเมื่อเลือกที่ deploy แล้ว", en: "Redis and S3-compatible storage — once the deploy target is chosen" },
   { status: "planned", area: { th: "AI", en: "AI" }, th: "1 ม.ค. 2027: แก้ราคา Gemini 3.8 Flash ในหน้าตั้งค่า AI เป็น $1.50 / $7.50 ต่อล้าน token (ราคาโปรหมด)", en: "1 Jan 2027: update Gemini 3.8 Flash prices in AI settings to $1.50 / $7.50 per million tokens (intro pricing ends)" },
 ];
 

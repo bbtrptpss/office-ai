@@ -128,3 +128,36 @@ internal class ReleaseConfig : IEntityTypeConfiguration<Release>
         b.HasOne<Project>().WithMany().HasForeignKey(r => r.ProjectId).OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+internal class LeadConfig : IEntityTypeConfiguration<Lead>
+{
+    public void Configure(EntityTypeBuilder<Lead> b)
+    {
+        EntityConfig.Base(b);
+        b.ToTable("Leads");
+        b.Property(l => l.Code).HasMaxLength(20);
+        b.Property(l => l.Title).HasMaxLength(200);
+        b.Property(l => l.CustomerName).HasMaxLength(200);
+        b.Property(l => l.ContactName).HasMaxLength(200);
+        b.Property(l => l.ContactEmail).HasMaxLength(200);
+        b.Property(l => l.ContactPhone).HasMaxLength(50);
+        b.Property(l => l.Source).HasMaxLength(100);
+        b.Property(l => l.Budget).HasPrecision(18, 2);
+        b.Property(l => l.Status).HasConversion<string>().HasMaxLength(20);
+        b.HasIndex(l => l.Code).IsUnique();
+        b.HasIndex(l => l.ProjectId);
+        b.HasOne<Project>().WithMany().HasForeignKey(l => l.ProjectId).OnDelete(DeleteBehavior.SetNull);
+        b.HasMany(l => l.Questions).WithOne().HasForeignKey(q => q.LeadId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal class LeadQuestionConfig : IEntityTypeConfiguration<LeadQuestion>
+{
+    public void Configure(EntityTypeBuilder<LeadQuestion> b)
+    {
+        EntityConfig.Base(b);
+        b.ToTable("LeadQuestions");
+        b.Property(q => q.Topic).HasMaxLength(40);
+        b.Property(q => q.Question).HasMaxLength(2000);
+    }
+}

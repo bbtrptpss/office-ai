@@ -141,6 +141,7 @@ public static class DependencyInjection
         services.AddScoped<StageGateService>();
         services.AddScoped<DefectService>();
         services.AddScoped<ReleaseService>();
+        services.AddScoped<LeadService>();
         services.AddScoped<CodeService>();
         services.AddScoped<OfficeAI.Application.Reports.ReportsService>();
         services.AddScoped<OfficeAI.Application.Reports.CloseoutService>();

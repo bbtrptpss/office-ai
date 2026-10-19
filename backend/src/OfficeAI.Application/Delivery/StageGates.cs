@@ -41,6 +41,8 @@ public class StageGateService(IAppDbContext db)
         var releases = await db.Releases.AsNoTracking().Where(r => r.ProjectId == projectId).OrderByDescending(r => r.CreatedAt)
             .Select(r => new { r.Tag, r.Status, HasNotes = r.Notes != null && r.Notes != "", Prepared = r.DeploymentPlan != null && r.DeploymentPlan != "" && r.RollbackPlan != null && r.RollbackPlan != "" }).ToListAsync(ct);
         var openDefects = await db.Defects.CountAsync(d => d.ProjectId == projectId && d.Status == DefectStatus.Open, ct);
+        // Follow-up questions to the customer stay part of intake after the lead became this project.
+        var lead = await db.Leads.AsNoTracking().Where(l => l.ProjectId == projectId).Select(l => new { l.Code, Open = l.Questions.Count(q => q.AnsweredAt == null) }).FirstOrDefaultAsync(ct);
         var lessons = await db.KnowledgeEntries.CountAsync(k => k.ProjectId == projectId && k.Kind == KnowledgeKind.Lesson && k.Status == KnowledgeStatus.Validated, ct);
 
         bool Doc(DocumentKind k) => docs.Any(d => d.Kind == k);
@@ -64,7 +66,8 @@ public class StageGateService(IAppDbContext db)
         var defs = new (string Code, List<StageCheckDto> Entry, List<StageCheckDto> Exit, List<string> Deliverables, StageCheckDto Approval)[]
         {
             ("intake", [new("projectCreated", true)],
-                [new("hasDescription", !string.IsNullOrWhiteSpace(p.Description)), new("hasBudget", p.EstimatedBudget is not null), new("hasDueDate", p.DueDate is not null)],
+                [new("hasDescription", !string.IsNullOrWhiteSpace(p.Description)), new("hasBudget", p.EstimatedBudget is not null), new("hasDueDate", p.DueDate is not null),
+                    new("clarificationsAnswered", lead is not { Open: > 0 }, lead is null ? null : $"{lead.Code}: {lead.Open}")],
                 ["projectBrief"], new("noApprovalNeeded", true)),
             ("discovery", [],
                 [new("hasRequirements", live.Count > 0, $"{live.Count}"),

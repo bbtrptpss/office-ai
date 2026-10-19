@@ -16,7 +16,7 @@ public class AppExceptionHandler(IProblemDetailsService problems, ILogger<AppExc
             NotFoundException => (404, "not_found", ex.Message),
             ConcurrencyException => (409, "concurrency_conflict", ex.Message),
             ForbiddenException => (403, "forbidden", ex.Message),
-            DomainException d => (d.Code.EndsWith("cycle") || d.Code.StartsWith("task.") || d.Code.StartsWith("agent.") || d.Code.StartsWith("approval.") || d.Code.StartsWith("workflow.") || d.Code.StartsWith("defect.") || d.Code.StartsWith("release.") ? 409 : 400, d.Code, d.Message),
+            DomainException d => (d.Code.EndsWith("cycle") || d.Code.StartsWith("task.") || d.Code.StartsWith("agent.") || d.Code.StartsWith("approval.") || d.Code.StartsWith("workflow.") || d.Code.StartsWith("defect.") || d.Code.StartsWith("release.") || d.Code.StartsWith("lead.") ? 409 : 400, d.Code, d.Message),
             DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } } =>
                 (409, "duplicate", "A record with the same unique value already exists."),
             BadHttpRequestException => (400, "bad_request", "The request body is invalid."),

@@ -229,3 +229,18 @@ Fix tasks are ordinary tasks, not part of a workflow, so the engine does not sta
 | Project page “Releases” tab; approval inbox shows tag, commit, plans and unresolved issues | done (typecheck/lint clean; browser walkthrough not done — Chrome extension not connected; API smoke-tested on the running stack) |
 
 208 tests.
+
+## Phase 17 — Customer intake ✅ (2026-10-19)
+
+| Item | Status |
+| --- | --- |
+| §7 Stage 1 “Receive customer requirements”: `Lead` (company-wide code LEAD-001…, customer, contact, source, need, goal, users, platforms, constraints, budget, desired date) with status New → Clarifying → Qualified → Converted / Lost; `GET/POST /leads`, `GET/PUT /leads/{id}` | done |
+| §7 Stage 1 “Detect missing information”: deterministic checks (contact, need detail ≥ 40 chars, business goal, target users, budget, desired date — blocking; platforms, constraints — optional; every question answered — blocking) | done |
+| §7 Stage 1 “Ask clarifying questions”: `POST /leads/{id}/questions` and `/questions/suggest` (one templated question per gap, th/en, no duplicates of open questions); answers recorded by people (`/questions/{qid}/answer`). Nothing is sent to the customer by the system | done |
+| `POST /leads/{id}/qualify` (refused while blocking checks fail), `/lost` (reason required), `/convert` (qualified only; creates a Draft project with budget and due date plus a “Project brief” document holding the request and every answer) | done |
+| Access: read needs `project.all`, write `project.manage`; restricted people get 403 | done |
+| Stage 1 gate adds “clarificationsAnswered” (follow-up questions on a converted lead hold the stage) | done |
+| `/leads` page (nav “Customer intake”) | done (typecheck/lint clean; browser walkthrough not done — Chrome extension not connected) |
+
+207 tests.
+
