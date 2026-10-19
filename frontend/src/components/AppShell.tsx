@@ -46,7 +46,11 @@ import { art } from "@/lib/characters";
 const MENU_WIDTH = 300;
 
 /** Pages also offered as pill tabs in the top bar, like the reference design's Dashboard / Widgets / Recent. */
-const TOP_TABS: NavKey[] = ["navDashboard", "navOffice", "navProjects", "navChat", "navApprovals"];
+const TOP_TABS: NavKey[] = ["navDashboard", "navOffice", "navProjects", "navTaskBoard", "navChat", "navApprovals"];
+/** Shorter top-bar labels where the menu name is too long for a pill. */
+const TOP_LABELS: Partial<Record<NavKey, "navTaskBoardShort">> = { navTaskBoard: "navTaskBoardShort" };
+/** Width from which the top-bar pills show their labels next to the icons. */
+const WIDE = "@media (min-width: 1280px)";
 
 /** A frosted-glass panel floating over the starry background. */
 const glassPanel = (th: import("@mui/material/styles").Theme) => ({
@@ -213,17 +217,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Stack direction="row" spacing={0.5} sx={{ display: { xs: "none", sm: "flex" }, p: 0.5, borderRadius: 999, bgcolor: "action.hover" }}>
               {tabs.map((item) => {
                 const selected = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href!);
+                const name = t[TOP_LABELS[item.key] ?? item.key];
                 return (
-                  <Button key={item.key} component={Link} href={item.href!} size="small" startIcon={item.icon}
-                    sx={(th) => ({
-                      px: 1.75, py: 0.5, color: selected ? "primary.main" : "text.secondary", fontWeight: selected ? 700 : 500,
-                      bgcolor: selected ? "#fff" : "transparent", boxShadow: selected ? `0 2px 10px ${brand.purple}26` : "none",
-                      "& .MuiSvgIcon-root": { fontSize: 18 }, "&:hover": { bgcolor: selected ? "#fff" : "action.hover" },
-                      ...th.applyStyles("dark", { bgcolor: selected ? "rgba(185,160,242,.2)" : "transparent", "&:hover": { bgcolor: "rgba(185,160,242,.14)" } }),
-                    })}>
-                    {t[item.key]}
-                    {(badges[item.key] ?? 0) > 0 && <Box component="span" sx={{ ml: 0.75, minWidth: 18, height: 18, px: 0.5, borderRadius: 999, bgcolor: "secondary.main", color: "#fff", fontSize: 11, lineHeight: "18px", textAlign: "center" }}>{badges[item.key]! > 99 ? "99+" : badges[item.key]}</Box>}
-                  </Button>
+                  <Tooltip key={item.key} title={name} slotProps={{ tooltip: { sx: { [WIDE]: { display: "none" } } } }}>
+                    <Button component={Link} href={item.href!} size="small" startIcon={item.icon} aria-label={name}
+                      sx={(th) => ({
+                        px: 1.25, py: 0.5, minWidth: 0, color: selected ? "primary.main" : "text.secondary", fontWeight: selected ? 700 : 500,
+                        bgcolor: selected ? "#fff" : "transparent", boxShadow: selected ? `0 2px 10px ${brand.purple}26` : "none",
+                        "& .MuiSvgIcon-root": { fontSize: 18 }, "&:hover": { bgcolor: selected ? "#fff" : "action.hover" },
+                        "& .MuiButton-startIcon": { mx: 0 }, [WIDE]: { px: 1.75, "& .MuiButton-startIcon": { mr: 1, ml: -0.5 } },
+                        ...th.applyStyles("dark", { bgcolor: selected ? "rgba(185,160,242,.2)" : "transparent", "&:hover": { bgcolor: "rgba(185,160,242,.14)" } }),
+                      })}>
+                      {/* Below WIDE the six pills don't fit with their labels, so they show icons only (name in the tooltip). */}
+                      <Box component="span" sx={{ display: "none", [WIDE]: { display: "inline" } }}>{name}</Box>
+                      {(badges[item.key] ?? 0) > 0 && <Box component="span" sx={{ ml: 0.75, minWidth: 18, height: 18, px: 0.5, borderRadius: 999, bgcolor: "secondary.main", color: "#fff", fontSize: 11, lineHeight: "18px", textAlign: "center" }}>{badges[item.key]! > 99 ? "99+" : badges[item.key]}</Box>}
+                    </Button>
+                  </Tooltip>
                 );
               })}
             </Stack>

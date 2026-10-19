@@ -145,7 +145,7 @@ The planned items left open after Phase 7, each with its own commit and Update l
 
 ## Phase 9 — Master Prompt gaps ✅ (merged to master, 2026-10-19)
 
-Items from the Master Prompt that were not built yet, each with an Update log entry (v0.14.0–v0.14.3); v0.14.4 hides the month picker on the profitability tab after a browser walkthrough.
+Items from the Master Prompt that were not built yet, each with an Update log entry (v0.14.0–v0.14.3); v0.14.4 hides the month picker on the profitability tab after a browser walkthrough; v0.14.5 adds the task board to the top bar (icon-only pills below 1280px).
 
 | Item | Status |
 | --- | --- |

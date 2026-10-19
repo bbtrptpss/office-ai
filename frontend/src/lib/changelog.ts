@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.14.5",
+    date: "2026-10-19",
+    title: { th: "กระดานงานอยู่ในแถบบน", en: "Task board in the top bar" },
+    changes: [
+      { type: "changed", th: "แถบเมนูด้านบนมี “กระดานงาน” ต่อจากโปรเจกต์ (ยังอยู่ในเมนูหลักใต้โลโก้เหมือนเดิม)", en: "The top bar now has “Task board” next to Projects (it stays in the main menu under the logo too)" },
+      { type: "fixed", th: "จอกว้างไม่ถึง 1280px แถบบนแสดงเฉพาะไอคอน ชี้เพื่อดูชื่อเมนู เดิมชื่อเมนูล้นแถบบนจอขนาดกลาง", en: "Below 1280px wide the top bar shows icons only, with the name on hover; the labels used to overflow on medium screens" },
+    ],
+  },
+  {
     version: "0.14.4",
     date: "2026-10-19",
     title: { th: "ซ่อนช่องเดือนในแท็บกำไร", en: "Month picker hidden on the profitability tab" },
