@@ -2738,6 +2738,9 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                     b.Property<string>("AcceptanceCriteria")
                         .HasColumnType("text");
 
+                    b.Property<int>("Complexity")
+                        .HasColumnType("integer");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 

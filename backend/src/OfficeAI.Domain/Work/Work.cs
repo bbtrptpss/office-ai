@@ -42,6 +42,13 @@ public enum TaskPriority
     Critical = 4,
 }
 
+public enum TaskComplexity
+{
+    Routine = 1,
+    Standard = 2,
+    Complex = 3,
+}
+
 /// <summary>A unit of work. Named WorkTask to avoid clashing with System.Threading.Tasks.Task.</summary>
 public class WorkTask : Entity, IAuditable
 {
@@ -53,6 +60,9 @@ public class WorkTask : Entity, IAuditable
     public string? AcceptanceCriteria { get; set; }
     public WorkTaskStatus Status { get; set; } = WorkTaskStatus.Todo;
     public TaskPriority Priority { get; set; } = TaskPriority.Medium;
+
+    /// <summary>Picks the model tier for AI runs: routine work goes to a cheaper model, complex work to a stronger one.</summary>
+    public TaskComplexity Complexity { get; set; } = TaskComplexity.Standard;
     public DateOnly? DueDate { get; set; }
     public List<TaskAssignment> Assignments { get; set; } = [];
 

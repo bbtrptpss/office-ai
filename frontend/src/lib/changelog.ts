@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.14.1",
+    date: "2026-10-19",
+    title: { th: "เลือกโมเดลตามความซับซ้อนของงาน", en: "Model choice by task complexity" },
+    changes: [
+      { type: "added", th: "งานมีช่อง “ความซับซ้อน” (งานทั่วไป / มาตรฐาน / ซับซ้อน): งานทั่วไปรันด้วยโมเดลระดับ Routine ที่ถูกที่สุดของผู้ให้บริการเดียวกัน งานซับซ้อนใช้โมเดลระดับขั้นสูง ถ้าไม่มีโมเดลระดับนั้นจะใช้โมเดลที่ตั้งไว้ของพนักงาน — งานเดิมทั้งหมดเป็น “มาตรฐาน” จึงไม่มีอะไรเปลี่ยน", en: "Tasks have a Complexity (Routine / Standard / Complex): routine tasks run on the cheapest routine-tier model of the same provider, complex tasks on its advanced-tier model, falling back to the employee's configured model — every existing task is Standard, so nothing changes until you set it" },
+      { type: "added", th: "AI ผู้วางแผนระบุความซับซ้อนของแต่ละงานในแผนได้ (แสดงในหน้าอนุมัติแผน) และงานย่อยที่ถูกมอบต่อใช้ความซับซ้อนเดียวกับงานแม่", en: "The AI planner can set each plan task's complexity (shown on plan approval), and delegated sub-tasks inherit their parent's complexity" },
+    ],
+  },
+  {
     version: "0.14.0",
     date: "2026-10-19",
     title: { th: "กำไรโดยประมาณและสถานการณ์จำลอง", en: "Profitability and scenario planning" },

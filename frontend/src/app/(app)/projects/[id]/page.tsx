@@ -10,7 +10,7 @@ import Link from "next/link";
 import AddIcon from "@mui/icons-material/Add";
 import ForumIcon from "@mui/icons-material/ForumOutlined";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
-import { AgentRun, api, Deliverable, Employee, Milestone, Project, Review, Task, TaskPriority, TaskStatus } from "@/lib/api";
+import { AgentRun, api, Deliverable, Employee, Milestone, Project, Review, Task, TaskComplexity, TaskPriority, TaskStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -21,6 +21,7 @@ import { DecisionsPanel, DocumentsPanel, EstimatesPanel, RepositoryPanel, Requir
 
 const COLUMNS: TaskStatus[] = ["Todo", "Assigned", "InProgress", "Blocked", "InReview", "WaitingApproval", "Done", "Failed"];
 const PRIORITIES: TaskPriority[] = ["Low", "Medium", "High", "Critical"];
+const COMPLEXITIES: TaskComplexity[] = ["Routine", "Standard", "Complex"];
 const COLUMN_COLORS: Record<TaskStatus, string> = {
   Todo: "#CDB8F5", Assigned: "#A9C7FF", InProgress: "#7B4FC9", Blocked: "#FF8A8A", InReview: "#FF7EB9",
   WaitingApproval: "#FFC56E", Done: "#7ED6A8", Failed: "#E06060", Cancelled: "#BDB6CC",
@@ -35,11 +36,12 @@ interface TaskForm {
   description: string;
   acceptanceCriteria: string;
   priority: TaskPriority;
+  complexity: TaskComplexity;
   dueDate: string;
   milestoneId: string;
 }
 
-const emptyForm: TaskForm = { title: "", description: "", acceptanceCriteria: "", priority: "Medium", dueDate: "", milestoneId: "" };
+const emptyForm: TaskForm = { title: "", description: "", acceptanceCriteria: "", priority: "Medium", complexity: "Standard", dueDate: "", milestoneId: "" };
 
 export default function ProjectBoardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -92,7 +94,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
     setOpenTaskId(task.id);
     setForm({
       title: task.title, description: task.description ?? "", acceptanceCriteria: task.acceptanceCriteria ?? "",
-      priority: task.priority, dueDate: task.dueDate ?? "", milestoneId: task.milestoneId ?? "",
+      priority: task.priority, complexity: task.complexity, dueDate: task.dueDate ?? "", milestoneId: task.milestoneId ?? "",
     });
   }
 
@@ -344,6 +346,10 @@ function TaskFields({ form, setForm, milestones, disabled }: {
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
         <TextField select label={t.priority} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })} fullWidth disabled={disabled}>
           {PRIORITIES.map((p) => <MenuItem key={p} value={p}>{label(p)}</MenuItem>)}
+        </TextField>
+        <TextField select label={t.complexity} value={form.complexity} onChange={(e) => setForm({ ...form, complexity: e.target.value as TaskComplexity })} fullWidth disabled={disabled}
+          helperText={form.complexity === "Standard" ? undefined : t.complexityHint}>
+          {COMPLEXITIES.map((c) => <MenuItem key={c} value={c}>{label(c)}</MenuItem>)}
         </TextField>
         <TextField label={t.dueDate} type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth disabled={disabled} />
         <TextField select label="Milestone" value={form.milestoneId} onChange={(e) => setForm({ ...form, milestoneId: e.target.value })} fullWidth disabled={disabled}>

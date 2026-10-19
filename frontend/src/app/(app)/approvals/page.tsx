@@ -149,6 +149,7 @@ function Payload({ approval: a }: { approval: Approval }) {
     const items: PlanItem[] = (payload.tasks ?? payload.Tasks ?? []).map((x: Record<string, unknown>) => ({
       key: x.key ?? x.Key, title: x.title ?? x.Title, description: x.description ?? x.Description,
       requiredSkills: x.requiredSkills ?? x.RequiredSkills ?? [], dependsOn: x.dependsOn ?? x.DependsOn ?? [], priority: x.priority ?? x.Priority,
+      complexity: x.complexity ?? x.Complexity,
     }) as PlanItem);
     return (
       <TableContainer component={Paper} variant="outlined">
@@ -172,7 +173,7 @@ function Payload({ approval: a }: { approval: Approval }) {
                 </TableCell>
                 <TableCell>{i.requiredSkills.join(", ")}</TableCell>
                 <TableCell sx={{ fontFamily: "monospace" }}>{i.dependsOn.join(", ") || "—"}</TableCell>
-                <TableCell>{label(i.priority)}</TableCell>
+                <TableCell>{label(i.priority)}{i.complexity && i.complexity !== "Standard" ? ` · ${label(i.complexity)}` : ""}</TableCell>
               </TableRow>
             ))}
           </TableBody>

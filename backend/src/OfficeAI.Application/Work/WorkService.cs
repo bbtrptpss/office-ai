@@ -19,11 +19,11 @@ public record SaveMilestoneRequest(string Name, DateOnly? DueDate, int SortOrder
 public record AssigneeDto(Guid EmployeeId, string DisplayName, EmployeeKind Kind);
 public record TaskDto(
     Guid Id, Guid ProjectId, Guid? MilestoneId, string Title, string? Description, string? AcceptanceCriteria,
-    WorkTaskStatus Status, TaskPriority Priority, DateOnly? DueDate, List<AssigneeDto> Assignees,
+    WorkTaskStatus Status, TaskPriority Priority, TaskComplexity Complexity, DateOnly? DueDate, List<AssigneeDto> Assignees,
     List<Guid> DependsOn, List<WorkTaskStatus> NextStates, uint Version);
 public record SaveTaskRequest(
     string Title, string? Description = null, string? AcceptanceCriteria = null, Guid? MilestoneId = null,
-    TaskPriority Priority = TaskPriority.Medium, DateOnly? DueDate = null, uint? Version = null);
+    TaskPriority Priority = TaskPriority.Medium, DateOnly? DueDate = null, uint? Version = null, TaskComplexity Complexity = TaskComplexity.Standard);
 public record ChangeStatusRequest(WorkTaskStatus Status, uint? Version = null);
 public record AssignRequest(Guid EmployeeId, uint? Version = null);
 public record AddDependencyRequest(Guid DependsOnTaskId);
@@ -138,7 +138,7 @@ public class WorkService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvi
         var deps = await db.TaskDependencies.AsNoTracking().Where(d => ids.Contains(d.TaskId)).ToListAsync(ct);
 
         return tasks.Select(t => new TaskDto(
-            t.Id, t.ProjectId, t.MilestoneId, t.Title, t.Description, t.AcceptanceCriteria, t.Status, t.Priority, t.DueDate,
+            t.Id, t.ProjectId, t.MilestoneId, t.Title, t.Description, t.AcceptanceCriteria, t.Status, t.Priority, t.Complexity, t.DueDate,
             assignees.Where(a => a.TaskId == t.Id).Select(a => new AssigneeDto(a.Id, a.DisplayName, a.Kind)).ToList(),
             deps.Where(d => d.TaskId == t.Id).Select(d => d.DependsOnTaskId).ToList(),
             [.. TaskStateMachine.NextStates(t.Status)],
@@ -169,6 +169,7 @@ public class WorkService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvi
     {
         Validate.Required(r.Title, "title");
         if (!Enum.IsDefined(r.Priority)) throw new DomainException("validation", "priority is invalid.");
+        if (!Enum.IsDefined(r.Complexity)) throw new DomainException("validation", "complexity is invalid.");
         if (r.MilestoneId is { } m && !await db.Milestones.AnyAsync(x => x.Id == m && x.ProjectId == t.ProjectId, ct))
             throw new DomainException("validation", "milestoneId does not belong to this project.");
         t.Title = r.Title.Trim();
@@ -176,6 +177,7 @@ public class WorkService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvi
         t.AcceptanceCriteria = r.AcceptanceCriteria;
         t.MilestoneId = r.MilestoneId;
         t.Priority = r.Priority;
+        t.Complexity = r.Complexity;
         t.DueDate = r.DueDate;
     }
 

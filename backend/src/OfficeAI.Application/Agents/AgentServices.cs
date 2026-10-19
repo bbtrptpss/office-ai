@@ -258,8 +258,10 @@ public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAg
         var provider = providers.Find(config.Provider);
         if (provider is null || !provider.IsAvailable)
             throw new DomainException("agent.provider_unavailable", $"AI provider '{config.Provider}' is not configured. Add its API key first.");
-        if (!await db.AiModels.AnyAsync(m => m.Provider == config.Provider && m.ModelId == config.ModelId && m.IsEnabled, ct))
-            throw new DomainException("agent.model_unavailable", $"Model '{config.ModelId}' is not enabled or has no price.");
+        var models = await db.AiModels.AsNoTracking().Where(m => m.Provider == config.Provider && m.IsEnabled).ToListAsync(ct);
+        var configured = models.FirstOrDefault(m => m.ModelId == config.ModelId)
+            ?? throw new DomainException("agent.model_unavailable", $"Model '{config.ModelId}' is not enabled or has no price.");
+        var model = ModelRouter.Pick(configured, task.Complexity, models);
 
         var monthStart = AgentAdminService.MonthStart(clock);
         var spent = await db.CostRecords.Where(c => c.EmployeeId == employeeId && c.Kind == CostKind.Actual && c.OccurredAt >= monthStart).SumAsync(c => c.AmountUsd, ct);
@@ -274,7 +276,7 @@ public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAg
         var run = new AgentRun
         {
             TaskId = taskId, ProjectId = task.ProjectId, EmployeeId = employeeId, Purpose = purpose, Attempt = attempt, Provider = provider.Name,
-            ModelId = config.ModelId, IsSimulated = provider.IsSimulated, TriggeredBy = current.UserId, CorrelationId = current.CorrelationId,
+            ModelId = model.ModelId, IsSimulated = provider.IsSimulated, TriggeredBy = current.UserId, CorrelationId = current.CorrelationId,
         };
         db.AgentRuns.Add(run);
         await db.SaveChangesAsync(ct);
@@ -356,5 +358,25 @@ public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAg
             runs.Count,
             runs.Count(r => r.Status is AgentRunStatus.Queued or AgentRunStatus.Running),
             byEmployee);
+    }
+}
+
+/// <summary>
+/// Chooses the model for a run. Standard tasks use the employee's configured model; routine tasks drop to the cheapest
+/// routine-tier model of the same provider and complex tasks rise to its cheapest advanced-tier model, when one is enabled.
+/// </summary>
+public static class ModelRouter
+{
+    public static AiModel Pick(AiModel configured, TaskComplexity complexity, IEnumerable<AiModel> enabledModels)
+    {
+        var wanted = complexity switch
+        {
+            TaskComplexity.Routine when configured.Tier > ModelTier.Routine => ModelTier.Routine,
+            TaskComplexity.Complex when configured.Tier < ModelTier.Advanced => ModelTier.Advanced,
+            _ => (ModelTier?)null,
+        };
+        if (wanted is null) return configured;
+        return enabledModels.Where(m => m.Provider == configured.Provider && m.IsEnabled && m.Tier == wanted)
+            .OrderBy(m => m.InputUsdPerMTok + m.OutputUsdPerMTok).ThenBy(m => m.ModelId).FirstOrDefault() ?? configured;
     }
 }

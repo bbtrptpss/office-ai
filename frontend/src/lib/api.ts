@@ -49,6 +49,7 @@ export type ProjectStatus = "Draft" | "Active" | "OnHold" | "Completed" | "Cance
 export type TaskStatus =
   | "Todo" | "Assigned" | "InProgress" | "Blocked" | "InReview" | "WaitingApproval" | "Done" | "Failed" | "Cancelled";
 export type TaskPriority = "Low" | "Medium" | "High" | "Critical";
+export type TaskComplexity = "Routine" | "Standard" | "Complex";
 
 export interface Me {
   userId: string;
@@ -144,6 +145,7 @@ export interface Task {
   acceptanceCriteria: string | null;
   status: TaskStatus;
   priority: TaskPriority;
+  complexity: TaskComplexity;
   dueDate: string | null;
   assignees: { employeeId: string; displayName: string; kind: EmployeeKind }[];
   dependsOn: string[];
@@ -426,6 +428,7 @@ export interface PlanItem {
   requiredSkills: string[];
   dependsOn: string[];
   priority: TaskPriority;
+  complexity?: TaskComplexity;
 }
 
 // ---------- Phase 4: delivery & code ----------

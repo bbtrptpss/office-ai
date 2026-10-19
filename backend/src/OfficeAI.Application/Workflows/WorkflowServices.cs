@@ -134,7 +134,7 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
             var task = new WorkTask
             {
                 ProjectId = workflow.ProjectId, WorkflowExecutionId = workflow.Id, PlanKey = i.Key, Title = i.Title, Description = i.Description,
-                AcceptanceCriteria = i.AcceptanceCriteria, Priority = i.Priority, RequiredSkills = i.RequiredSkills,
+                AcceptanceCriteria = i.AcceptanceCriteria, Priority = i.Priority, Complexity = i.Complexity, RequiredSkills = i.RequiredSkills,
             };
             db.Tasks.Add(task);
             byKey[i.Key] = task;

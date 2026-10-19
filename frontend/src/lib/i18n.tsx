@@ -259,6 +259,8 @@ const th = {
   // company management
   finance: "การเงิน",
   performance: "ผลงานพนักงาน AI",
+  complexity: "ความซับซ้อน",
+  complexityHint: "งานทั่วไปใช้โมเดลราคาถูก งานซับซ้อนใช้โมเดลขั้นสูง (ถ้ามีในผู้ให้บริการเดียวกัน)",
   profitability: "กำไรและสถานการณ์จำลอง",
   profitTitle: "กำไรโดยประมาณต่อโปรเจกต์",
   profitNote: "คำนวณจากใบประเมินราคาที่อนุมัติล่าสุด · คาดการณ์ = ต้นทุนตามแผน + ค่า AI ที่เกินแผนจริง (เป็นการประมาณ ไม่ใช่ผลจริง)",
@@ -616,6 +618,8 @@ const en: Dict = {
   roles: "Roles",
   finance: "Finance",
   performance: "AI performance",
+  complexity: "Complexity",
+  complexityHint: "Routine uses a cheaper model, Complex a stronger one (when the same provider has one)",
   profitability: "Profitability & scenarios",
   profitTitle: "Estimated profitability by project",
   profitNote: "From the latest approved estimate · forecast = planned cost + actual AI spend above plan (an estimate, not an actual result)",
@@ -966,7 +970,7 @@ const statusTh: Record<string, string> = {
   Policy: "นโยบาย", Lesson: "บทเรียน", Template: "แม่แบบ", Reference: "อ้างอิง", Company: "ทั้งบริษัท", Department: "แผนก", Project: "โปรเจกต์",
   Queued: "รอคิว", Running: "กำลังทำงาน", Succeeded: "สำเร็จ", LimitReached: "ถึงขีดจำกัด",
   Denied: "ถูกปฏิเสธ", TimedOut: "หมดเวลา", InvalidInput: "ข้อมูลไม่ถูกต้อง", Submitted: "ส่งแล้ว", Accepted: "ยอมรับ", Rejected: "ไม่ผ่าน",
-  Routine: "งานทั่วไป", Standard: "มาตรฐาน", Advanced: "ขั้นสูง", XHigh: "สูงมาก", Max: "สูงสุด",
+  Routine: "งานทั่วไป", Standard: "มาตรฐาน", Advanced: "ขั้นสูง", Complex: "ซับซ้อน", XHigh: "สูงมาก", Max: "สูงสุด",
   Published: "เผยแพร่แล้ว", Normal: "ปกติ", Important: "สำคัญ", Scheduled: "นัดไว้", Held: "ประชุมแล้ว", None: "ยังไม่มี",
   Invited: "ได้รับเชิญ", Attended: "เข้าร่วม", Absent: "ไม่ได้เข้าร่วม",
 };

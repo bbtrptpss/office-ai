@@ -5,7 +5,8 @@ using OfficeAI.Domain.Work;
 namespace OfficeAI.Application.Workflows;
 
 public sealed record PlanItem(
-    string Key, string Title, string? Description, string? AcceptanceCriteria, List<string> RequiredSkills, List<string> DependsOn, TaskPriority Priority);
+    string Key, string Title, string? Description, string? AcceptanceCriteria, List<string> RequiredSkills, List<string> DependsOn, TaskPriority Priority,
+    TaskComplexity Complexity = TaskComplexity.Standard);
 
 public static partial class PlanParser
 {
@@ -28,10 +29,11 @@ public static partial class PlanParser
             if (key is null || !KeyPattern().IsMatch(key)) return (null, $"Task key '{key}' must be 1-40 lowercase letters, digits or dashes.");
             if (string.IsNullOrWhiteSpace(title) || title.Length > 200) return (null, $"Task '{key}' needs a title of at most 200 characters.");
             var priority = Enum.TryParse<TaskPriority>(Str(t, "priority"), true, out var p) && Enum.IsDefined(p) ? p : TaskPriority.Medium;
+            var complexity = Enum.TryParse<TaskComplexity>(Str(t, "complexity"), true, out var c) && Enum.IsDefined(c) ? c : TaskComplexity.Standard;
             items.Add(new PlanItem(key, title, Limit(Str(t, "description"), 4000), Limit(Str(t, "acceptanceCriteria"), 4000),
                 Strings(t, "requiredSkills").Select(s => s.Trim().ToLowerInvariant()).Where(s => s.Length > 0).Distinct().Take(10).ToList(),
                 Strings(t, "dependsOn").Select(s => s.Trim().ToLowerInvariant()).Distinct().ToList(),
-                priority));
+                priority, complexity));
         }
         if (items.Count == 0) return (null, "The plan has no tasks.");
         if (items.Count > MaxItems) return (null, $"The plan has {items.Count} tasks; the limit is {MaxItems}. Group smaller steps together.");

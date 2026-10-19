@@ -37,7 +37,8 @@ public sealed class PlanSubmitTool : IAgentTool
 
     public ToolDescriptor Descriptor { get; } = new(ToolId, "1.0",
         "Submit the plan for the objective: a list of tasks with a short key, title, description, acceptance criteria, required skills, " +
-        "the keys of tasks each one depends on, and a priority (Low, Medium, High, Critical). Keep tasks concrete and independently checkable.",
+        "the keys of tasks each one depends on, a priority (Low, Medium, High, Critical) and a complexity (Routine for formatting/simple edits, " +
+        "Standard, Complex for architecture, hard reasoning or security work; it picks a cheaper or stronger model). Keep tasks concrete and independently checkable.",
         JsonSerializer.SerializeToElement(new
         {
             type = "object",
@@ -60,6 +61,7 @@ public sealed class PlanSubmitTool : IAgentTool
                             requiredSkills = new { type = "array", items = new { type = "string" } },
                             dependsOn = new { type = "array", items = new { type = "string" } },
                             priority = new { type = "string", @enum = new[] { "Low", "Medium", "High", "Critical" } },
+                            complexity = new { type = "string", @enum = new[] { "Routine", "Standard", "Complex" } },
                         },
                         required = new[] { "key", "title" },
                     },
@@ -206,7 +208,7 @@ public sealed class DelegateTaskTool : IAgentTool
             ProjectId = parent.ProjectId, WorkflowExecutionId = workflowId, ParentTaskId = parent.Id, DelegationDepth = parent.DelegationDepth + 1,
             Title = input.GetProperty("title").GetString()!.Trim(), Description = input.GetProperty("description").GetString(),
             AcceptanceCriteria = input.TryGetProperty("acceptanceCriteria", out var a) ? a.GetString() : null,
-            Priority = parent.Priority, RequiredSkills = skills,
+            Priority = parent.Priority, Complexity = parent.Complexity, RequiredSkills = skills,
         };
         ctx.Db.Tasks.Add(child);
         ctx.Db.TaskDependencies.Add(new TaskDependency { TaskId = parent.Id, DependsOnTaskId = child.Id, CreatedAt = ctx.Clock.GetUtcNow() });
