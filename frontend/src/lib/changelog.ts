@@ -31,6 +31,14 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.14.3",
+    date: "2026-10-19",
+    title: { th: "Claude ใช้ prompt caching", en: "Prompt caching for Claude" },
+    changes: [
+      { type: "changed", th: "การเรียก Claude เปิด prompt caching อัตโนมัติ: แต่ละรอบของงานส่ง tools, system prompt และประวัติเดิมซ้ำ ส่วนนั้นจะอ่านจาก cache ในราคาถูกกว่ามาก (ค่า cache คิดเงินแยกตามราคาในหน้าตั้งค่า AI อยู่แล้ว) — ยังไม่ได้ทดสอบกับ API จริงเพราะบัญชี Anthropic ยังไม่มีเครดิต", en: "Claude calls use automatic prompt caching: each turn of a run resends the same tools, system prompt and history, which is then read from cache at a much lower price (cache tokens are already priced separately in AI settings) — not yet exercised against the real API because the Anthropic account has no credit" },
+    ],
+  },
+  {
     version: "0.14.2",
     date: "2026-10-19",
     title: { th: "กระดานงานทั้งบริษัท", en: "Company task board" },

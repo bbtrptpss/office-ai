@@ -77,6 +77,9 @@ public sealed class AnthropicProvider(IOptions<AnthropicOptions> options, IAiCre
             OutputConfig = new OutputConfig { Effort = MapEffort(request.Effort) },
             Messages = request.Messages.Select(ToParam).ToList(),
             Tools = request.Tools.Select(t => new ToolUnion(ToTool(t))).ToList(),
+            // Automatic prompt caching: each turn of a run resends the same tools, system prompt and history, so the
+            // prefix is read from cache at a fraction of the input price. Prefixes below the model's minimum simply don't cache.
+            CacheControl = new CacheControlEphemeral(),
         };
 
         Message message;
