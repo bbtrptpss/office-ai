@@ -165,3 +165,13 @@ Items from the Master Prompt that were not built yet, each with an Update log en
 
 Human working hours are not recorded anywhere, so the report shows them as “not recorded” rather than inventing an actual. 189 tests.
 
+## Phase 11 — Per-project access control ✅ (2026-10-19)
+
+| Item | Status |
+| --- | --- |
+| §14 “Department, project, and resource-level access control” / “protection against cross-project data leakage”: new permission `project.all` (CEO, Manager, Auditor by default). Everyone else sees only projects they belong to (owner, task assignee, added member) | done |
+| Enforcement: `ProjectScopeMiddleware` loads the caller's visible project ids once per request into `ProjectScope`; EF global query filters on every project-owned table (and children via task/run/repository/workflow/estimate) hide the rest, so lists omit them and ids return 404. Background work (AI runs, workflow engine) is unrestricted; agent tools stay scoped to their task's project | done |
+| Project page “Members” dialog (shared with chat); chat “sees all project channels” now follows `project.all` (or comms.manage) instead of project.manage | done |
+
+Not filtered on purpose: chat channels and meetings keep their own membership rules; realtime events carry ids only and clients re-read through the filtered API. 191 tests.
+

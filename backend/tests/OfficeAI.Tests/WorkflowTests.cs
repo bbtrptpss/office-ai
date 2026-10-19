@@ -12,6 +12,7 @@ using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Common;
 using OfficeAI.Domain.Organization;
 using OfficeAI.Domain.Work;
+using OfficeAI.Domain.Security;
 using OfficeAI.Domain.Workflows;
 using OfficeAI.Infrastructure.Persistence;
 
@@ -250,8 +251,8 @@ public class WorkflowTests(ApiFixture fx)
         var res = await ceo.PostAsJsonAsync($"/api/approvals/{plan.Id}/decision", new { approve = true, payloadHash = new string('0', 64) });
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
 
-        // A Member cannot approve plans.
-        var member = await fx.UserWithRolesAsync("Member");
+        // A Member of the project cannot approve plans.
+        var (member, _) = await fx.PersonAsync([SystemRoles.Member], project.Id);
         res = await member.PostAsJsonAsync($"/api/approvals/{plan.Id}/decision", new { approve = true, payloadHash = plan.PayloadHash });
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
 

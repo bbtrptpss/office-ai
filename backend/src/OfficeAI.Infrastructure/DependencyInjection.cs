@@ -54,6 +54,7 @@ public static class DependencyInjection
         var dataProtection = services.AddDataProtection().PersistKeysToDbContext<AppDbContext>().SetApplicationName("OfficeAI");
         ProtectKeysAtRest(dataProtection, config);
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+        services.AddScoped<ProjectScope>();
         services.AddSingleton(TimeProvider.System);
         services.Configure<SeedOptions>(config.GetSection("Seed"));
         services.AddScoped<Seeder>();

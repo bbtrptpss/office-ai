@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.16.0",
+    date: "2026-10-19",
+    title: { th: "จำกัดสิทธิ์การมองเห็นรายโปรเจกต์", en: "Per-project access control" },
+    changes: [
+      { type: "security", th: "สิทธิ์ใหม่ “เห็นทุกโปรเจกต์” (project.all) ให้ CEO, Manager และ Auditor เป็นค่าเริ่มต้น คนที่ไม่มีสิทธิ์นี้ (เช่น Member) จะเห็นเฉพาะโปรเจกต์ที่ตัวเองเป็นสมาชิก (เจ้าของ, ได้รับมอบหมายงาน หรือถูกเพิ่มเป็นสมาชิก) — งาน เอกสาร ใบประเมิน repository งาน AI การอนุมัติ ความรู้ของโปรเจกต์ และค่าใช้จ่ายของโปรเจกต์อื่นจะเหมือนไม่มีอยู่ (404) ปรับสิทธิ์นี้ได้ที่หน้าสิทธิ์และผู้ใช้", en: "New “see every project” permission (project.all), granted to CEO, Manager and Auditor by default. Without it (e.g. Member) people see only projects they belong to (owner, task assignee or added member); other projects' tasks, documents, estimates, repositories, AI runs, approvals, project knowledge and costs behave as if they don't exist (404). Change it on the Security page" },
+      { type: "added", th: "หน้าโปรเจกต์มีปุ่ม “สมาชิก” สำหรับเพิ่ม/ลบสมาชิก (เดิมทำได้เฉพาะในแชต) แชตของโปรเจกต์ใช้กติกาเดียวกัน", en: "Projects have a “Members” button to add or remove members (previously only in chat); project chat follows the same rule" },
+    ],
+  },
+  {
     version: "0.15.0",
     date: "2026-10-19",
     title: { th: "สรุปปิดโปรเจกต์และร่างรายงานปิดโปรเจกต์", en: "Project closeout and completion report draft" },

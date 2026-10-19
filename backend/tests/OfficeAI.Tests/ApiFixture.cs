@@ -91,6 +91,20 @@ public sealed class ApiFixture : IAsyncLifetime
         res.EnsureSuccessStatusCode();
         return await LoginAsync(email, password);
     }
+
+    /// <summary>A person with a login, the given roles and an employee profile, added by hand to each listed project.</summary>
+    public async Task<(HttpClient Client, Guid EmployeeId)> PersonAsync(string[] roles, params Guid[] projectIds)
+    {
+        var ceo = await CeoAsync();
+        var client = await UserWithRolesAsync(roles);
+        var me = await client.GetAsync<OfficeAI.Api.Endpoints.MeDto>("/api/auth/me");
+        var role = (await ceo.GetAsync<List<OfficeAI.Application.Organization.RoleDefinitionDto>>("/api/role-definitions")).First(r => r.Code == "BACKEND");
+        var employee = await ceo.PostAsync<OfficeAI.Application.Organization.EmployeeDto>("/api/employees",
+            new { displayName = $"Person {Guid.NewGuid():N}"[..20], kind = "Human", departmentId = role.DepartmentId, roleDefinitionId = role.Id, userId = me.UserId });
+        foreach (var p in projectIds)
+            (await ceo.PostAsJsonAsync($"/api/projects/{p}/members/{employee.Id}", new { })).EnsureSuccessStatusCode();
+        return (client, employee.Id);
+    }
 }
 
 [CollectionDefinition(Name)]

@@ -115,6 +115,7 @@ app.UseStatusCodePages();
 app.UseCors();
 app.UseMiddleware<SecurityMiddleware>();
 app.UseAuthentication();
+app.UseMiddleware<ProjectScopeMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapAppEndpoints();

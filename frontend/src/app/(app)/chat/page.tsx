@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } f
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
-  Alert, Autocomplete, Badge, Box, Button, Card, Chip, MenuItem, MenuList, Paper, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, List, ListItemButton,
+  Alert, Badge, Box, Button, Card, Chip, MenuItem, MenuList, Paper, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, List, ListItemButton,
   ListItemText, ListSubheader, Stack, TextField, Tooltip, Typography, useMediaQuery, useTheme,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -13,12 +13,13 @@ import DeleteIcon from "@mui/icons-material/DeleteOutline";
 import SendIcon from "@mui/icons-material/SendRounded";
 import InventoryIcon from "@mui/icons-material/Inventory2Outlined";
 import PeopleIcon from "@mui/icons-material/PeopleAltOutlined";
-import { api, ChannelKind, ChannelMember, ChatChannel, ChatMessage, Employee } from "@/lib/api";
+import { api, ChannelKind, ChannelMember, ChatChannel, ChatMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { emitLocal, useRealtime } from "@/lib/realtime";
 import { Loading, PageHeader, useErrorMessage, useLoad } from "@/components/common";
 import { Avatar, Mascot } from "@/components/cute";
+import { MembersDialog } from "@/components/members";
 
 const PAGE = 50;
 const KIND_ORDER: ChannelKind[] = ["Company", "Department", "Project"];
@@ -394,7 +395,7 @@ function Conversation({ channel, canManage, onBack, onChanged }: { channel: Chat
         </Stack>
       )}
       {membersOpen && members && (
-        <MembersDialog channel={channel} members={members} onClose={() => setMembersOpen(false)} onChanged={() => void reloadMembers()} />
+        <MembersDialog title={`#${channel.name}`} projectId={channel.projectId ?? null} members={members} onClose={() => setMembersOpen(false)} onChanged={() => void reloadMembers()} />
       )}
     </Card>
   );
@@ -411,53 +412,5 @@ function MentionText({ body, names }: { body: string; names: string[] }) {
         ? <Box key={i} component="span" sx={{ color: "secondary.main", fontWeight: 700 }}>{part}</Box>
         : <span key={i}>{part}</span>))}
     </>
-  );
-}
-
-/** Project channel members. Owners and task assignees are members automatically; managers add others by hand. */
-function MembersDialog({ channel, members, onClose, onChanged }: { channel: ChatChannel; members: ChannelMember[]; onClose: () => void; onChanged: () => void }) {
-  const { t } = useI18n();
-  const { can } = useAuth();
-  const errorMessage = useErrorMessage();
-  const canEdit = can("project.manage") && !!channel.projectId;
-  const { data: employees } = useLoad(() => (canEdit ? api.get<Employee[]>("/api/employees") : Promise.resolve([] as Employee[])), String(canEdit));
-  const [problem, setProblem] = useState<string | null>(null);
-  const memberIds = new Set(members.map((m) => m.employeeId));
-
-  async function change(fn: () => Promise<unknown>) {
-    setProblem(null);
-    try { await fn(); onChanged(); } catch (e) { setProblem(errorMessage(e)); }
-  }
-
-  return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>{t.members} · #{channel.name}</DialogTitle>
-      <DialogContent>
-        {problem && <Alert severity="warning" sx={{ mb: 1 }}>{problem}</Alert>}
-        <List dense disablePadding>
-          {members.map((m) => (
-            <Stack key={m.employeeId} direction="row" spacing={1.5} sx={{ alignItems: "center", py: 0.75 }}>
-              <Avatar kind={m.kind} seed={m.displayName} size={30} />
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" noWrap>{m.displayName}</Typography>
-                <Typography variant="caption" color="text.secondary" noWrap component="div">{m.isExplicit ? m.jobTitle : `${m.jobTitle} · ${t.memberByRole}`}</Typography>
-              </Box>
-              {canEdit && m.isExplicit && (
-                <IconButton size="small" aria-label="remove" onClick={() => change(() => api.del(`/api/projects/${channel.projectId}/members/${m.employeeId}`))}>
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              )}
-            </Stack>
-          ))}
-        </List>
-        {canEdit && (
-          <Autocomplete sx={{ mt: 2 }} options={(employees ?? []).filter((e) => !memberIds.has(e.id))} value={null}
-            getOptionLabel={(e) => `${e.displayName} · ${e.jobTitle}`}
-            onChange={(_, e) => e && change(() => api.post(`/api/projects/${channel.projectId}/members/${e.id}`))}
-            renderInput={(params) => <TextField {...params} size="small" label={t.addMember} />} />
-        )}
-      </DialogContent>
-      <DialogActions><Button onClick={onClose}>{t.close}</Button></DialogActions>
-    </Dialog>
   );
 }

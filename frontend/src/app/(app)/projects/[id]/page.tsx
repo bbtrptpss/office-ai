@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import AddIcon from "@mui/icons-material/Add";
 import ForumIcon from "@mui/icons-material/ForumOutlined";
+import PeopleIcon from "@mui/icons-material/PeopleAltOutlined";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { AgentRun, api, Deliverable, Employee, Milestone, Project, Review, Task, TaskComplexity, TaskPriority, TaskStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -18,6 +19,7 @@ import { useRealtime } from "@/lib/realtime";
 import { KindIcon, Loading, PageHeader, StatusChip, useErrorMessage, useLoad } from "@/components/common";
 import { DeliverableList, RunList } from "@/components/agents";
 import { ObjectivesPanel } from "@/components/objectives";
+import { ProjectMembersDialog } from "@/components/members";
 import { CloseoutPanel, DecisionsPanel, DocumentsPanel, EstimatesPanel, RepositoryPanel, RequirementsPanel } from "@/components/workspace";
 
 const COLUMNS: TaskStatus[] = ["Todo", "Assigned", "InProgress", "Blocked", "InReview", "WaitingApproval", "Done", "Failed"];
@@ -71,6 +73,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   const [milestoneName, setMilestoneName] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showCancelled, setShowCancelled] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const [tab, setTab] = useState<"board" | "requirements" | "decisions" | "estimates" | "repository" | "documents" | "closeout">("board");
   // ?task=<id> (from the company task board) opens that task once the board has loaded.
   const linkedTaskId = useSearchParams().get("task");
@@ -129,6 +132,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
         actions={
           <>
             {can("org.read") && <Button component={Link} href={`/chat?project=${id}`} startIcon={<ForumIcon />}>{t.openProjectChat}</Button>}
+            {can("project.manage") && <Button startIcon={<PeopleIcon />} onClick={() => setMembersOpen(true)}>{t.members}</Button>}
             {can("project.manage") && <Button onClick={() => setMilestoneName("")}>{t.newMilestone}</Button>}
             {can("task.manage") && (
               <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setMessage(null); setNewTask(emptyForm); }}>
@@ -139,6 +143,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
         }
       />
 
+      {membersOpen && <ProjectMembersDialog projectId={id} title={data.project.name} onClose={() => setMembersOpen(false)} />}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile sx={{ mb: 2 }}>
         <Tab value="board" label={t.board} />
         <Tab value="requirements" label={t.requirements} />

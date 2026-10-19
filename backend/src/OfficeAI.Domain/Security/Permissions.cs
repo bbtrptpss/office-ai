@@ -7,6 +7,9 @@ public static class Permissions
     public const string OrgManage = "org.manage";
     public const string ProjectRead = "project.read";
     public const string ProjectManage = "project.manage";
+
+    /// <summary>See every project. Without it, people see only projects they belong to (owner, assignee or added member).</summary>
+    public const string ProjectAll = "project.all";
     public const string TaskRead = "task.read";
     public const string TaskManage = "task.manage";
     public const string TaskAssign = "task.assign";
@@ -29,6 +32,7 @@ public static class Permissions
         [OrgManage] = "Create and change departments, positions and employees",
         [ProjectRead] = "View projects and milestones",
         [ProjectManage] = "Create and change projects and milestones",
+        [ProjectAll] = "See every project, not only the ones you belong to",
         [TaskRead] = "View tasks",
         [TaskManage] = "Create and edit tasks and dependencies",
         [TaskAssign] = "Assign tasks to employees",
@@ -63,13 +67,13 @@ public static class SystemRoles
         [Ceo] = [.. Permissions.All.Keys],
         [Manager] =
         [
-            Permissions.OrgRead, Permissions.ProjectRead, Permissions.ProjectManage, Permissions.TaskRead,
+            Permissions.OrgRead, Permissions.ProjectRead, Permissions.ProjectManage, Permissions.ProjectAll, Permissions.TaskRead,
             Permissions.TaskManage, Permissions.TaskAssign, Permissions.TaskUpdateStatus, Permissions.TaskApprove,
             Permissions.AgentRead, Permissions.AgentRun, Permissions.FinanceRead, Permissions.KnowledgeManage,
             Permissions.CommsPost, Permissions.CommsManage,
         ],
         [Member] = [Permissions.OrgRead, Permissions.ProjectRead, Permissions.TaskRead, Permissions.TaskUpdateStatus, Permissions.AgentRead, Permissions.CommsPost],
-        [Auditor] = [Permissions.OrgRead, Permissions.ProjectRead, Permissions.TaskRead, Permissions.AuditRead, Permissions.AgentRead, Permissions.FinanceRead],
+        [Auditor] = [Permissions.OrgRead, Permissions.ProjectRead, Permissions.ProjectAll, Permissions.TaskRead, Permissions.AuditRead, Permissions.AgentRead, Permissions.FinanceRead],
         [AiAgent] = [Permissions.OrgRead, Permissions.ProjectRead, Permissions.TaskRead, Permissions.TaskUpdateStatus, Permissions.CommsPost],
     };
 }

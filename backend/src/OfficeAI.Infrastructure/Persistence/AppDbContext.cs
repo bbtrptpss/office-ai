@@ -21,7 +21,7 @@ using OfficeAI.Infrastructure.Identity;
 
 namespace OfficeAI.Infrastructure.Persistence;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser currentUser, TimeProvider clock)
+public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser currentUser, TimeProvider clock, ProjectScope? projectScope = null)
     : IdentityDbContext<AppUser, AppRole, Guid>(options), IAppDbContext, IDataProtectionKeyContext
 {
     public DbSet<Department> Departments => Set<Department>();
@@ -88,6 +88,49 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         b.Entity<IdentityUserLogin<Guid>>().ToTable("UserLogins");
         b.Entity<IdentityUserToken<Guid>>().ToTable("UserTokens");
         b.Entity<IdentityRoleClaim<Guid>>().ToTable("RoleClaims");
+        ApplyProjectScope(b);
+    }
+
+    // Read per query from this context instance, so each request gets its own scope (EF parameterizes context members in filters).
+    private bool ProjectsRestricted => projectScope?.Restricted ?? false;
+    private List<Guid> VisibleProjectIds => projectScope?.VisibleProjectIds ?? [];
+
+    /// <summary>
+    /// Hides other projects' data from people without project.all. Tables that hang off a task, run, repository or
+    /// workflow follow their parent, so nothing project-owned can be reached by id either. Chat channels and meetings keep
+    /// their own membership rules (see CommunicationService / MeetingService).
+    /// </summary>
+    private void ApplyProjectScope(ModelBuilder b)
+    {
+        b.Entity<Project>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.Id));
+        b.Entity<Milestone>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+        b.Entity<WorkTask>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+        b.Entity<AgentRun>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+        b.Entity<UsageRecord>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+        b.Entity<WorkflowExecution>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+        b.Entity<ProjectRequirement>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+        b.Entity<ArchitectureDecision>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+        b.Entity<ProjectEstimate>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+        b.Entity<CodeRepository>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+        b.Entity<MergeRequest>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+        b.Entity<ProjectDocument>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+        b.Entity<ProjectMember>().HasQueryFilter(x => !ProjectsRestricted || VisibleProjectIds.Contains(x.ProjectId));
+
+        // Company-wide rows (no project) stay visible.
+        b.Entity<ApprovalRequest>().HasQueryFilter(x => !ProjectsRestricted || x.ProjectId == null || VisibleProjectIds.Contains(x.ProjectId.Value));
+        b.Entity<CostRecord>().HasQueryFilter(x => !ProjectsRestricted || x.ProjectId == null || VisibleProjectIds.Contains(x.ProjectId.Value));
+        b.Entity<KnowledgeEntry>().HasQueryFilter(x => !ProjectsRestricted || x.ProjectId == null || VisibleProjectIds.Contains(x.ProjectId.Value));
+
+        // Children follow their (already filtered) parent.
+        b.Entity<TaskAssignment>().HasQueryFilter(x => !ProjectsRestricted || Tasks.Any(t => t.Id == x.TaskId));
+        b.Entity<TaskDependency>().HasQueryFilter(x => !ProjectsRestricted || Tasks.Any(t => t.Id == x.TaskId));
+        b.Entity<Deliverable>().HasQueryFilter(x => !ProjectsRestricted || Tasks.Any(t => t.Id == x.TaskId));
+        b.Entity<Review>().HasQueryFilter(x => !ProjectsRestricted || Tasks.Any(t => t.Id == x.TaskId));
+        b.Entity<AgentRunStep>().HasQueryFilter(x => !ProjectsRestricted || AgentRuns.Any(r => r.Id == x.RunId));
+        b.Entity<ToolExecution>().HasQueryFilter(x => !ProjectsRestricted || AgentRuns.Any(r => r.Id == x.RunId));
+        b.Entity<TestRun>().HasQueryFilter(x => !ProjectsRestricted || CodeRepositories.Any(r => r.Id == x.RepositoryId));
+        b.Entity<WorkflowEvent>().HasQueryFilter(x => !ProjectsRestricted || WorkflowExecutions.Any(w => w.Id == x.WorkflowExecutionId));
+        b.Entity<EstimateLineItem>().HasQueryFilter(x => !ProjectsRestricted || Estimates.Any(e => e.Id == x.EstimateId));
     }
 
     private const long EngineLockKey = 0x0FF1CEA1;

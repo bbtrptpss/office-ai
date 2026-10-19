@@ -85,7 +85,7 @@ public class WorkTests(ApiFixture fx)
         Assert.True(dash.ActiveProjects >= 1);
         Assert.True(dash.TotalTasks >= 1);
         Assert.True(dash.AiEmployees >= 30);
-        Assert.Equal(1, dash.HumanEmployees);
+        Assert.True(dash.HumanEmployees >= 1); // other tests add people too
         Assert.Contains(dash.Workload, w => w.EmployeeId == dev.Id && w.OpenTasks >= 1);
     }
 
@@ -106,8 +106,8 @@ public class WorkTests(ApiFixture fx)
     public async Task Full_workflow_to_Done_and_only_an_approver_can_close()
     {
         var ceo = await fx.CeoAsync();
-        var member = await fx.UserWithRolesAsync(SystemRoles.Member);
         var project = await NewProjectAsync(ceo);
+        var (member, _) = await fx.PersonAsync([SystemRoles.Member], project.Id);
         var task = await NewTaskAsync(ceo, project.Id, "Build login page");
         var dev = await AiEmployeeAsync(ceo, "Frontend Developer Agent");
         await ceo.PostAsync<TaskDto>($"/api/tasks/{task.Id}/assign", new { employeeId = dev.Id });

@@ -142,3 +142,22 @@ public interface IAgentRunQueue
     /// <summary>Signals a running execution to stop as soon as possible.</summary>
     void Cancel(Guid runId);
 }
+
+/// <summary>
+/// Which projects the current request may see. Unrestricted by default: background work (AI runs, the workflow engine) and
+/// people with project.all see everything. The API restricts it once per request for everyone else, and the database
+/// applies it to every project-owned table, so hidden projects look like they don't exist.
+/// </summary>
+public sealed class ProjectScope
+{
+    public bool Restricted { get; private set; }
+    public List<Guid> VisibleProjectIds { get; private set; } = [];
+
+    public void Restrict(IEnumerable<Guid> projectIds)
+    {
+        VisibleProjectIds = projectIds.Distinct().ToList();
+        Restricted = true;
+    }
+
+    public bool CanSee(Guid projectId) => !Restricted || VisibleProjectIds.Contains(projectId);
+}

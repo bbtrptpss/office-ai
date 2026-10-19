@@ -62,4 +62,10 @@ public static class ProjectMembership
 
     public static Task<bool> IsMemberAsync(IAppDbContext db, Guid projectId, Guid? employeeId, CancellationToken ct) =>
         employeeId is { } e ? MemberIds(db, projectId).AnyAsync(x => x == e, ct) : Task.FromResult(false);
+
+    /// <summary>Projects the employee belongs to (owner, assignee or added by hand).</summary>
+    public static IQueryable<Guid> ProjectsOf(IAppDbContext db, Guid employeeId) =>
+        db.ProjectMembers.Where(m => m.EmployeeId == employeeId).Select(m => m.ProjectId)
+            .Union(db.Projects.Where(p => p.OwnerEmployeeId == employeeId).Select(p => p.Id))
+            .Union(db.TaskAssignments.Where(a => a.EmployeeId == employeeId).Join(db.Tasks, a => a.TaskId, t => t.Id, (a, t) => t.ProjectId));
 }

@@ -17,7 +17,7 @@ public record ChannelMemberDto(Guid EmployeeId, string DisplayName, EmployeeKind
 
 /// <summary>What the caller may do in chat, resolved from their permissions by the API.</summary>
 /// <param name="CanModerate">comms.manage: delete any message, archive channels.</param>
-/// <param name="SeesAllProjects">comms.manage or project.manage: read every project channel without being a member.</param>
+/// <param name="SeesAllProjects">comms.manage or project.all: read every project channel without being a member.</param>
 /// <param name="CanCommandAi">task.manage, task.assign and agent.run: give an AI employee real work from chat with <c>/run</c>.</param>
 public record ChatAccess(bool CanModerate, bool SeesAllProjects, bool CanCommandAi = false);
 
@@ -72,11 +72,7 @@ public class ChatService(IAppDbContext db, ICurrentUser current, IRealtimeNotifi
     private Task<Guid?> MyEmployeeIdAsync(CancellationToken ct) =>
         db.Employees.Where(e => e.UserId == current.UserId).Select(e => (Guid?)e.Id).FirstOrDefaultAsync(ct);
 
-    /// <summary>Projects the employee belongs to (owner, assignee or added by hand).</summary>
-    private IQueryable<Guid> ProjectsOf(Guid employeeId) =>
-        db.ProjectMembers.Where(m => m.EmployeeId == employeeId).Select(m => m.ProjectId)
-            .Union(db.Projects.Where(p => p.OwnerEmployeeId == employeeId).Select(p => p.Id))
-            .Union(db.TaskAssignments.Where(a => a.EmployeeId == employeeId).Join(db.Tasks, a => a.TaskId, t => t.Id, (a, t) => t.ProjectId));
+    private IQueryable<Guid> ProjectsOf(Guid employeeId) => ProjectMembership.ProjectsOf(db, employeeId);
 
     /// <summary>Loads a channel the caller may read. Channels of projects they are not part of look like they do not exist.</summary>
     private async Task<ChatChannel> VisibleChannelAsync(Guid channelId, ChatAccess access, CancellationToken ct)
