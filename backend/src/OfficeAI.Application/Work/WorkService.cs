@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Application.Abstractions;
 using OfficeAI.Application.Delivery;
+using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Common;
 using OfficeAI.Domain.Organization;
 using OfficeAI.Domain.Work;
+using OfficeAI.Domain.Workflows;
 
 namespace OfficeAI.Application.Work;
 
@@ -38,7 +40,7 @@ public record RecentTaskDto(Guid Id, Guid ProjectId, string ProjectName, string 
 public record BoardTaskDto(TaskDto Task, string ProjectCode, string ProjectName, bool IsOverdue);
 public record TaskBoardQuery(Guid? ProjectId = null, Guid? EmployeeId = null, TaskPriority? Priority = null, bool OverdueOnly = false);
 
-public class WorkService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvider clock)
+public class WorkService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvider clock, IAgentRunQueue queue)
 {
     // ---------- Projects ----------
 
@@ -75,9 +77,46 @@ public class WorkService(IAppDbContext db, IRealtimeNotifier notifier, TimeProvi
     {
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id, ct) ?? throw new NotFoundException("Project", id);
         if (req.Version is { } v) db.ExpectVersion(project, v);
+        var wasCancelled = project.Status == ProjectStatus.Cancelled;
         await ApplyAsync(project, req, ct);
+        var stop = !wasCancelled && project.Status == ProjectStatus.Cancelled ? await CancelOpenWorkAsync(id, ct) : null;
         await db.SaveChangesAsync(ct);
+        if (stop is not null) await AfterCancelAsync(id, stop, ct);
         return await GetProjectAsync(id, ct);
+    }
+
+    private sealed record CancelledWork(List<WorkTask> Tasks, List<AgentRun> Runs, bool Approvals);
+
+    /// <summary>
+    /// A cancelled project leaves nothing running: its open tasks are cancelled, AI runs on them are asked to stop and
+    /// pending approvals are withdrawn. Done tasks and finished runs stay as they are. Saved with the project change.
+    /// </summary>
+    private async Task<CancelledWork> CancelOpenWorkAsync(Guid projectId, CancellationToken ct)
+    {
+        var tasks = await db.Tasks.Where(t => t.ProjectId == projectId && t.Status != WorkTaskStatus.Done && t.Status != WorkTaskStatus.Cancelled).ToListAsync(ct);
+        foreach (var t in tasks) t.Status = WorkTaskStatus.Cancelled;
+        var runs = await db.AgentRuns.Where(r => r.ProjectId == projectId && (r.Status == AgentRunStatus.Queued || r.Status == AgentRunStatus.Running)).ToListAsync(ct);
+        foreach (var r in runs) r.CancelRequested = true;
+        var now = clock.GetUtcNow();
+        var approvals = await db.ApprovalRequests.Where(a => a.ProjectId == projectId && a.Status == ApprovalStatus.Pending).ToListAsync(ct);
+        foreach (var a in approvals)
+        {
+            a.Status = ApprovalStatus.Cancelled;
+            a.DecidedAt = now;
+            a.DecisionNote = "Project cancelled";
+        }
+        return new CancelledWork(tasks, runs, approvals.Count > 0);
+    }
+
+    private async Task AfterCancelAsync(Guid projectId, CancelledWork stop, CancellationToken ct)
+    {
+        foreach (var r in stop.Runs)
+        {
+            queue.Cancel(r.Id);
+            await notifier.AgentRunChangedAsync(r.Id, r.TaskId, projectId, r.Status.ToString(), ct);
+        }
+        foreach (var t in stop.Tasks) await notifier.TaskChangedAsync(projectId, t.Id, ct);
+        if (stop.Approvals) await notifier.ApprovalsChangedAsync(ct);
     }
 
     private async Task ApplyAsync(Project p, SaveProjectRequest r, CancellationToken ct)
