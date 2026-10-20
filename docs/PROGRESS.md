@@ -277,6 +277,6 @@ Fix tasks are ordinary tasks, not part of a workflow, so the engine does not sta
 | --- | --- |
 | `POST /agent-runs/{id}/retry {note?}` (agent.run, people only): the task's latest Failed / LimitReached / Cancelled run of that purpose; same employee and purpose, new attempt number. Refused for succeeded, active or older runs, and for tasks marked Failed (move to Todo and reassign) | done |
 | A pending escalation on the task is answered as “try again” through `ApprovalService.DecideAsync` (needs task.manage); inside an executing workflow the engine then starts the run and counts attempts from that decision. Otherwise a Blocked task is unblocked (needs task.update_status), the note is saved as a human review, and the run starts at once | done |
-| “Try again” button with an optional note in the run drawer and next to “Run with AI” on the task's latest run | done (typecheck/lint clean; browser walkthrough not done) |
+| “Try again” button with an optional note in the run drawer and next to “Run with AI” on the task's latest run | done (verified in browser 2026-10-20: failed run → note saved, attempt #2 on Gemini succeeded, task moved to InReview) |
 
 215 tests.
