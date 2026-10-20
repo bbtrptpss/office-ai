@@ -316,6 +316,15 @@ export interface AgentRun {
   error: string | null;
 }
 
+export interface RetryRunResult {
+  taskId: string;
+  runId: string | null;
+  handedToWorkflow: boolean;
+}
+
+/** Failed, stopped (limit reached) and cancelled runs can be retried when they are the task's latest run. */
+export const isRetryable = (r: AgentRun) => r.status === "Failed" || r.status === "LimitReached" || r.status === "Cancelled";
+
 export interface AgentRunDetail {
   run: AgentRun;
   steps: { sequence: number; kind: RunStepKind; content: string; toolCallId: string | null; createdAt: string }[];

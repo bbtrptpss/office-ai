@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
-  Alert, Box, Button, Card, CardActionArea, Chip, Drawer, IconButton, Stack, Tooltip, Typography,
+  Alert, Box, Button, Card, CardActionArea, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Drawer, IconButton, Stack, TextField,
+  Tooltip, Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import BuildIcon from "@mui/icons-material/BuildOutlined";
 import ChatBubbleIcon from "@mui/icons-material/ChatBubbleOutline";
 import InfoIcon from "@mui/icons-material/InfoOutlined";
 import StopIcon from "@mui/icons-material/StopCircleOutlined";
-import { api, AgentRun, AgentRunDetail, Deliverable, usd } from "@/lib/api";
+import ReplayIcon from "@mui/icons-material/Replay";
+import { api, AgentRun, AgentRunDetail, Deliverable, isRetryable, RetryRunResult, usd } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -35,6 +37,53 @@ export function duration(run: AgentRun) {
 }
 
 const isActive = (r: AgentRun) => r.status === "Queued" || r.status === "Running";
+
+/** "Try again" on a failed, stopped or cancelled run, with an optional note the AI reads on its next run. */
+export function RetryRunButton({ run, onDone, onError, size = "small" }: {
+  run: AgentRun;
+  onDone?: (result: RetryRunResult) => void;
+  onError: (message: string) => void;
+  size?: "small" | "medium";
+}) {
+  const { t } = useI18n();
+  const { can } = useAuth();
+  const errorMessage = useErrorMessage();
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!can("agent.run") || !isRetryable(run)) return null;
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      const result = await api.post<RetryRunResult>(`/api/agent-runs/${run.id}/retry`, { note: note.trim() || undefined });
+      setOpen(false);
+      setNote("");
+      onDone?.(result);
+    } catch (e) {
+      onError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Button variant="outlined" size={size} startIcon={<ReplayIcon />} onClick={() => setOpen(true)}>{t.retryRun}</Button>
+      <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{t.retryRunTitle}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{t.retryRunHint}</Typography>
+          <TextField label={t.retryRunNote} value={note} onChange={(e) => setNote(e.target.value)} fullWidth multiline minRows={2} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)} disabled={busy}>{t.cancel}</Button>
+          <Button variant="contained" startIcon={<ReplayIcon />} onClick={submit} disabled={busy}>{t.retryRun}</Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
 
 /** A list of runs as cute cards; clicking one opens its transcript. */
 export function RunList({ runs, showTask = true }: { runs: AgentRun[]; showTask?: boolean }) {
@@ -153,6 +202,13 @@ function RunDetailView({ runId, onClose }: { runId: string; onClose: () => void 
           {t.cancelRun}
         </Button>
       )}
+      <Box sx={{ mb: isRetryable(run) ? 2 : 0 }}>
+        <RetryRunButton run={run} onError={setMessage}
+          onDone={(r) => {
+            setMessage(r.handedToWorkflow ? t.retryRunHanded : null);
+            if (!r.handedToWorkflow) onClose();
+          }} />
+      </Box>
 
       <Typography variant="subtitle2" color="text.secondary" gutterBottom>{t.transcript}</Typography>
       <Stack spacing={1}>

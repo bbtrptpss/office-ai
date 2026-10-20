@@ -187,6 +187,8 @@ public static class Endpoints
         api.MapGet("/agent-runs", (Guid? taskId, Guid? employeeId, Guid? projectId, int? take, AgentRunService s, CancellationToken ct) =>
             s.ListRunsAsync(taskId, employeeId, projectId, take ?? 50, ct)).RequirePermission(Permissions.AgentRead);
         api.MapGet("/agent-runs/{id:guid}", (Guid id, AgentRunService s, CancellationToken ct) => s.GetRunDetailAsync(id, ct)).RequirePermission(Permissions.AgentRead);
+        api.MapPost("/agent-runs/{id:guid}/retry", async (Guid id, RetryRunRequest? r, AgentRunService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+            await s.RetryAsync(id, r ?? new RetryRunRequest(), await perms.GetPermissionsAsync(me.UserId!.Value, ct), ct)).RequirePermission(Permissions.AgentRun);
         api.MapPost("/agent-runs/{id:guid}/cancel", (Guid id, AgentRunService s, CancellationToken ct) => s.CancelAsync(id, ct)).RequirePermission(Permissions.AgentRun);
         api.MapGet("/ai/usage", (AgentRunService s, CancellationToken ct) => s.GetUsageSummaryAsync(ct)).RequirePermission(Permissions.AgentRead);
     }

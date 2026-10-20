@@ -3,7 +3,9 @@ using OfficeAI.Application.Abstractions;
 using OfficeAI.Domain.Agents;
 using OfficeAI.Domain.Common;
 using OfficeAI.Domain.Organization;
+using OfficeAI.Domain.Security;
 using OfficeAI.Domain.Work;
+using OfficeAI.Domain.Workflows;
 
 namespace OfficeAI.Application.Agents;
 
@@ -26,6 +28,9 @@ public record UpdateAgentConfigRequest(string Provider, string ModelId, Effort E
 public record SetAgentToolsRequest(List<string> Tools);
 
 public record StartRunRequest(Guid? EmployeeId = null);
+public record RetryRunRequest(string? Note = null);
+/// <param name="RunId">The new run, or null when the workflow engine starts it on its next tick.</param>
+public record RetryRunDto(Guid TaskId, Guid? RunId, bool HandedToWorkflow);
 public record AgentRunDto(Guid Id, Guid TaskId, string TaskTitle, Guid ProjectId, Guid EmployeeId, string EmployeeName, AgentRunStatus Status,
     string Provider, string ModelId, bool IsSimulated, DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? FinishedAt,
     int Turns, int ToolCalls, long InputTokens, long OutputTokens, decimal CostUsd, string? StopReason, string? Error, RunPurpose Purpose, int Attempt);
@@ -215,7 +220,8 @@ public class AgentAdminService(IAppDbContext db, AiProviderRegistry providers, T
 }
 
 /// <summary>Starting, cancelling and inspecting AI runs.</summary>
-public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAgentRunQueue queue, IRealtimeNotifier notifier, ICurrentUser current, TimeProvider clock, Reports.ReportsService reports)
+public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAgentRunQueue queue, IRealtimeNotifier notifier, ICurrentUser current, TimeProvider clock,
+    Reports.ReportsService reports, Workflows.ApprovalService approvals)
 {
     /// <summary>A person starts a work run on a task assigned to an AI employee.</summary>
     public async Task<AgentRunDto> StartAsync(Guid taskId, StartRunRequest req, CancellationToken ct)
@@ -283,6 +289,55 @@ public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAg
         await queue.EnqueueAsync(run.Id, ct);
         await notifier.AgentRunChangedAsync(run.Id, run.TaskId, run.ProjectId, run.Status.ToString(), ct);
         return run;
+    }
+
+    /// <summary>
+    /// "Try again" on the task's latest failed, stopped or cancelled run: answers a pending escalation as "try again"
+    /// (which needs its permission), unblocks the task, and starts a new run for the same employee and purpose.
+    /// Inside a running workflow an answered escalation is left to the engine, which counts attempts from that decision.
+    /// </summary>
+    /// <param name="callerPermissions">Effective permissions of the caller, resolved server-side.</param>
+    public async Task<RetryRunDto> RetryAsync(Guid runId, RetryRunRequest req, IReadOnlySet<string> callerPermissions, CancellationToken ct)
+    {
+        if (current.IsAgent || current.UserId is null) throw new ForbiddenException("Only a person can retry a run.");
+        var run = await db.AgentRuns.AsNoTracking().FirstOrDefaultAsync(r => r.Id == runId, ct) ?? throw new NotFoundException("AgentRun", runId);
+        if (run.Status is not (AgentRunStatus.Failed or AgentRunStatus.LimitReached or AgentRunStatus.Cancelled))
+            throw new DomainException("agent.retry_state", $"Only failed, stopped or cancelled runs can be retried; this one is {run.Status}.");
+        var latest = await db.AgentRuns.AsNoTracking().Where(r => r.TaskId == run.TaskId && r.Purpose == run.Purpose)
+            .OrderByDescending(r => r.CreatedAt).Select(r => r.Id).FirstAsync(ct);
+        if (latest != run.Id) throw new DomainException("agent.retry_not_latest", "A newer run exists for this task; retry that one instead.");
+
+        var task = await db.Tasks.FirstAsync(t => t.Id == run.TaskId, ct);
+        if (task.Status == WorkTaskStatus.Failed)
+            throw new DomainException("agent.task_state", "The task is marked Failed. Move it back to Todo and assign it again.");
+        var note = string.IsNullOrWhiteSpace(req.Note) ? null : req.Note.Trim();
+
+        var escalation = await db.ApprovalRequests.AsNoTracking()
+            .Where(a => a.TaskId == task.Id && a.Kind == ApprovalKind.Escalation && a.Status == ApprovalStatus.Pending)
+            .OrderByDescending(a => a.CreatedAt).FirstOrDefaultAsync(ct);
+        if (escalation is not null)
+        {
+            // Same decision as "try again" in the approval inbox, with its permission checks.
+            await approvals.DecideAsync(escalation.Id, new Workflows.DecideApprovalRequest(true, escalation.PayloadHash, note), callerPermissions, ct);
+            var workflowRunning = task.WorkflowExecutionId is { } wf
+                && await db.WorkflowExecutions.AnyAsync(w => w.Id == wf && w.Status == WorkflowStatus.Executing, ct);
+            if (workflowRunning) return new RetryRunDto(task.Id, null, true);
+        }
+        else
+        {
+            if (task.Status == WorkTaskStatus.Blocked)
+            {
+                if (!callerPermissions.Contains(Permissions.TaskUpdateStatus))
+                    throw new ForbiddenException($"Unblocking the task needs the {Permissions.TaskUpdateStatus} permission.");
+                task.Status = WorkTaskStatus.InProgress;
+            }
+            if (note is not null) db.Reviews.Add(new Review { TaskId = task.Id, ReviewerUserId = current.UserId, Outcome = ReviewOutcome.ChangesRequested, Comments = note });
+            await db.SaveChangesAsync(ct);
+            await notifier.TaskChangedAsync(task.ProjectId, task.Id, ct);
+        }
+
+        var next = await CreateRunAsync(task.Id, run.EmployeeId, run.Purpose, ct);
+        return new RetryRunDto(task.Id, next.Id, false);
     }
 
     public async Task<AgentRunDto> CancelAsync(Guid runId, CancellationToken ct)

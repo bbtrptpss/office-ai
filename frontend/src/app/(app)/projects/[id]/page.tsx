@@ -17,7 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
 import { KindIcon, Loading, PageHeader, StatusChip, useErrorMessage, useLoad } from "@/components/common";
-import { DeliverableList, RunList } from "@/components/agents";
+import { DeliverableList, RetryRunButton, RunList } from "@/components/agents";
 import { ObjectivesPanel } from "@/components/objectives";
 import { ProjectMembersDialog } from "@/components/members";
 import { StagesPanel } from "@/components/stages";
@@ -396,6 +396,7 @@ function TaskAiPanel({ task, onError }: { task: Task; onError: (m: string) => vo
   const { can } = useAuth();
   const errorMessage = useErrorMessage();
   const [starting, setStarting] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
   const { data, reload } = useLoad(async () => {
     const [runs, deliverables] = await Promise.all([
       api.get<AgentRun[]>(`/api/agent-runs?taskId=${task.id}&take=20`),
@@ -411,6 +412,7 @@ function TaskAiPanel({ task, onError }: { task: Task; onError: (m: string) => vo
   const aiAssignee = task.assignees.find((a) => a.kind === "AI");
   const active = data?.runs.some((r) => r.status === "Queued" || r.status === "Running");
   const canStart = can("agent.run") && !!aiAssignee && ["Assigned", "InProgress"].includes(task.status) && !active;
+  const latest = data?.runs.reduce<AgentRun | undefined>((a, r) => (!a || r.createdAt > a.createdAt ? r : a), undefined);
 
   return (
     <Box sx={{ p: 2, borderRadius: "18px", bgcolor: (th) => `rgba(${th.vars?.palette.secondary.mainChannel} / 0.06)` }}>
@@ -436,7 +438,15 @@ function TaskAiPanel({ task, onError }: { task: Task; onError: (m: string) => vo
             {t.runWithAi}
           </Button>
         )}
+        {latest && !active && (
+          <RetryRunButton run={latest} onError={onError}
+            onDone={(r) => {
+              setInfo(r.handedToWorkflow ? t.retryRunHanded : null);
+              void reload();
+            }} />
+        )}
       </Stack>
+      {info && <Alert severity="info" sx={{ mb: 1.5 }} onClose={() => setInfo(null)}>{info}</Alert>}
       {!data ? <Loading /> : <RunList runs={data.runs} showTask={false} />}
       <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2, mb: 1 }}>{t.deliverables}</Typography>
       {data && <DeliverableList items={data.deliverables} />}

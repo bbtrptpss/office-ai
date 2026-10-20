@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.23.1",
+    date: "2026-10-20",
+    title: { th: "ปุ่ม “ลองใหม่” ให้ AI ที่ทำงานล้มเหลว", en: "“Try again” for failed AI runs" },
+    changes: [
+      { type: "added", th: "ปุ่ม “ลองใหม่” บนรันที่ล้มเหลว ชนเพดาน หรือถูกหยุด (ในหน้าต่างรายละเอียดรัน และข้างปุ่ม “ให้ AI ทำงานนี้” ของงาน) สั่ง AI คนเดิมทำใหม่ทันที พร้อมเขียนคำแนะนำถึง AI ได้", en: "“Try again” on failed, limit-reached or stopped runs (in the run drawer and next to “Run with AI” on the task) runs the same AI employee again, with an optional note for it" },
+      { type: "changed", th: "ถ้างานติดขัดอยู่ ระบบปลดให้เอง ถ้ามีคำขอ “ต้องตัดสินใจ” ค้างในกล่องอนุมัติ จะนับเป็นการกด “ลองใหม่” และ workflow สั่ง AI ทำต่อในรอบถัดไป", en: "A blocked task is unblocked; a pending “Needs a decision” request is answered as “try again” and the workflow starts the AI on its next round" },
+    ],
+  },
+  {
     version: "0.23.0",
     date: "2026-10-19",
     title: { th: "AI ตรวจ lint / static analysis และหารหัสลับในโค้ดก่อนเปิด merge request", en: "AI lint / static analysis and secret scanning before merge requests" },

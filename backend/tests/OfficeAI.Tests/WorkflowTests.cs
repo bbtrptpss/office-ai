@@ -356,6 +356,34 @@ public class WorkflowTests(ApiFixture fx)
     }
 
     [Fact]
+    public async Task Retrying_the_failed_run_answers_the_escalation_and_the_engine_runs_again()
+    {
+        var ceo = await fx.CeoAsync();
+        var failing = await ScriptedModelAsync((_, _) => throw new AiProviderException("boom", retryable: false));
+        var worker = await NewAgentAsync(ceo, "BACKEND", ScriptedProvider.ProviderName, failing);
+        var (_, workflow, project) = await ApprovedOneTaskWorkflowAsync(worker);
+        for (var i = 0; i < 6; i++)
+        {
+            await TickAsync();
+            await WaitForIdleAsync();
+        }
+        var task = (await ceo.GetAsync<List<TaskDto>>($"/api/projects/{project.Id}/tasks")).Single(t => t.Title == "Only task");
+        var latest = (await ceo.GetAsync<List<AgentRunDto>>($"/api/agent-runs?taskId={task.Id}")).OrderByDescending(r => r.CreatedAt).First();
+        Assert.Equal(ApprovalKind.Escalation, Assert.Single(await PendingAsync(ceo, workflow.Id)).Kind);
+
+        var retry = await ceo.PostAsync<RetryRunDto>($"/api/agent-runs/{latest.Id}/retry", new { note = "Provider fixed" });
+        Assert.True(retry.HandedToWorkflow);
+        Assert.Null(retry.RunId);
+        Assert.Empty(await PendingAsync(ceo, workflow.Id));
+        Assert.Equal(WorkTaskStatus.InProgress, (await ceo.GetAsync<TaskDto>($"/api/tasks/{task.Id}")).Status);
+
+        await TickAsync();
+        await WaitForIdleAsync();
+        Assert.Equal(4, (await ceo.GetAsync<List<AgentRunDto>>($"/api/agent-runs?taskId={task.Id}")).Count);
+        await ceo.PostAsync<WorkflowDto>($"/api/workflows/{workflow.Id}/cancel", new { });
+    }
+
+    [Fact]
     public async Task Parallel_limit_is_respected_and_cancelling_stops_everything()
     {
         var ceo = await fx.CeoAsync();

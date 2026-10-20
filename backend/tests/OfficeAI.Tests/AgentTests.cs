@@ -297,6 +297,40 @@ public class AgentTests(ApiFixture fx)
     }
 
     [Fact]
+    public async Task Failed_run_can_be_retried_and_unblocks_the_task()
+    {
+        var (ceo, agent, task) = await AgentWithTaskAsync();
+        var calls = 0;
+        var model = await ScriptedModelAsync((_, _) => Interlocked.Increment(ref calls) == 1
+            ? throw new AiProviderException("boom", retryable: false)
+            : Task.FromResult(ScriptedProvider.Text("trying again")));
+        await UseModelAsync(ceo, agent.Id, ScriptedProvider.ProviderName, model);
+
+        var first = await WaitAsync(ceo, (await StartAsync(ceo, task.Id)).Id);
+        Assert.Equal(AgentRunStatus.Failed, first.Run.Status);
+        await ceo.PostAsync<TaskDto>($"/api/tasks/{task.Id}/status", new { status = "Blocked" });
+
+        var retry = await ceo.PostAsync<RetryRunDto>($"/api/agent-runs/{first.Run.Id}/retry", new { note = "Use the v2 endpoints" });
+        Assert.False(retry.HandedToWorkflow);
+        var second = await WaitAsync(ceo, retry.RunId!.Value);
+        Assert.Equal(2, second.Run.Attempt);
+        Assert.Equal(agent.Id, second.Run.EmployeeId);
+        Assert.NotEqual(WorkTaskStatus.Blocked, (await ceo.GetAsync<TaskDto>($"/api/tasks/{task.Id}")).Status);
+        await using (var scope = fx.Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.True(await db.Reviews.AnyAsync(r => r.TaskId == task.Id && r.Comments == "Use the v2 endpoints"));
+        }
+
+        // Only the latest run, and only one that did not succeed, can be retried.
+        var stale = await ceo.PostAsJsonAsync($"/api/agent-runs/{first.Run.Id}/retry", new { });
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        Assert.Contains("agent.retry_not_latest", await stale.Content.ReadAsStringAsync());
+        var succeeded = await ceo.PostAsJsonAsync($"/api/agent-runs/{second.Run.Id}/retry", new { });
+        Assert.Equal(HttpStatusCode.Conflict, succeeded.StatusCode);
+    }
+
+    [Fact]
     public async Task Only_one_active_run_per_task()
     {
         var (ceo, agent, task) = await AgentWithTaskAsync();
