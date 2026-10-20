@@ -33,8 +33,9 @@ export interface OfficeRoom {
 const DESK_COLS = 3;
 const DESK_DX = 1.7;
 const DESK_DZ = 1.9;
-const ROOM_GAP = 1.6; // corridor width between rooms
-const ROOMS_PER_ROW = 3;
+const ROOM_GAP = 1.6; // grass between neighbouring rooms, and the side street
+const STREET = 2.6; // the cobbled street the rooms face
+const ROOMS_PER_ROW = 4;
 const WALK_SPEED = 1.1;
 const RUSH_SPEED = 2.6; // back to the desk when work arrives
 
@@ -92,43 +93,70 @@ const ACTIVITY_BUBBLE = { lounge: { icon: "☕", bg: "#FCE7F3" }, visit: { icon:
 // ---------- layout and walking routes (all in office coordinates) ----------
 
 type V2 = [number, number];
-interface Cell { x0: number; z0: number; col: number; row: number }
+/** A room's plot. `flip` rooms sit below their street and are turned around, so every gate opens onto the street. */
+interface Cell { x0: number; z0: number; col: number; row: number; flip: boolean; streetZ: number }
 interface Seat { key: string; x: number; z: number; y: number; face: V2 }
-interface Layout { w: number; d: number; cells: Cell[]; lounge: Cell; seats: Seat[]; totalW: number; totalD: number }
+interface Layout { w: number; d: number; cells: Cell[]; lounge: Cell; seats: Seat[]; streets: number[]; cols: number; totalW: number; totalD: number }
 
+/**
+ * A village street: rooms stand in pairs of rows on both sides of a cobbled street, every gate facing it; with more
+ * rooms than one street holds, the next pair of rows gets its own street and a side street joins them on the left.
+ * Inside a room everything is in room coordinates: z = 0 is the back wall, z = d the gate side.
+ */
 function buildLayout(roomCount: number, maxPeople: number): Layout {
   const rows = Math.max(1, Math.ceil(maxPeople / DESK_COLS));
   const w = DESK_COLS * DESK_DX + 1.6;
   const d = Math.max(rows * DESK_DZ + 1.8, 5.6); // tall enough for the lounge furniture
   const count = roomCount + 1; // the last cell is the lounge
-  const cols = Math.min(ROOMS_PER_ROW, count);
+  const cols = Math.min(ROOMS_PER_ROW, Math.ceil(count / 2));
+  const pairH = 2 * d + STREET + ROOM_GAP;
   const cells = Array.from({ length: count }, (_, i) => {
-    const col = i % cols, row = Math.floor(i / cols);
-    return { col, row, x0: col * (w + ROOM_GAP), z0: row * (d + ROOM_GAP) };
+    const pair = Math.floor(i / (2 * cols)), k = i % (2 * cols);
+    const flip = k >= cols, col = k % cols;
+    const top = pair * pairH;
+    return { col, row: pair * 2 + (flip ? 1 : 0), flip, x0: col * (w + ROOM_GAP), z0: flip ? top + d + STREET : top, streetZ: top + d + STREET / 2 };
   });
   const lounge = cells[count - 1];
-  const cx = lounge.x0 + w / 2, cz = lounge.z0 + d / 2;
+  const at = (lx: number, lz: number) => toWorld({ w, d } as Layout, lounge, lx, lz);
+  const turn = (f: V2): V2 => (lounge.flip ? [-f[0], -f[1]] : f);
+  const cx = w / 2, cz = d / 2;
+  const seat = (key: string, lx: number, lz: number, y: number, face: V2): Seat => {
+    const [x, z] = at(lx, lz);
+    return { key, x, z, y, face: turn(face) };
+  };
   const seats: Seat[] = [
-    ...[-0.75, 0, 0.75].map((dx, i) => ({ key: `sofa-a${i}`, x: cx + dx, z: cz - 1.25, y: 0.3, face: [0, 1] as V2 })),
-    ...[-0.75, 0, 0.75].map((dx, i) => ({ key: `sofa-b${i}`, x: cx + dx, z: cz + 1.25, y: 0.3, face: [0, -1] as V2 })),
-    { key: "bean-l", x: cx - 2.3, z: cz, y: 0.18, face: [1, 0] },
-    { key: "bean-r", x: cx + 2.3, z: cz, y: 0.18, face: [-1, 0] },
+    ...[-0.75, 0, 0.75].map((dx, i) => seat(`sofa-a${i}`, cx + dx, cz - 1.25, 0.3, [0, 1])),
+    ...[-0.75, 0, 0.75].map((dx, i) => seat(`sofa-b${i}`, cx + dx, cz + 1.25, 0.3, [0, -1])),
+    seat("bean-l", cx - 2.3, cz, 0.18, [1, 0]),
+    seat("bean-r", cx + 2.3, cz, 0.18, [-1, 0]),
   ];
-  const rowsOfCells = Math.ceil(count / cols);
-  return { w, d, cells, lounge, seats, totalW: cols * w + (cols - 1) * ROOM_GAP, totalD: rowsOfCells * d + (rowsOfCells - 1) * ROOM_GAP };
+  const streets = [...new Set(cells.map((c) => c.streetZ))];
+  const last = streets[streets.length - 1];
+  return {
+    w, d, cells, lounge, seats, streets, cols,
+    totalW: cols * w + (cols - 1) * ROOM_GAP,
+    totalD: Math.max(...cells.map((c) => c.z0 + d), last + STREET / 2),
+  };
 }
 
-const aisleX = (L: Layout, c: Cell) => c.x0 + L.w - 0.45; // open right-hand aisle of every room
-const corridorZ = (L: Layout, c: Cell) => c.z0 + L.d + ROOM_GAP / 2; // corridor in front of a row
-const crossX = (L: Layout, c: Cell) => c.x0 + L.w + ROOM_GAP / 2; // corridor to the right of a column
+/** Room coordinates to office coordinates (a flipped room is turned 180° inside its plot). */
+function toWorld(L: Layout, c: Cell, lx: number, lz: number): V2 {
+  return c.flip ? [c.x0 + L.w - lx, c.z0 + L.d - lz] : [c.x0 + lx, c.z0 + lz];
+}
+const toLocal = toWorld; // turning 180° twice is the identity, so the same formula maps back
 
-/** Walks out by the room's aisle, along the corridors, and in by the other room's aisle — never through walls. */
+const AISLE = 0.45; // the free aisle runs inside the right-hand wall, from the desks to the gate
+const SIDE_STREET_X = -ROOM_GAP / 2;
+
+/** Out along the aisle, through the gate, along the street (and the side street between streets), in through the other gate. */
 function route(L: Layout, from: Cell, p: V2, to: Cell, q: V2): V2[] {
-  const ax = aisleX(L, from), bx = aisleX(L, to);
-  if (from === to) return [[ax, p[1]], [ax, q[1]], q];
-  const path: V2[] = [[ax, p[1]], [ax, corridorZ(L, from)]];
-  if (from.row !== to.row) path.push([crossX(L, from), corridorZ(L, from)], [crossX(L, from), corridorZ(L, to)]);
-  path.push([bx, corridorZ(L, to)], [bx, q[1]], q);
+  const ax = L.w - AISLE;
+  const pz = toLocal(L, from, p[0], p[1])[1], qz = toLocal(L, to, q[0], q[1])[1];
+  if (from === to) return [toWorld(L, from, ax, pz), toWorld(L, from, ax, qz), q];
+  const outGate = toWorld(L, from, ax, L.d), inGate = toWorld(L, to, ax, L.d);
+  const path: V2[] = [toWorld(L, from, ax, pz), outGate, [outGate[0], from.streetZ]];
+  if (from.streetZ !== to.streetZ) path.push([SIDE_STREET_X, from.streetZ], [SIDE_STREET_X, to.streetZ]);
+  path.push([inGate[0], to.streetZ], inGate, toWorld(L, to, ax, qz), q);
   return path;
 }
 
@@ -170,10 +198,18 @@ export default function Office3D({ rooms, selectedId, onSelect, onRoomClick, lab
       <Clouds span={span} />
       <KitContext.Provider value={kit}>
         <group position={[-L.totalW / 2, 0, -L.totalD / 2]}>
-          {/* one connected cobbled floor: the corridors between and around the rooms */}
-          <RoundedBox args={[L.totalW + ROOM_GAP * 2, 0.04, L.totalD + ROOM_GAP * 2]} radius={0.02} position={[L.totalW / 2, -0.03, L.totalD / 2]} receiveShadow>
-            <meshStandardMaterial color="#EEE6F7" map={kit.path} />
-          </RoundedBox>
+          {/* cobbled streets between the rows, and the side street joining them */}
+          {L.streets.map((z) => (
+            <RoundedBox key={z} args={[L.totalW + ROOM_GAP * 2, 0.04, STREET]} radius={0.02} position={[L.totalW / 2, -0.03, z]} receiveShadow>
+              <meshStandardMaterial color="#EEE6F7" map={kit.path} />
+            </RoundedBox>
+          ))}
+          {L.streets.length > 1 && (
+            <RoundedBox args={[ROOM_GAP, 0.04, L.streets[L.streets.length - 1] - L.streets[0]]} radius={0.02}
+              position={[SIDE_STREET_X, -0.03, (L.streets[0] + L.streets[L.streets.length - 1]) / 2]} receiveShadow>
+              <meshStandardMaterial color="#EEE6F7" map={kit.sidePath} />
+            </RoundedBox>
+          )}
           {rooms.map((room, i) => (
             <Room key={room.id} room={room} index={i} cell={L.cells[i]} L={L} hint={roomHint}
               onClick={onRoomClick && (() => onRoomClick(room.id))} />
@@ -181,7 +217,7 @@ export default function Office3D({ rooms, selectedId, onSelect, onRoomClick, lab
           <Lounge L={L} name={loungeName} />
           <Lanterns L={L} />
           {rooms.flatMap((room, i) => room.people.map((p, j) => (
-            <Character key={p.id} person={p} home={deskSpot(L.cells[i], j)} homeCell={L.cells[i]} world={world}
+            <Character key={p.id} person={p} home={toWorld(L, L.cells[i], ...deskSpot(j))} homeCell={L.cells[i]} world={world}
               selected={selectedId === p.id} onSelect={onSelect} label={labels(p.status)} />
           )))}
         </group>
@@ -201,7 +237,10 @@ interface Kit {
   wallBack: THREE.Texture;
   wallSide: THREE.Texture;
   path: THREE.Texture;
+  sidePath: THREE.Texture;
+  /** Battlements on the tall walls: rooms whose back faces away from the camera, and turned-around rooms. */
   merlons: THREE.BufferGeometry;
+  merlonsFlip: THREE.BufferGeometry;
 }
 const KitContext = createContext<Kit | null>(null);
 
@@ -265,17 +304,27 @@ function makeKit(L: Layout): Kit {
       }
     }
   });
-  const parts: THREE.BufferGeometry[] = [];
-  for (let x = 0.75; x < L.w - 0.1; x += 0.5) parts.push(new THREE.BoxGeometry(0.24, 0.16, 0.14).translate(x, 0.98, 0.05));
-  for (let z = 0.75; z < L.d - 0.1; z += 0.5) parts.push(new THREE.BoxGeometry(0.14, 0.16, 0.24).translate(0.05, 0.98, z));
-  const merlons = mergeGeometries(parts)!;
-  parts.forEach((p) => p.dispose());
+  const battlements = (flip: boolean) => {
+    const parts: THREE.BufferGeometry[] = [];
+    const add = (x: number, z: number, alongX: boolean) =>
+      parts.push(new THREE.BoxGeometry(alongX ? 0.24 : 0.14, 0.16, alongX ? 0.14 : 0.24).translate(x, 0.98, z));
+    // the tall long wall is the back one, or for a turned-around room the gate wall (up to the gate)
+    if (flip) for (let x = 0.75; x < L.w - 1.1; x += 0.5) add(x, L.d - 0.05, true);
+    else for (let x = 0.75; x < L.w - 0.1; x += 0.5) add(x, 0.05, true);
+    for (let z = flip ? 0.25 : 0.75; z < L.d - (flip ? 0.75 : 0.1); z += 0.5) add(0.05, z, false);
+    for (let z = 0.25; z < L.d - 0.1; z += 0.5) add(L.w - 0.05, z, false);
+    const g = mergeGeometries(parts)!;
+    parts.forEach((p) => p.dispose());
+    return g;
+  };
   return {
     floor: planks([L.w / 2, L.d / 2]),
     wallBack: bricks([L.w / 1.6, 1]),
     wallSide: bricks([L.d / 1.6, 1]),
-    path: cobbles([(L.totalW + ROOM_GAP * 2) / 2.5, (L.totalD + ROOM_GAP * 2) / 2.5]),
-    merlons,
+    path: cobbles([(L.totalW + ROOM_GAP * 2) / 2.5, STREET / 2.5]),
+    sidePath: cobbles([ROOM_GAP / 2.5, Math.max(1, (L.streets[L.streets.length - 1] - L.streets[0]) / 2.5)]),
+    merlons: battlements(false),
+    merlonsFlip: battlements(true),
   };
 }
 
@@ -407,9 +456,13 @@ function Clouds({ span }: { span: number }) {
   );
 }
 
-/** Lanterns floating over the corridor crossings. */
+/** Lamp posts at the mouths of the gaps between rooms, and lanterns floating over the streets. */
 function Lanterns({ L }: { L: Layout }) {
-  const spots = useMemo(() => L.cells.map((c) => [crossX(L, c), corridorZ(L, c)] as V2), [L]);
+  const floating = useMemo(() => L.streets.flatMap((z) => Array.from({ length: L.cols }, (_, c) => [c * (L.w + ROOM_GAP) + L.w / 2, z] as V2)), [L]);
+  const posts = useMemo(() => {
+    const xs = [...Array.from({ length: L.cols - 1 }, (_, c) => (c + 1) * (L.w + ROOM_GAP) - ROOM_GAP / 2), L.totalW + ROOM_GAP * 0.6];
+    return L.streets.flatMap((z) => xs.flatMap((x) => [[x, z - STREET / 2 + 0.2], [x, z + STREET / 2 - 0.2]] as V2[]));
+  }, [L]);
   const refs = useRef<(THREE.Group | null)[]>([]);
   useFrame(({ clock }) => refs.current.forEach((g, i) => {
     if (!g) return;
@@ -418,13 +471,28 @@ function Lanterns({ L }: { L: Layout }) {
   }));
   return (
     <>
-      {spots.map(([x, z], i) => (
+      {floating.map(([x, z], i) => (
         <group key={i} ref={(g) => { refs.current[i] = g; }} position={[x, 2.4, z]}>
-          <mesh position-y={0.17} rotation-y={Math.PI / 4}><coneGeometry args={[0.15, 0.12, 4]} /><meshStandardMaterial color={brand.purpleDeep} /></mesh>
-          <mesh><boxGeometry args={[0.16, 0.22, 0.16]} /><meshStandardMaterial color="#FFE7A8" emissive="#FFC75A" emissiveIntensity={1} /></mesh>
-          <mesh position-y={-0.13}><boxGeometry args={[0.19, 0.03, 0.19]} /><meshStandardMaterial color={brand.purpleDeep} /></mesh>
+          <Lantern />
         </group>
       ))}
+      {posts.map(([x, z], i) => (
+        <group key={`p${i}`} position={[x, 0, z]}>
+          <mesh position-y={0.85} castShadow><cylinderGeometry args={[0.035, 0.055, 1.7, 8]} /><meshStandardMaterial color="#3A3150" /></mesh>
+          <mesh position-y={0.04}><cylinderGeometry args={[0.1, 0.12, 0.08, 10]} /><meshStandardMaterial color="#3A3150" /></mesh>
+          <group position-y={1.82}><Lantern /></group>
+        </group>
+      ))}
+    </>
+  );
+}
+
+function Lantern() {
+  return (
+    <>
+      <mesh position-y={0.17} rotation-y={Math.PI / 4}><coneGeometry args={[0.15, 0.12, 4]} /><meshStandardMaterial color={brand.purpleDeep} /></mesh>
+      <mesh><boxGeometry args={[0.16, 0.22, 0.16]} /><meshStandardMaterial color="#FFE7A8" emissive="#FFC75A" emissiveIntensity={1} /></mesh>
+      <mesh position-y={-0.13}><boxGeometry args={[0.19, 0.03, 0.19]} /><meshStandardMaterial color={brand.purpleDeep} /></mesh>
     </>
   );
 }
@@ -473,35 +541,45 @@ function Crystal({ position, scale = 1, hue = 0 }: { position: [number, number, 
   );
 }
 
-/** Where person number j of a room works: the chair is at (x, z - 0.25), the desk in front of it. */
-function deskSpot(cell: Pick<Cell, "x0" | "z0">, j: number): V2 {
+/** Where person number j works, in room coordinates: the chair is at (x, z - 0.25), the desk in front of it, facing the gate. */
+function deskSpot(j: number): V2 {
   const col = j % DESK_COLS, row = Math.floor(j / DESK_COLS);
-  return [cell.x0 + 0.9 + col * DESK_DX + DESK_DX / 2 - 0.1, cell.z0 + 1.35 + row * DESK_DZ];
+  return [0.9 + col * DESK_DX + DESK_DX / 2 - 0.1, 1.35 + row * DESK_DZ];
 }
 
-/** A guild hall: plank floor, stone walls with battlements on the back and left, and a tower in the back corner. */
-function Walls({ L, floor, banner }: { L: Layout; floor: string; banner: string }) {
+/** A guild hall: plank floor, stone walls all round with a gate onto the street, and a tower in the corner away from the camera. */
+function Walls({ L, floor, banner, flip }: { L: Layout; floor: string; banner: string; flip: boolean }) {
   const kit = useContext(KitContext);
+  // the wall on the camera side stays low, like a dollhouse cut open toward the viewer
+  const backH = flip ? 0.45 : 0.9, frontH = flip ? 0.9 : 0.45;
+  const gateL = L.w - 0.85; // the gate wall runs from the left corner to the gate
   return (
     <>
-      {/* floor + low walls on the back and left, like a dollhouse cut open toward the camera */}
       <RoundedBox args={[L.w, 0.12, L.d]} radius={0.05} position={[L.w / 2, -0.06, L.d / 2]} receiveShadow>
         <meshStandardMaterial color={floor} map={kit?.floor} />
       </RoundedBox>
-      <mesh position={[L.w / 2, 0.45, 0.05]} castShadow receiveShadow>
-        <boxGeometry args={[L.w, 0.9, 0.1]} />
+      <mesh position={[L.w / 2, backH / 2, 0.05]} castShadow receiveShadow>
+        <boxGeometry args={[L.w, backH, 0.1]} />
         <meshStandardMaterial color={STONE} map={kit?.wallBack} />
       </mesh>
-      <mesh position={[0.05, 0.45, L.d / 2]} castShadow receiveShadow>
-        <boxGeometry args={[0.1, 0.9, L.d]} />
-        <meshStandardMaterial color="#DCD1EE" map={kit?.wallSide} />
+      <mesh position={[gateL / 2, frontH / 2, L.d - 0.05]} castShadow receiveShadow>
+        <boxGeometry args={[gateL, frontH, 0.1]} />
+        <meshStandardMaterial color={STONE} map={kit?.wallBack} />
       </mesh>
-      {kit && <mesh geometry={kit.merlons} dispose={null} castShadow><meshStandardMaterial color={STONE} /></mesh>}
-      <group position={[0.1, 0, 0.1]}>
+      {[0.05, L.w - 0.05].map((x) => (
+        <mesh key={x} position={[x, 0.45, L.d / 2]} castShadow receiveShadow>
+          <boxGeometry args={[0.1, 0.9, L.d]} />
+          <meshStandardMaterial color="#DCD1EE" map={kit?.wallSide} />
+        </mesh>
+      ))}
+      {kit && <mesh geometry={flip ? kit.merlonsFlip : kit.merlons} dispose={null} castShadow><meshStandardMaterial color={STONE} /></mesh>}
+      <Gate position={[L.w - AISLE, 0, L.d - 0.05]} color={banner} />
+      <group position={[0.1, 0, flip ? L.d - 0.1 : 0.1]}>
         <mesh position-y={0.85} castShadow><cylinderGeometry args={[0.36, 0.42, 1.7, 14]} /><meshStandardMaterial color={STONE} /></mesh>
         <mesh position-y={1.72}><cylinderGeometry args={[0.45, 0.45, 0.1, 14]} /><meshStandardMaterial color="#CFC2E6" /></mesh>
         <mesh position-y={2.18} castShadow><coneGeometry args={[0.52, 0.85, 14]} /><meshStandardMaterial color={ROOF} /></mesh>
-        <mesh position={[0.27, 1.25, 0.27]} rotation-y={Math.PI / 4}>
+        {/* window toward the camera */}
+        <mesh position={[0.27, 1.25, flip ? -0.27 : 0.27]} rotation-y={flip ? (Math.PI * 3) / 4 : Math.PI / 4}>
           <planeGeometry args={[0.14, 0.22]} />
           <meshStandardMaterial color="#FFE7A8" emissive="#FFC75A" emissiveIntensity={0.9} />
         </mesh>
@@ -512,10 +590,30 @@ function Walls({ L, floor, banner }: { L: Layout; floor: string; banner: string 
   );
 }
 
-/** The room's banner on the back wall, with a golden star emblem. */
-function Banner({ position, color }: { position: [number, number, number]; color: string }) {
+/** Stone gate posts under a slate arch with a glowing keystone and a lantern, opening onto the street. */
+function Gate({ position, color }: { position: [number, number, number]; color: string }) {
   return (
     <group position={position}>
+      {[-0.4, 0.4].map((x) => (
+        <group key={x} position-x={x}>
+          <mesh position-y={0.65} castShadow><boxGeometry args={[0.16, 1.3, 0.16]} /><meshStandardMaterial color={STONE} /></mesh>
+          <mesh position-y={1.33}><boxGeometry args={[0.2, 0.06, 0.2]} /><meshStandardMaterial color="#CFC2E6" /></mesh>
+        </group>
+      ))}
+      <mesh position-y={1.33} castShadow><torusGeometry args={[0.4, 0.06, 8, 24, Math.PI]} /><meshStandardMaterial color={ROOF} /></mesh>
+      <mesh position-y={1.75} scale={[0.07, 0.1, 0.07]}><octahedronGeometry args={[1]} /><meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.8} flatShading /></mesh>
+      <mesh position-y={1.6}><cylinderGeometry args={[0.008, 0.008, 0.14, 4]} /><meshStandardMaterial color="#3A3150" /></mesh>
+      <group position-y={1.45} scale={0.6}><Lantern /></group>
+      {/* doormat in the room's colour */}
+      <mesh position={[0, 0.004, 0.32]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.7, 0.45]} /><meshStandardMaterial color={color} /></mesh>
+    </group>
+  );
+}
+
+/** The room's banner on the back wall, with a golden star emblem. */
+function Banner({ position, color, turn = false }: { position: [number, number, number]; color: string; turn?: boolean }) {
+  return (
+    <group position={position} rotation-y={turn ? Math.PI : 0}>
       <mesh position-y={0.24} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.02, 0.02, 0.62, 6]} /><meshStandardMaterial color={GOLD} /></mesh>
       <mesh><planeGeometry args={[0.5, 0.42]} /><meshStandardMaterial color={color} /></mesh>
       <mesh position-y={-0.2825} rotation-z={-Math.PI / 2} scale={[0.5, 1, 1]}><circleGeometry args={[0.29, 3]} /><meshStandardMaterial color={color} /></mesh>
@@ -593,20 +691,30 @@ function Label({ position, text, onClick, hint }: { position: [number, number, n
   );
 }
 
+/** A room's own coordinates: z = 0 at the back wall, the gate at z = d; turned-around rooms face the street from below. */
+function Plot({ L, cell, children }: { L: Layout; cell: Cell; children: ReactNode }) {
+  return (
+    <group position={cell.flip ? [cell.x0 + L.w, 0, cell.z0 + L.d] : [cell.x0, 0, cell.z0]} rotation-y={cell.flip ? Math.PI : 0}>
+      {children}
+    </group>
+  );
+}
+
 function Room({ room, index, cell, L, onClick, hint }: { room: OfficeRoom; index: number; cell: Cell; L: Layout; onClick?: () => void; hint?: string }) {
   const working = room.people.filter((p) => p.status === "Working").length;
   const banner = BANNERS[index % BANNERS.length];
   return (
-    <group position={[cell.x0, 0, cell.z0]}>
-      <Walls L={L} floor={FLOORS[index % FLOORS.length]} banner={banner} />
-      <Banner position={[L.w * 0.62, 0.66, 0.115]} color={banner} />
+    <Plot L={L} cell={cell}>
+      <Walls L={L} floor={FLOORS[index % FLOORS.length]} banner={banner} flip={cell.flip} />
+      {/* the banner hangs on whichever tall wall the camera looks at */}
+      <Banner position={cell.flip ? [L.w * 0.4, 0.66, L.d - 0.115] : [L.w * 0.62, 0.66, 0.115]} color={banner} turn={cell.flip} />
       <Crystal position={[L.w - 0.35, 0, 0.4]} hue={index} />
-      <Label position={[L.w / 2, 2.1, -0.2]} text={`${room.name} · ${working}/${room.people.length}`} onClick={onClick} hint={hint} />
+      <Label position={[L.w - AISLE, 2.3, L.d]} text={`${room.name} · ${working}/${room.people.length}`} onClick={onClick} hint={hint} />
       {room.people.map((p, j) => {
-        const [x, z] = deskSpot({ x0: 0, z0: 0 }, j);
+        const [x, z] = deskSpot(j);
         return <Desk key={p.id} position={[x, 0, z]} working={p.status === "Working"} />;
       })}
-    </group>
+    </Plot>
   );
 }
 
@@ -659,9 +767,9 @@ function Lounge({ L, name }: { L: Layout; name: string }) {
   const c = L.lounge;
   const cx = L.w / 2, cz = L.d / 2;
   return (
-    <group position={[c.x0, 0, c.z0]}>
-      <Walls L={L} floor="#FFE9F3" banner={brand.star} />
-      <Label position={[cx, 2.1, -0.2]} text={name} />
+    <Plot L={L} cell={c}>
+      <Walls L={L} floor="#FFE9F3" banner={brand.star} flip={c.flip} />
+      <Label position={[L.w - AISLE, 2.3, L.d]} text={name} />
       <MagicCircle position={[cx, 0.006, cz]} />
       <Cauldron position={[cx, 0, cz]} />
       <Sofa position={[cx, 0, cz - 1.25]} facing={1} color="#C4B5FD" />
@@ -693,7 +801,7 @@ function Lounge({ L, name }: { L: Layout; name: string }) {
           )))}
       </group>
       <Mushrooms position={[L.w - 0.4, 0, 0.45]} scale={1.4} />
-    </group>
+    </Plot>
   );
 }
 
@@ -806,11 +914,13 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
   const phase = (seed % 1000) / 160;
   const status = person.status;
   const dim = status === "Inactive";
-  const stand: V2 = [home[0], home[1] - 0.85];
+  const toward = homeCell.flip ? -1 : 1; // which way along z the desk (and the gate) is from the chair
+  const facing0 = homeCell.flip ? 0 : Math.PI; // turn that faces the desk
+  const stand: V2 = [home[0], home[1] - 0.85 * toward];
 
   const st = useRef({
     mode: "home" as Mode, after: "home" as Mode, path: [] as V2[], speed: WALK_SPEED, rushing: false,
-    cell: homeCell, dest: homeCell, x: stand[0], z: stand[1], heading: Math.PI, until: -1, seat: null as Seat | null, random: rng(seed),
+    cell: homeCell, dest: homeCell, x: stand[0], z: stand[1], heading: facing0, until: -1, seat: null as Seat | null, random: rng(seed),
   });
 
   const walkTo = (path: V2[], dest: Cell, after: Mode, speed = WALK_SPEED) => {
@@ -836,7 +946,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
       s.rushing = true;
     }
 
-    g.rotation.set(0, Math.PI, 0);
+    g.rotation.set(0, facing0, 0);
     g.scale.setScalar(1);
     armL.current?.rotation.set(0, 0, 0);
     armR.current?.rotation.set(0, 0, 0);
@@ -896,7 +1006,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
     // At the desk: the pose follows the live status.
     const seated = status === "Working" || status === "Blocked" || status === "Failed" || status === "Inactive";
     s.x = stand[0]; s.z = stand[1];
-    g.position.set(home[0], seated ? 0.42 : 0, seated ? home[1] - 0.25 : stand[1]);
+    g.position.set(home[0], seated ? 0.42 : 0, seated ? home[1] - 0.25 * toward : stand[1]);
     if (status === "Working") {
       g.position.y += Math.abs(Math.sin(t * 6)) * 0.03;
       if (armL.current) armL.current.rotation.x = -1.2 + Math.sin(t * 14) * 0.25;
@@ -908,7 +1018,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
       s.x = stand[0] + Math.cos(a) * 0.5;
       s.z = stand[1] + Math.sin(a) * 0.15;
       g.position.set(s.x, Math.abs(Math.sin(t * 5)) * 0.05, s.z);
-      g.rotation.y = -a + Math.PI;
+      g.rotation.y = -a + facing0;
       if (armL.current) armL.current.rotation.x = Math.sin(t * 5) * 0.5;
       if (armR.current) armR.current.rotation.x = -Math.sin(t * 5) * 0.5;
       if (p) p.rotation.z = Math.sin(t * 5) * 0.1;
@@ -923,7 +1033,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
           walkTo(route(L, homeCell, [s.x, s.z], L.lounge, [seat.x, seat.z]), L.lounge, "lounge");
         } else if (roll < 0.85 && others.length > 0) {
           const cell = others[Math.floor(s.random() * others.length)];
-          const spot: V2 = [cell.x0 + 1 + s.random() * (L.w - 2.4), cell.z0 + L.d - 0.55];
+          const spot = toWorld(L, cell, 1 + s.random() * (L.w - 2.4), L.d - 0.55); // just inside the gate
           walkTo(route(L, homeCell, [s.x, s.z], cell, spot), cell, "visit");
         } else {
           s.until = now + 5 + s.random() * 10;
@@ -940,7 +1050,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
       if (p) p.scale.y = 0.94;
     } else {
       // blocked / inactive: slumped over the desk, slow breathing
-      g.rotation.x = status === "Inactive" ? 0.5 : 0.2; // Euler XYZ: the tilt is about world X, so + leans toward the desk
+      g.rotation.x = (status === "Inactive" ? 0.5 : 0.2) * toward; // Euler XYZ: the tilt is about world X, so it leans toward the desk
       g.scale.setScalar(1 + Math.sin(t * 1.5) * 0.015);
       if (armL.current) armL.current.rotation.x = -0.9;
       if (armR.current) armR.current.rotation.x = -0.9;

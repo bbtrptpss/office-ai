@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.24.3",
+    date: "2026-10-20",
+    title: { th: "ออฟฟิศ 3D แบบถนนหมู่บ้านแฟนตาซี", en: "3D office as a fantasy village street" },
+    changes: [
+      { type: "changed", th: "ห้องแต่ละแผนกเป็นอาคารแยกกัน มีกำแพงล้อมรอบทุกด้านและสนามหญ้าคั่น ตั้งเป็นแถวสองฝั่งถนนปูหิน ทุกห้องมีประตูซุ้มโค้งหันออกถนน โต๊ะทำงานหันไปทางประตู", en: "Each department is its own walled building with grass in between, in rows on both sides of a cobbled street; every room has an arched gate onto the street and its desks face the gate" },
+      { type: "changed", th: "ตัวละครเดินออกทางประตู ไปตามถนน แล้วเข้าประตูห้องอื่น ถ้ามีหลายถนนจะเดินผ่านถนนข้างทางซ้าย มีเสาไฟและโคมลอยเหนือถนน", en: "Characters leave through their gate, walk along the street and enter the other room's gate (a side street joins several streets); lamp posts and floating lanterns line the streets" },
+    ],
+  },
+  {
     version: "0.24.2",
     date: "2026-10-20",
     title: { th: "แก้ error ในหน้าออฟฟิศ 3D", en: "3D office console errors fixed" },
