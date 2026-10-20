@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.25.0",
+    date: "2026-10-20",
+    title: { th: "แก้ไขและยกเลิกโปรเจกต์", en: "Edit and cancel projects" },
+    changes: [
+      { type: "added", th: "ปุ่ม “แก้ไขโปรเจกต์” ในหน้าโปรเจกต์ (ผู้มีสิทธิ์ project.manage): แก้รหัส ชื่อ คำอธิบาย สถานะ งบประมาณ และวันที่ได้", en: "“Edit project” button on the project page (project.manage): change code, name, description, status, budget and dates" },
+      { type: "added", th: "เปลี่ยนสถานะเป็น “ยกเลิก” จะถามยืนยันก่อน แล้วยกเลิกงานที่ยังไม่เสร็จทั้งหมดในโปรเจกต์ หยุด AI ที่กำลังทำงานในโปรเจกต์ และยกเลิกคำขออนุมัติที่รออยู่ งานที่เสร็จแล้วยังอยู่เหมือนเดิม", en: "Switching to Cancelled asks first, then cancels every unfinished task in the project, stops AI runs in it and withdraws pending approvals; finished tasks stay" },
+    ],
+  },
+  {
     version: "0.24.7",
     date: "2026-10-20",
     title: { th: "สถานะ “ล้มเหลว” ค้าง", en: "Stuck “failed” status" },

@@ -11,6 +11,7 @@ import { useSearchParams } from "next/navigation";
 import AddIcon from "@mui/icons-material/Add";
 import ForumIcon from "@mui/icons-material/ForumOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleAltOutlined";
+import EditIcon from "@mui/icons-material/EditOutlined";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { AgentRun, api, Deliverable, Employee, Milestone, Project, Review, Task, TaskComplexity, TaskPriority, TaskStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -20,6 +21,7 @@ import { KindIcon, Loading, PageHeader, StatusChip, useErrorMessage, useLoad } f
 import { DeliverableList, RetryRunButton, RunList } from "@/components/agents";
 import { ObjectivesPanel } from "@/components/objectives";
 import { ProjectMembersDialog } from "@/components/members";
+import { ProjectEditDialog } from "@/components/projectEdit";
 import { StagesPanel } from "@/components/stages";
 import { DefectsPanel } from "@/components/defects";
 import { ReleasesPanel } from "@/components/releases";
@@ -78,6 +80,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   const [message, setMessage] = useState<string | null>(null);
   const [showCancelled, setShowCancelled] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [tab, setTab] = useState<"board" | "stages" | "defects" | "releases" | "delivery" | "requirements" | "decisions" | "estimates" | "repository" | "documents" | "closeout">("board");
   // ?task=<id> (from the company task board) opens that task once the board has loaded.
   const linkedTaskId = useSearchParams().get("task");
@@ -136,6 +139,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
         actions={
           <>
             {can("org.read") && <Button component={Link} href={`/chat?project=${id}`} startIcon={<ForumIcon />}>{t.openProjectChat}</Button>}
+            {can("project.manage") && <Button startIcon={<EditIcon />} onClick={() => setEditOpen(true)}>{t.editProject}</Button>}
             {can("project.manage") && <Button startIcon={<PeopleIcon />} onClick={() => setMembersOpen(true)}>{t.members}</Button>}
             {can("project.manage") && <Button onClick={() => setMilestoneName("")}>{t.newMilestone}</Button>}
             {can("task.manage") && (
@@ -148,6 +152,10 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
       />
 
       {membersOpen && <ProjectMembersDialog projectId={id} title={data.project.name} onClose={() => setMembersOpen(false)} />}
+      {editOpen && (
+        <ProjectEditDialog project={data.project} openTasks={data.tasks.filter((x) => x.status !== "Done" && x.status !== "Cancelled").length}
+          onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); void reload(); }} />
+      )}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile sx={{ mb: 2 }}>
         <Tab value="board" label={t.board} />
         <Tab value="stages" label={t.stages} />
