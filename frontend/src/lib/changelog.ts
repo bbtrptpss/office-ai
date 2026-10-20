@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.24.2",
+    date: "2026-10-20",
+    title: { th: "แก้ error ในหน้าออฟฟิศ 3D", en: "3D office console errors fixed" },
+    changes: [
+      { type: "fixed", th: "หน้าออฟฟิศไม่ขึ้น error “Attempted to synchronously unmount a root” อีก (ป้ายชื่อห้องและบับเบิลสถานะใช้ตัววางป้ายของเราเองแทน Html ของ drei ที่ปิดตัวเองผิดจังหวะ)", en: "The office page no longer logs “Attempted to synchronously unmount a root” (room signs and status bubbles use our own pin instead of drei's Html, which unmounted at the wrong moment)" },
+      { type: "fixed", th: "เลิกใช้เงาแบบ PCFSoft ที่ three.js ถอดออกแล้ว ไม่ขึ้นคำเตือนอีก", en: "Shadows use PCF directly instead of the removed PCFSoft type, so three.js no longer warns" },
+    ],
+  },
+  {
     version: "0.24.1",
     date: "2026-10-20",
     title: { th: "ออฟฟิศ 3D โลกแฟนตาซี", en: "Fantasy 3D office" },
