@@ -31,6 +31,14 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.24.7",
+    date: "2026-10-20",
+    title: { th: "สถานะ “ล้มเหลว” ค้าง", en: "Stuck “failed” status" },
+    changes: [
+      { type: "fixed", th: "พนักงาน AI ที่งานล่าสุดล้มเหลว จะกลับเป็น “ว่าง” เองเมื่องานนั้นถูกยกเลิกหรือเสร็จ หรือโปรเจกต์ของงานถูกยกเลิก/ปิด (ตรวจทุก 30 วินาทีและตอนเปิดเซิร์ฟเวอร์) เดิมจะค้าง “ล้มเหลว” จนกว่าจะได้รันงานใหม่", en: "An AI employee whose last run failed goes back to Available once that task is cancelled or done, or its project cancelled or completed (checked every 30 seconds and at start-up); before, Failed stayed until their next run" },
+    ],
+  },
+  {
     version: "0.24.6",
     date: "2026-10-20",
     title: { th: "ออฟฟิศ 3D ลานน้ำพุกลางหมู่บ้าน", en: "3D office village square with a fountain" },

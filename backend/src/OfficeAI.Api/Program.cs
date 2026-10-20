@@ -58,6 +58,7 @@ builder.Services.AddHostedService<ChatReplyWorker>();
 builder.Services.AddHostedService<WorkflowEngineWorker>();
 builder.Services.AddHostedService<IntegrationWorker>();
 builder.Services.AddHostedService<EmailWorker>();
+builder.Services.AddHostedService<StaleFailureWorker>();
 builder.Services.AddHostedService<RetentionWorker>();
 
 // ---------- Identity + cookie auth ----------

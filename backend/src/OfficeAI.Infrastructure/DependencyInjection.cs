@@ -61,6 +61,7 @@ public static class DependencyInjection
 
         services.AddScoped<OrganizationService>();
         services.AddScoped<EmployeeOverviewService>();
+        services.AddScoped<StaleFailureService>();
         services.AddScoped<WorkService>();
         services.AddScoped<PermissionService>();
         services.AddScoped<SecurityAdminService>();

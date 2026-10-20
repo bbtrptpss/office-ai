@@ -48,6 +48,7 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("Sandbox:UseLocalDocker", "true");
             b.UseSetting("Sandbox:TestTimeoutSeconds", "8");
             b.UseSetting("Integrations:AutoDispatch", "false");
+            b.UseSetting("Organization:ClearStaleFailures", "false"); // tests clear stale failures explicitly
             b.UseSetting("Integrations:AllowHttp", "true");
             b.UseSetting("Integrations:AppBaseUrl", "https://office.test");
             b.UseSetting("Email:AutoDispatch", "false"); // tests drive the email dispatcher explicitly
