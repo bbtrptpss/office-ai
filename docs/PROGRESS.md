@@ -296,3 +296,5 @@ Fix tasks are ordinary tasks, not part of a workflow, so the engine does not sta
 Open: an SMTP account (waiting on the CEO). On localhost the calendar link only works for calendar apps on the same computer; online Google/Outlook need the deployed address (`Integrations:ApiBaseUrl`).
 
 220 tests.
+
+Browser check 2026-10-20 (CEO, real data): Defects, Release, Customer delivery and Repository tabs of AI-DEMO open with their empty states and no console errors; Update log shows v0.24.0. Not exercised with new records (that would add test data to the live company); their API paths are covered by the automated tests.
