@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
-import { Html, OrbitControls, RoundedBox, Sparkles, Stars, useTexture } from "@react-three/drei";
+import { createContext, Suspense, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { OrbitControls, RoundedBox, Sparkles, Stars, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { EmployeeKind, EmployeeStatus } from "@/lib/api";
@@ -153,7 +154,7 @@ export default function Office3D({ rooms, selectedId, onSelect, onRoomClick, lab
   useEffect(() => () => { Object.values(kit).forEach((x) => x.dispose()); }, [kit]);
 
   return (
-    <Canvas shadows flat dpr={[1, 2]} camera={{ position: [span * 0.32, span * 0.5, span * 0.62], fov: 40, far: span * 20 }} onPointerMissed={() => onSelect(null)}>
+    <Canvas shadows={{ type: THREE.PCFShadowMap }} flat dpr={[1, 2]} camera={{ position: [span * 0.32, span * 0.5, span * 0.62], fov: 40, far: span * 20 }} onPointerMissed={() => onSelect(null)}>
       <fog attach="fog" args={["#D9C6F2", span * 1.8, span * 5]} />
       <SkyDome radius={span * 8} />
       <Stars radius={span * 4} depth={span * 2} count={1800} factor={5} saturation={0.4} fade speed={0.6} />
@@ -524,10 +525,60 @@ function Banner({ position, color }: { position: [number, number, number]; color
   );
 }
 
+const pinAt = new THREE.Vector3();
+const pinCam = new THREE.Vector3();
+
+/**
+ * HTML pinned to a point in the scene: drei's <Html> cut down to what the office uses. drei unmounts its React root
+ * synchronously inside the canvas commit, which React reports as an error ("Attempted to synchronously unmount a root");
+ * this one hides the element at once and unmounts on the next tick.
+ */
+function Pin({ position, center, distanceFactor, zIndexRange, children }: {
+  position: [number, number, number]; center?: boolean; distanceFactor: number; zIndexRange: [number, number]; children: ReactNode;
+}) {
+  const group = useRef<THREE.Group>(null);
+  const host = useRef<{ el: HTMLDivElement; root: Root } | null>(null);
+  const gl = useThree((s) => s.gl);
+
+  useLayoutEffect(() => {
+    const target = gl.domElement.parentNode;
+    const el = document.createElement("div");
+    el.style.cssText = "position:absolute;top:0;left:0;pointer-events:none;transform-origin:0 0;visibility:hidden;";
+    target?.appendChild(el);
+    const h = (host.current = { el, root: createRoot(el) });
+    return () => {
+      if (host.current === h) host.current = null;
+      el.style.display = "none";
+      setTimeout(() => { h.root.unmount(); el.remove(); });
+    };
+  }, [gl]);
+
+  useLayoutEffect(() => {
+    host.current?.root.render(<div style={{ position: "absolute", transform: center ? "translate3d(-50%,-50%,0)" : "none" }}>{children}</div>);
+  });
+
+  useFrame(({ camera, size }) => {
+    const g = group.current, h = host.current;
+    if (!g || !h) return;
+    g.updateWorldMatrix(true, false);
+    pinAt.setFromMatrixPosition(g.matrixWorld);
+    const dist = pinAt.distanceTo(pinCam.setFromMatrixPosition(camera.matrixWorld));
+    pinAt.project(camera);
+    const cam = camera as THREE.PerspectiveCamera;
+    const scale = distanceFactor / (2 * Math.tan((cam.fov * Math.PI) / 360) * dist);
+    const a = (zIndexRange[1] - zIndexRange[0]) / (cam.far - cam.near);
+    h.el.style.visibility = pinAt.z > 1 ? "hidden" : "visible";
+    h.el.style.zIndex = String(Math.round(a * dist + zIndexRange[1] - a * cam.far));
+    h.el.style.transform = `translate3d(${(pinAt.x * 0.5 + 0.5) * size.width}px,${(-pinAt.y * 0.5 + 0.5) * size.height}px,0) scale(${scale})`;
+  });
+
+  return <group ref={group} position={position} />;
+}
+
 function Label({ position, text, onClick, hint }: { position: [number, number, number]; text: string; onClick?: () => void; hint?: string }) {
   const [hover, setHover] = useState(false);
   return (
-    <Html position={position} center distanceFactor={18} zIndexRange={[10, 0]}>
+    <Pin position={position} center distanceFactor={18} zIndexRange={[10, 0]}>
       <div role={onClick ? "button" : undefined} title={hint} onClick={onClick}
         onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)}
         style={{
@@ -538,7 +589,7 @@ function Label({ position, text, onClick, hint }: { position: [number, number, n
         }}>
         ✦ {text}{onClick && hover ? " ✎" : ""}
       </div>
-    </Html>
+    </Pin>
   );
 }
 
@@ -959,7 +1010,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
       </>
       )}
       {(bubble || hover || selected) && (
-        <Html position={[0, SPRITE ? SPRITE_H + 0.35 : 1.45, 0]} center distanceFactor={12} zIndexRange={[20, 0]}>
+        <Pin position={[0, SPRITE ? SPRITE_H + 0.35 : 1.45, 0]} center distanceFactor={12} zIndexRange={[20, 0]}>
           <div style={{ pointerEvents: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
             {(hover || selected) && (
               <div style={{ whiteSpace: "nowrap", padding: "3px 10px", borderRadius: 10, background: "rgba(255,255,255,.95)", fontSize: 12, color: brand.ink, boxShadow: "0 3px 10px rgba(0,0,0,.12)" }}>
@@ -968,7 +1019,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
             )}
             {bubble && <div style={{ width: 28, height: 28, borderRadius: "50%", display: "grid", placeItems: "center", background: bubble.bg, fontSize: 15, boxShadow: "0 3px 8px rgba(0,0,0,.12)" }}>{bubble.icon}</div>}
           </div>
-        </Html>
+        </Pin>
       )}
     </group>
   );
