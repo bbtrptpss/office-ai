@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.24.1",
+    date: "2026-10-20",
+    title: { th: "ออฟฟิศ 3D โลกแฟนตาซี", en: "Fantasy 3D office" },
+    changes: [
+      { type: "changed", th: "ออฟฟิศ 3D กลายเป็นเกาะลอยฟ้าในโลกแฟนตาซี: ท้องฟ้ายามสนธยาพร้อมดาวและดวงจันทร์ ก้อนเมฆ เกาะเล็กลอยรอบ ๆ ต้นไม้สีพาสเทล เห็ดเรืองแสง คริสตัล หิ่งห้อย และโคมลอยเหนือทางเดิน", en: "The 3D office is now a floating island in a fantasy world: twilight sky with stars and a moon, clouds, small drifting islets, pastel trees, glowing mushrooms, crystals, fireflies and lanterns over the corridors" },
+      { type: "changed", th: "แต่ละห้องเป็นหอกิลด์: พื้นไม้ กำแพงหินมีใบเสมา หอคอยหลังคาแหลมที่มุมห้อง และธงประจำห้อง โต๊ะทำงานเป็นโต๊ะนักเวทย์ มีกระจกวิเศษแทนจอ (เรืองแสงเมื่อกำลังทำงาน) เทียน และคริสตัลลอย", en: "Each room is a guild hall: plank floor, stone walls with battlements, a spired tower in the corner and a room banner; desks are mage desks with a scrying mirror for a screen (glowing while working), a candle and a floating crystal" },
+      { type: "changed", th: "ห้องพักผ่อนเป็นโรงเตี๊ยมเวทมนตร์: หม้อยาเดือดปุด ๆ บนวงเวทย์ที่หมุนช้า ๆ ม้านั่งไม้ เก้าอี้เห็ด และบาร์ยาวิเศษ", en: "The lounge is a magic tavern: a bubbling cauldron on a slowly turning magic circle, wooden benches, mushroom stools and a potion bar" },
+    ],
+  },
+  {
     version: "0.24.0",
     date: "2026-10-20",
     title: { th: "อีเมลแจ้งเตือนและปฏิทิน", en: "Email notifications and calendar" },

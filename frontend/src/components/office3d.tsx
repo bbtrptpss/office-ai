@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useMemo, useRef, useState } from "react";
+import { createContext, Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
-import { Html, OrbitControls, RoundedBox, useTexture } from "@react-three/drei";
+import { Html, OrbitControls, RoundedBox, Sparkles, Stars, useTexture } from "@react-three/drei";
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { EmployeeKind, EmployeeStatus } from "@/lib/api";
 import { art } from "@/lib/characters";
 import { brand } from "@/theme";
@@ -38,6 +39,17 @@ const RUSH_SPEED = 2.6; // back to the desk when work arrives
 
 /** Pastel floor per room, cycling. */
 const FLOORS = ["#F3E8FF", "#FCE7F3", "#E0F2FE", "#ECFCCB", "#FEF3C7", "#EDE9FE", "#FFE4E6", "#DCFCE7"];
+/** Banner on each room's back wall, cycling. */
+const BANNERS = [brand.purple, brand.pink, "#60A5FA", "#34D399", "#F59E0B", "#A78BFA", "#FB7185", "#2DD4BF"];
+
+/** Fantasy materials: wood, stone, slate roofs, gold trim and glowing magic. */
+const WOOD = "#C99B6D";
+const WOOD_DARK = "#8A6246";
+const STONE = "#E6DDF4";
+const ROOF = "#7C5CC4";
+const GOLD = "#E9C46A";
+const LEAVES = ["#F9A8D4", "#C4B5FD", "#A7F3D0", "#FBCFE8"];
+const MAGIC = ["#F472B6", "#A78BFA", "#60A5FA", "#34D399"];
 
 /** Original chibi characters (not any brand's): picked from the name so a person always looks the same. */
 const SPECIES = [
@@ -137,30 +149,326 @@ export default function Office3D({ rooms, selectedId, onSelect, onRoomClick, lab
   const [taken] = useState(() => new Map<string, string>());
   const world = useMemo<World>(() => ({ L, taken }), [L, taken]);
   const span = Math.max(L.totalW, L.totalD);
+  const kit = useMemo(() => makeKit(L), [L]);
+  useEffect(() => () => { Object.values(kit).forEach((x) => x.dispose()); }, [kit]);
 
   return (
-    <Canvas shadows flat dpr={[1, 2]} camera={{ position: [span * 0.32, span * 0.5, span * 0.62], fov: 40 }} onPointerMissed={() => onSelect(null)}>
-      <ambientLight intensity={0.75} />
-      <hemisphereLight args={["#ffffff", "#E9D5FF", 0.6]} />
-      <directionalLight position={[span * 0.4, span, span * 0.3]} intensity={1.1} castShadow
+    <Canvas shadows flat dpr={[1, 2]} camera={{ position: [span * 0.32, span * 0.5, span * 0.62], fov: 40, far: span * 20 }} onPointerMissed={() => onSelect(null)}>
+      <fog attach="fog" args={["#D9C6F2", span * 1.8, span * 5]} />
+      <SkyDome radius={span * 8} />
+      <Stars radius={span * 4} depth={span * 2} count={1800} factor={5} saturation={0.4} fade speed={0.6} />
+      <mesh position={[-span * 3, span * 2.2, -span * 4]}>
+        <sphereGeometry args={[span * 0.35, 32, 16]} />
+        <meshBasicMaterial color="#FFF6D6" fog={false} />
+      </mesh>
+      <ambientLight intensity={0.6} color="#EDE4FF" />
+      <hemisphereLight args={["#FFE9F6", "#5B4391", 0.6]} />
+      <directionalLight color="#FFF1DE" position={[span * 0.4, span, span * 0.3]} intensity={1.1} castShadow
         shadow-mapSize={[2048, 2048]} shadow-camera-left={-span} shadow-camera-right={span} shadow-camera-top={span} shadow-camera-bottom={-span} />
-      <group position={[-L.totalW / 2, 0, -L.totalD / 2]}>
-        {/* one connected floor: the corridors between and around the rooms */}
-        <RoundedBox args={[L.totalW + ROOM_GAP * 2, 0.04, L.totalD + ROOM_GAP * 2]} radius={0.02} position={[L.totalW / 2, -0.03, L.totalD / 2]} receiveShadow>
-          <meshStandardMaterial color="#FFF8FC" />
-        </RoundedBox>
-        {rooms.map((room, i) => (
-          <Room key={room.id} room={room} index={i} cell={L.cells[i]} L={L} hint={roomHint}
-            onClick={onRoomClick && (() => onRoomClick(room.id))} />
-        ))}
-        <Lounge L={L} name={loungeName} />
-        {rooms.flatMap((room, i) => room.people.map((p, j) => (
-          <Character key={p.id} person={p} home={deskSpot(L.cells[i], j)} homeCell={L.cells[i]} world={world}
-            selected={selectedId === p.id} onSelect={onSelect} label={labels(p.status)} />
-        )))}
-      </group>
+      <Island L={L} />
+      <Clouds span={span} />
+      <KitContext.Provider value={kit}>
+        <group position={[-L.totalW / 2, 0, -L.totalD / 2]}>
+          {/* one connected cobbled floor: the corridors between and around the rooms */}
+          <RoundedBox args={[L.totalW + ROOM_GAP * 2, 0.04, L.totalD + ROOM_GAP * 2]} radius={0.02} position={[L.totalW / 2, -0.03, L.totalD / 2]} receiveShadow>
+            <meshStandardMaterial color="#EEE6F7" map={kit.path} />
+          </RoundedBox>
+          {rooms.map((room, i) => (
+            <Room key={room.id} room={room} index={i} cell={L.cells[i]} L={L} hint={roomHint}
+              onClick={onRoomClick && (() => onRoomClick(room.id))} />
+          ))}
+          <Lounge L={L} name={loungeName} />
+          <Lanterns L={L} />
+          {rooms.flatMap((room, i) => room.people.map((p, j) => (
+            <Character key={p.id} person={p} home={deskSpot(L.cells[i], j)} homeCell={L.cells[i]} world={world}
+              selected={selectedId === p.id} onSelect={onSelect} label={labels(p.status)} />
+          )))}
+        </group>
+      </KitContext.Provider>
+      {/* fireflies drifting over the whole island */}
+      <Sparkles count={Math.round(60 + span * 6)} scale={[L.totalW + 4, 3, L.totalD + 4]} position={[0, 1.6, 0]} size={5} speed={0.35} opacity={0.9} color={brand.star} />
       <OrbitControls makeDefault enableDamping maxPolarAngle={Math.PI / 2.3} minDistance={4} maxDistance={span * 1.6} target={[0, 0, 0]} />
     </Canvas>
+  );
+}
+
+// ---------- the fantasy world around the office ----------
+
+/** Shared textures and geometry, made once per layout. */
+interface Kit {
+  floor: THREE.Texture;
+  wallBack: THREE.Texture;
+  wallSide: THREE.Texture;
+  path: THREE.Texture;
+  merlons: THREE.BufferGeometry;
+}
+const KitContext = createContext<Kit | null>(null);
+
+function canvasTexture(w: number, h: number, repeat: V2, draw: (g: CanvasRenderingContext2D, r: () => number) => void) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  draw(c.getContext("2d")!, rng(w * 31 + h));
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(...repeat);
+  t.anisotropy = 4;
+  return t;
+}
+
+/** Light patterns that each material tints with its own colour: wooden planks, stone blocks, cobbles. */
+function makeKit(L: Layout): Kit {
+  const planks = (repeat: V2) => canvasTexture(256, 256, repeat, (g, r) => {
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, 256, 256);
+    for (let y = 0; y < 256; y += 32) {
+      g.fillStyle = `rgba(110,80,50,${0.03 + r() * 0.07})`;
+      g.fillRect(0, y, 256, 32);
+      g.strokeStyle = "rgba(110,80,50,.35)";
+      g.lineWidth = 2;
+      const cut = r() * 256;
+      g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.moveTo(cut, y); g.lineTo(cut, y + 32); g.stroke();
+      g.strokeStyle = "rgba(110,80,50,.1)";
+      g.lineWidth = 1;
+      for (let k = 0; k < 3; k++) {
+        const gy = y + 6 + r() * 20;
+        g.beginPath(); g.moveTo(0, gy); g.bezierCurveTo(80, gy + 3, 170, gy - 3, 256, gy); g.stroke();
+      }
+    }
+  });
+  const bricks = (repeat: V2) => canvasTexture(256, 128, repeat, (g, r) => {
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, 256, 128);
+    g.strokeStyle = "rgba(90,70,140,.35)";
+    g.lineWidth = 3;
+    for (let row = 0; row < 4; row++) {
+      for (let x = row % 2 ? -32 : 0; x < 256; x += 64) {
+        g.fillStyle = `rgba(90,70,140,${r() * 0.1})`;
+        g.fillRect(x, row * 32, 64, 32);
+        g.strokeRect(x, row * 32, 64, 32);
+      }
+    }
+  });
+  const cobbles = (repeat: V2) => canvasTexture(256, 256, repeat, (g, r) => {
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, 256, 256);
+    g.strokeStyle = "rgba(100,90,130,.3)";
+    g.lineWidth = 3;
+    for (let y = 0; y < 256; y += 51.2) {
+      for (let x = 0; x < 256; x += 51.2) {
+        g.fillStyle = `rgba(100,90,130,${0.04 + r() * 0.1})`;
+        g.beginPath();
+        g.roundRect(x + 3 + r() * 4, y + 3 + r() * 4, 40 + r() * 4, 40 + r() * 4, 12);
+        g.fill(); g.stroke();
+      }
+    }
+  });
+  const parts: THREE.BufferGeometry[] = [];
+  for (let x = 0.75; x < L.w - 0.1; x += 0.5) parts.push(new THREE.BoxGeometry(0.24, 0.16, 0.14).translate(x, 0.98, 0.05));
+  for (let z = 0.75; z < L.d - 0.1; z += 0.5) parts.push(new THREE.BoxGeometry(0.14, 0.16, 0.24).translate(0.05, 0.98, z));
+  const merlons = mergeGeometries(parts)!;
+  parts.forEach((p) => p.dispose());
+  return {
+    floor: planks([L.w / 2, L.d / 2]),
+    wallBack: bricks([L.w / 1.6, 1]),
+    wallSide: bricks([L.d / 1.6, 1]),
+    path: cobbles([(L.totalW + ROOM_GAP * 2) / 2.5, (L.totalD + ROOM_GAP * 2) / 2.5]),
+    merlons,
+  };
+}
+
+/** Twilight sky: deep violet overhead, pink at the horizon, lavender haze below the island. */
+function SkyDome({ radius }: { radius: number }) {
+  const material = useMemo(() => new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    uniforms: {
+      top: { value: new THREE.Color("#2B1B58") },
+      mid: { value: new THREE.Color("#8E6BD6") },
+      horizon: { value: new THREE.Color("#F7B9D7") },
+      below: { value: new THREE.Color("#B9A0EC") },
+    },
+    vertexShader: `varying vec3 vDir;
+void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 horizon; uniform vec3 below; varying vec3 vDir;
+void main() {
+  float h = vDir.y;
+  vec3 c = h > 0.0 ? (h < 0.22 ? mix(horizon, mid, h / 0.22) : mix(mid, top, smoothstep(0.22, 0.8, h))) : mix(horizon, below, smoothstep(0.0, 0.35, -h));
+  gl_FragColor = vec4(c, 1.0);
+  #include <colorspace_fragment>
+}`,
+  }), []);
+  useEffect(() => () => material.dispose(), [material]);
+  return <mesh material={material} renderOrder={-1}><sphereGeometry args={[radius, 32, 16]} /></mesh>;
+}
+
+let rockGeometry: THREE.BufferGeometry | null = null;
+/** A cone of rock with a jagged surface; points at the same place move the same way, so the seams stay closed. */
+function rock() {
+  if (rockGeometry) return rockGeometry;
+  const g = new THREE.CylinderGeometry(1, 0.08, 1, 12, 5);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    if (y > 0.49) continue;
+    const r = rng(hash(`${Math.round(x * 1000)},${Math.round(y * 1000)},${Math.round(z * 1000)}`));
+    const k = 1 + (r() - 0.5) * 0.35;
+    p.setXYZ(i, x * k, y + (r() - 0.5) * 0.08, z * k);
+  }
+  g.computeVertexNormals();
+  return (rockGeometry = g);
+}
+
+interface Prop { kind: "tree" | "mushroom" | "crystal"; x: number; z: number; s: number; hue: number }
+
+/** Trees, glowing mushrooms and crystals on the grass around the paving; the side facing the camera stays low. */
+function scatter(L: Layout, a: number, b: number): Prop[] {
+  const r = rng(L.cells.length * 977 + 13);
+  const hx = L.totalW / 2 + ROOM_GAP + 0.35, hz = L.totalD / 2 + ROOM_GAP + 0.35;
+  const out: Prop[] = [];
+  for (let tries = 0; tries < 400 && out.length < 34; tries++) {
+    const th = r() * Math.PI * 2, k = 0.55 + r() * 0.38;
+    const x = Math.cos(th) * a * k, z = Math.sin(th) * b * k;
+    if (Math.abs(x) < hx && Math.abs(z) < hz) continue;
+    if (out.some((p) => Math.hypot(p.x - x, p.z - z) < 0.9)) continue;
+    const roll = r();
+    const kind = z > 0 ? (roll < 0.6 ? "mushroom" : "crystal") : roll < 0.55 ? "tree" : roll < 0.8 ? "mushroom" : "crystal";
+    out.push({ kind, x, z, s: 0.8 + r() * 0.6, hue: Math.floor(r() * 4) });
+  }
+  return out;
+}
+
+/** The office floats on a grassy island in the sky, with a few small islets drifting around it. */
+function Island({ L }: { L: Layout }) {
+  const a = (L.totalW / 2 + ROOM_GAP) * 1.45, b = (L.totalD / 2 + ROOM_GAP) * 1.45;
+  const depth = Math.max(a, b) * 0.9;
+  const props = useMemo(() => scatter(L, a, b), [L, a, b]);
+  const islets = useMemo(() => [0.7, 2.3, 3.7, 5.3].map((th, i) => {
+    const x = Math.cos(th) * a * 1.4, z = Math.sin(th) * b * 1.4;
+    return { x, z, y: z > 0 ? -1.8 : 0.5 + i * 0.25, phase: i * 1.7 };
+  }), [a, b]);
+  return (
+    <group>
+      <mesh position-y={-0.2} scale={[a, 1, b]} receiveShadow><cylinderGeometry args={[1, 1, 0.24, 48]} /><meshStandardMaterial color="#A6DDB0" /></mesh>
+      <mesh position-y={-0.42} scale={[a, 1, b]}><cylinderGeometry args={[1, 0.97, 0.22, 48]} /><meshStandardMaterial color="#B98F72" /></mesh>
+      <mesh geometry={rock()} dispose={null} position-y={-0.53 - depth / 2} scale={[a * 0.97, depth, b * 0.97]}>
+        <meshStandardMaterial color="#7D6AA6" flatShading />
+      </mesh>
+      {props.map((p, i) => {
+        const at: [number, number, number] = [p.x, -0.08, p.z];
+        if (p.kind === "tree") return <Tree key={i} position={at} scale={p.s} color={LEAVES[p.hue]} />;
+        if (p.kind === "mushroom") return <Mushrooms key={i} position={at} scale={p.s} hue={p.hue} />;
+        return <Crystal key={i} position={at} scale={p.s} hue={p.hue} />;
+      })}
+      {islets.map((it, i) => (
+        <Islet key={i} position={[it.x, it.y, it.z]} phase={it.phase}>
+          {i % 2 ? <Tree position={[0, 0.07, 0]} scale={0.8} color={LEAVES[i]} /> : <Crystal position={[0, 0.07, 0]} scale={1.3} hue={i} />}
+        </Islet>
+      ))}
+    </group>
+  );
+}
+
+function Islet({ position, phase, children }: { position: [number, number, number]; phase: number; children: React.ReactNode }) {
+  const g = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => { if (g.current) g.current.position.y = position[1] + Math.sin(clock.elapsedTime * 0.6 + phase) * 0.25; });
+  return (
+    <group ref={g} position={position}>
+      <mesh scale={[0.9, 1, 0.9]}><cylinderGeometry args={[1, 1, 0.14, 12]} /><meshStandardMaterial color="#A6DDB0" /></mesh>
+      <mesh geometry={rock()} dispose={null} position-y={-0.67} scale={[0.85, 1.2, 0.85]}><meshStandardMaterial color="#7D6AA6" flatShading /></mesh>
+      {children}
+    </group>
+  );
+}
+
+/** Puffy pink-white clouds slowly circling below the island. */
+function Clouds({ span }: { span: number }) {
+  const g = useRef<THREE.Group>(null);
+  const puffs = useMemo(() => {
+    const r = rng(42);
+    return Array.from({ length: 14 }, (_, i) => {
+      const th = (i / 14) * Math.PI * 2 + r() * 0.3, d = span * (0.9 + r() * 0.9);
+      return { x: Math.cos(th) * d, z: Math.sin(th) * d, y: -2.5 - r() * 3, s: 0.8 + r() * 1.4 };
+    });
+  }, [span]);
+  useFrame((_, dt) => { if (g.current) g.current.rotation.y += dt * 0.01; });
+  return (
+    <group ref={g}>
+      {puffs.map((p, i) => (
+        <group key={i} position={[p.x, p.y, p.z]} scale={p.s}>
+          {[[0, 0, 0, 1], [0.9, -0.1, 0.2, 0.75], [-0.85, -0.15, -0.1, 0.7], [0.3, 0.35, -0.2, 0.65]].map(([x, y, z, r], k) => (
+            <mesh key={k} position={[x, y, z]}><sphereGeometry args={[r, 16, 12]} /><meshStandardMaterial color="#FFF1F8" emissive="#F5D0FE" emissiveIntensity={0.25} /></mesh>
+          ))}
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/** Lanterns floating over the corridor crossings. */
+function Lanterns({ L }: { L: Layout }) {
+  const spots = useMemo(() => L.cells.map((c) => [crossX(L, c), corridorZ(L, c)] as V2), [L]);
+  const refs = useRef<(THREE.Group | null)[]>([]);
+  useFrame(({ clock }) => refs.current.forEach((g, i) => {
+    if (!g) return;
+    g.position.y = 2.4 + Math.sin(clock.elapsedTime * 0.9 + i * 1.3) * 0.12;
+    g.rotation.y = clock.elapsedTime * 0.3 + i;
+  }));
+  return (
+    <>
+      {spots.map(([x, z], i) => (
+        <group key={i} ref={(g) => { refs.current[i] = g; }} position={[x, 2.4, z]}>
+          <mesh position-y={0.17} rotation-y={Math.PI / 4}><coneGeometry args={[0.15, 0.12, 4]} /><meshStandardMaterial color={brand.purpleDeep} /></mesh>
+          <mesh><boxGeometry args={[0.16, 0.22, 0.16]} /><meshStandardMaterial color="#FFE7A8" emissive="#FFC75A" emissiveIntensity={1} /></mesh>
+          <mesh position-y={-0.13}><boxGeometry args={[0.19, 0.03, 0.19]} /><meshStandardMaterial color={brand.purpleDeep} /></mesh>
+        </group>
+      ))}
+    </>
+  );
+}
+
+function Tree({ position, scale = 1, color }: { position: [number, number, number]; scale?: number; color: string }) {
+  return (
+    <group position={position} scale={scale}>
+      <mesh position-y={0.45} castShadow><cylinderGeometry args={[0.07, 0.12, 0.9, 8]} /><meshStandardMaterial color={WOOD_DARK} /></mesh>
+      {[[0, 1.05, 0, 0.42], [0.24, 0.9, 0.1, 0.3], [-0.22, 0.92, -0.05, 0.32], [0.02, 1.38, 0.02, 0.28]].map(([x, y, z, r], i) => (
+        <mesh key={i} position={[x, y, z]} castShadow><icosahedronGeometry args={[r, 1]} /><meshStandardMaterial color={color} flatShading /></mesh>
+      ))}
+      {[[0.3, 1.1, 0.25], [-0.28, 1.2, 0.2], [0.1, 0.85, 0.36]].map(([x, y, z], i) => (
+        <mesh key={i} position={[x, y, z]}><sphereGeometry args={[0.04, 8, 8]} /><meshStandardMaterial color={brand.star} emissive={brand.star} emissiveIntensity={1} /></mesh>
+      ))}
+    </group>
+  );
+}
+
+/** A little cluster of glowing mushrooms. */
+function Mushrooms({ position, scale = 1, hue = 0 }: { position: [number, number, number]; scale?: number; hue?: number }) {
+  const c = MAGIC[hue % MAGIC.length];
+  return (
+    <group position={position} scale={scale}>
+      {[[0, 0, 1], [0.18, 0.08, 0.7], [-0.14, 0.12, 0.55]].map(([x, z, s], i) => (
+        <group key={i} position={[x, 0, z]} scale={s}>
+          <mesh position-y={0.15} castShadow><cylinderGeometry args={[0.05, 0.07, 0.3, 10]} /><meshStandardMaterial color="#FFF4E0" /></mesh>
+          <mesh position-y={0.32} scale={[1, 0.6, 1]} castShadow><sphereGeometry args={[0.17, 16, 12]} /><meshStandardMaterial color={c} emissive={c} emissiveIntensity={0.55} /></mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/** Glowing crystals growing out of the ground. */
+function Crystal({ position, scale = 1, hue = 0 }: { position: [number, number, number]; scale?: number; hue?: number }) {
+  const c = MAGIC[(hue + 1) % MAGIC.length];
+  return (
+    <group position={position} scale={scale}>
+      {[[0, 0.38, 0, 0], [0.14, 0.24, 0.06, -0.5], [-0.12, 0.2, -0.04, 0.45]].map(([x, h, z, tilt], i) => (
+        <mesh key={i} position={[x, h * 0.55, z]} rotation-z={tilt} scale={[0.09, h, 0.09]} castShadow>
+          <octahedronGeometry args={[1]} />
+          <meshStandardMaterial color={c} emissive={c} emissiveIntensity={0.6} flatShading transparent opacity={0.9} />
+        </mesh>
+      ))}
+    </group>
   );
 }
 
@@ -170,22 +478,49 @@ function deskSpot(cell: Pick<Cell, "x0" | "z0">, j: number): V2 {
   return [cell.x0 + 0.9 + col * DESK_DX + DESK_DX / 2 - 0.1, cell.z0 + 1.35 + row * DESK_DZ];
 }
 
-function Walls({ L, floor }: { L: Layout; floor: string }) {
+/** A guild hall: plank floor, stone walls with battlements on the back and left, and a tower in the back corner. */
+function Walls({ L, floor, banner }: { L: Layout; floor: string; banner: string }) {
+  const kit = useContext(KitContext);
   return (
     <>
       {/* floor + low walls on the back and left, like a dollhouse cut open toward the camera */}
       <RoundedBox args={[L.w, 0.12, L.d]} radius={0.05} position={[L.w / 2, -0.06, L.d / 2]} receiveShadow>
-        <meshStandardMaterial color={floor} />
+        <meshStandardMaterial color={floor} map={kit?.floor} />
       </RoundedBox>
       <mesh position={[L.w / 2, 0.45, 0.05]} castShadow receiveShadow>
         <boxGeometry args={[L.w, 0.9, 0.1]} />
-        <meshStandardMaterial color="#FFFFFF" />
+        <meshStandardMaterial color={STONE} map={kit?.wallBack} />
       </mesh>
       <mesh position={[0.05, 0.45, L.d / 2]} castShadow receiveShadow>
         <boxGeometry args={[0.1, 0.9, L.d]} />
-        <meshStandardMaterial color="#FAF5FF" />
+        <meshStandardMaterial color="#DCD1EE" map={kit?.wallSide} />
       </mesh>
+      {kit && <mesh geometry={kit.merlons} dispose={null} castShadow><meshStandardMaterial color={STONE} /></mesh>}
+      <group position={[0.1, 0, 0.1]}>
+        <mesh position-y={0.85} castShadow><cylinderGeometry args={[0.36, 0.42, 1.7, 14]} /><meshStandardMaterial color={STONE} /></mesh>
+        <mesh position-y={1.72}><cylinderGeometry args={[0.45, 0.45, 0.1, 14]} /><meshStandardMaterial color="#CFC2E6" /></mesh>
+        <mesh position-y={2.18} castShadow><coneGeometry args={[0.52, 0.85, 14]} /><meshStandardMaterial color={ROOF} /></mesh>
+        <mesh position={[0.27, 1.25, 0.27]} rotation-y={Math.PI / 4}>
+          <planeGeometry args={[0.14, 0.22]} />
+          <meshStandardMaterial color="#FFE7A8" emissive="#FFC75A" emissiveIntensity={0.9} />
+        </mesh>
+        <mesh position-y={2.75}><cylinderGeometry args={[0.012, 0.012, 0.35, 6]} /><meshStandardMaterial color={GOLD} /></mesh>
+        <mesh position={[0.1, 2.85, 0]}><planeGeometry args={[0.2, 0.12]} /><meshStandardMaterial color={banner} side={THREE.DoubleSide} /></mesh>
+      </group>
     </>
+  );
+}
+
+/** The room's banner on the back wall, with a golden star emblem. */
+function Banner({ position, color }: { position: [number, number, number]; color: string }) {
+  return (
+    <group position={position}>
+      <mesh position-y={0.24} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.02, 0.02, 0.62, 6]} /><meshStandardMaterial color={GOLD} /></mesh>
+      <mesh><planeGeometry args={[0.5, 0.42]} /><meshStandardMaterial color={color} /></mesh>
+      <mesh position-y={-0.2825} rotation-z={-Math.PI / 2} scale={[0.5, 1, 1]}><circleGeometry args={[0.29, 3]} /><meshStandardMaterial color={color} /></mesh>
+      <mesh position-z={0.005}><ringGeometry args={[0.09, 0.12, 24]} /><meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.5} /></mesh>
+      <mesh position-z={0.005} rotation-z={Math.PI / 2}><circleGeometry args={[0.06, 5]} /><meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.5} /></mesh>
+    </group>
   );
 }
 
@@ -196,12 +531,12 @@ function Label({ position, text, onClick, hint }: { position: [number, number, n
       <div role={onClick ? "button" : undefined} title={hint} onClick={onClick}
         onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)}
         style={{
-          whiteSpace: "nowrap", padding: "4px 12px", borderRadius: 999, fontSize: 14, fontWeight: 600, userSelect: "none",
-          background: hover && onClick ? brand.purple : "rgba(255,255,255,.9)", color: hover && onClick ? "#fff" : brand.ink,
-          boxShadow: "0 4px 14px rgba(110,80,170,.18)", cursor: onClick ? "pointer" : "default", pointerEvents: onClick ? "auto" : "none",
+          whiteSpace: "nowrap", padding: "4px 14px", borderRadius: 999, fontSize: 14, fontWeight: 600, userSelect: "none",
+          background: hover && onClick ? brand.purple : "linear-gradient(180deg, #FFFBEF, #F6E8C8)", color: hover && onClick ? "#fff" : brand.ink,
+          border: `1.5px solid ${GOLD}`, boxShadow: "0 4px 16px rgba(60,30,110,.35)", cursor: onClick ? "pointer" : "default", pointerEvents: onClick ? "auto" : "none",
           transition: "background .15s, color .15s",
         }}>
-        {text}{onClick && hover ? " ✎" : ""}
+        ✦ {text}{onClick && hover ? " ✎" : ""}
       </div>
     </Html>
   );
@@ -209,14 +544,12 @@ function Label({ position, text, onClick, hint }: { position: [number, number, n
 
 function Room({ room, index, cell, L, onClick, hint }: { room: OfficeRoom; index: number; cell: Cell; L: Layout; onClick?: () => void; hint?: string }) {
   const working = room.people.filter((p) => p.status === "Working").length;
+  const banner = BANNERS[index % BANNERS.length];
   return (
     <group position={[cell.x0, 0, cell.z0]}>
-      <Walls L={L} floor={FLOORS[index % FLOORS.length]} />
-      <mesh position={[L.w * 0.75, 0.55, 0.11]}>
-        <planeGeometry args={[1.1, 0.5]} />
-        <meshStandardMaterial color="#C7D2FE" emissive="#A5B4FC" emissiveIntensity={0.25} />
-      </mesh>
-      <Plant position={[L.w - 0.35, 0, 0.4]} />
+      <Walls L={L} floor={FLOORS[index % FLOORS.length]} banner={banner} />
+      <Banner position={[L.w * 0.62, 0.66, 0.115]} color={banner} />
+      <Crystal position={[L.w - 0.35, 0, 0.4]} hue={index} />
       <Label position={[L.w / 2, 2.1, -0.2]} text={`${room.name} · ${working}/${room.people.length}`} onClick={onClick} hint={hint} />
       {room.people.map((p, j) => {
         const [x, z] = deskSpot({ x0: 0, z0: 0 }, j);
@@ -226,93 +559,178 @@ function Room({ room, index, cell, L, onClick, hint }: { room: OfficeRoom; index
   );
 }
 
-function Plant({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
-  return (
-    <group position={position} scale={scale}>
-      <mesh position-y={0.15} castShadow><cylinderGeometry args={[0.13, 0.1, 0.3, 16]} /><meshStandardMaterial color={brand.pinkSoft} /></mesh>
-      <mesh position-y={0.42} castShadow><sphereGeometry args={[0.2, 16, 16]} /><meshStandardMaterial color="#86EFAC" /></mesh>
-    </group>
-  );
-}
-
-/** Desk, chair and monitor; the screen glows while its owner is working. */
+/** A mage's desk: wooden top, a scrying mirror for a screen, a candle and a floating crystal; the mirror glows while its owner is working. */
 function Desk({ position, working }: { position: [number, number, number]; working: boolean }) {
-  const screen = useRef<THREE.MeshStandardMaterial>(null);
+  const glass = useRef<THREE.MeshStandardMaterial>(null);
+  const crystal = useRef<THREE.Mesh>(null);
+  const flame = useRef<THREE.Mesh>(null);
+  const phase = position[0] * 7.3 + position[2] * 3.1;
   useFrame(({ clock }) => {
-    if (screen.current) screen.current.emissiveIntensity = working ? 0.7 + Math.sin(clock.elapsedTime * 4) * 0.25 : 0.05;
+    const t = clock.elapsedTime + phase;
+    if (glass.current) glass.current.emissiveIntensity = working ? 0.75 + Math.sin(t * 4) * 0.25 : 0.06;
+    if (crystal.current) {
+      crystal.current.rotation.y = t * (working ? 1.8 : 0.4);
+      crystal.current.position.y = 1.2 + Math.sin(t * 1.5) * 0.05;
+    }
+    if (flame.current) flame.current.scale.y = 1.8 + Math.sin(t * 13) * 0.25 + Math.sin(t * 7.3) * 0.15;
   });
   return (
     <group position={position}>
       <RoundedBox args={[1.2, 0.08, 0.6]} radius={0.03} position={[0, 0.62, 0.35]} castShadow receiveShadow>
-        <meshStandardMaterial color="#FFFFFF" />
+        <meshStandardMaterial color={WOOD} />
       </RoundedBox>
       {[-0.52, 0.52].map((lx) => (
-        <mesh key={lx} position={[lx, 0.3, 0.35]} castShadow><boxGeometry args={[0.06, 0.6, 0.5]} /><meshStandardMaterial color={brand.lavender} /></mesh>
+        <mesh key={lx} position={[lx, 0.3, 0.35]} castShadow><boxGeometry args={[0.07, 0.6, 0.5]} /><meshStandardMaterial color={WOOD_DARK} /></mesh>
       ))}
-      <mesh position={[0, 0.95, 0.52]} castShadow>
-        <boxGeometry args={[0.62, 0.4, 0.04]} />
-        <meshStandardMaterial color="#3A3150" />
+      <mesh position={[0, 0.98, 0.53]} rotation-x={Math.PI / 2} castShadow><cylinderGeometry args={[0.24, 0.24, 0.03, 28]} /><meshStandardMaterial color="#3A3150" /></mesh>
+      <mesh position={[0, 0.98, 0.51]}><torusGeometry args={[0.24, 0.03, 10, 32]} /><meshStandardMaterial color={GOLD} metalness={0.5} roughness={0.35} /></mesh>
+      <mesh position={[0, 0.98, 0.505]} rotation-y={Math.PI}>
+        <circleGeometry args={[0.22, 32]} />
+        <meshStandardMaterial ref={glass} color={working ? "#DDD6FE" : "#3E3360"} emissive={working ? "#B794F6" : "#000000"} />
       </mesh>
-      <mesh position={[0, 0.95, 0.497]} rotation-y={Math.PI}>
-        <planeGeometry args={[0.56, 0.34]} />
-        <meshStandardMaterial ref={screen} color={working ? "#DDD6FE" : "#4B4166"} emissive={working ? "#C4B5FD" : "#000000"} />
+      <mesh position={[0, 0.71, 0.53]}><cylinderGeometry args={[0.025, 0.05, 0.14, 8]} /><meshStandardMaterial color={GOLD} /></mesh>
+      <mesh ref={crystal} position={[0.45, 1.2, 0.45]} scale={[0.06, 0.11, 0.06]}>
+        <octahedronGeometry args={[1]} />
+        <meshStandardMaterial color="#A5F3FC" emissive="#67E8F9" emissiveIntensity={working ? 0.9 : 0.25} flatShading />
       </mesh>
-      <mesh position={[0, 0.7, 0.52]}><cylinderGeometry args={[0.03, 0.05, 0.12, 8]} /><meshStandardMaterial color="#3A3150" /></mesh>
+      <mesh position={[-0.42, 0.72, 0.42]}><cylinderGeometry args={[0.035, 0.035, 0.12, 10]} /><meshStandardMaterial color="#FFF4E0" /></mesh>
+      <mesh ref={flame} position={[-0.42, 0.81, 0.42]} scale={[1, 1.8, 1]}><sphereGeometry args={[0.022, 8, 8]} /><meshBasicMaterial color="#FFB547" /></mesh>
+      <mesh position={[0.25, 0.68, 0.25]} rotation-y={0.3} castShadow><boxGeometry args={[0.22, 0.04, 0.16]} /><meshStandardMaterial color={brand.purple} /></mesh>
+      {/* stool with a cushion */}
       <mesh position={[0, 0.38, -0.25]} castShadow><cylinderGeometry args={[0.26, 0.26, 0.08, 20]} /><meshStandardMaterial color={brand.pink} /></mesh>
-      <mesh position={[0, 0.19, -0.25]}><cylinderGeometry args={[0.04, 0.04, 0.34, 8]} /><meshStandardMaterial color="#9CA3AF" /></mesh>
+      <mesh position={[0, 0.19, -0.25]}><cylinderGeometry args={[0.05, 0.07, 0.34, 8]} /><meshStandardMaterial color={WOOD_DARK} /></mesh>
     </group>
   );
 }
 
-/** The lounge: sofas around a coffee table, bean bags, a coffee bar and a bookshelf. */
+/** The lounge: benches around a bubbling cauldron on a magic circle, mushroom stools, a potion bar and a bookshelf. */
 function Lounge({ L, name }: { L: Layout; name: string }) {
   const c = L.lounge;
   const cx = L.w / 2, cz = L.d / 2;
   return (
     <group position={[c.x0, 0, c.z0]}>
-      <Walls L={L} floor="#FFE9F3" />
+      <Walls L={L} floor="#FFE9F3" banner={brand.star} />
       <Label position={[cx, 2.1, -0.2]} text={name} />
-      {/* rug + coffee table */}
-      <mesh rotation-x={-Math.PI / 2} position={[cx, 0.005, cz]} receiveShadow><circleGeometry args={[1.9, 48]} /><meshStandardMaterial color="#FBCFE8" /></mesh>
-      <mesh position={[cx, 0.32, cz]} castShadow><cylinderGeometry args={[0.55, 0.55, 0.06, 32]} /><meshStandardMaterial color="#FFFFFF" /></mesh>
-      <mesh position={[cx, 0.15, cz]}><cylinderGeometry args={[0.08, 0.12, 0.3, 12]} /><meshStandardMaterial color={brand.lavender} /></mesh>
-      {[[-0.2, 0.1], [0.18, -0.12]].map(([dx, dz]) => (
-        <mesh key={dx} position={[cx + dx, 0.41, cz + dz]} castShadow><cylinderGeometry args={[0.06, 0.05, 0.12, 12]} /><meshStandardMaterial color={brand.pink} /></mesh>
-      ))}
+      <MagicCircle position={[cx, 0.006, cz]} />
+      <Cauldron position={[cx, 0, cz]} />
       <Sofa position={[cx, 0, cz - 1.25]} facing={1} color="#C4B5FD" />
       <Sofa position={[cx, 0, cz + 1.25]} facing={-1} color="#F9A8D4" />
-      {[-2.3, 2.3].map((dx) => (
-        <mesh key={dx} position={[cx + dx, 0.14, cz]} scale={[1, 0.55, 1]} castShadow><sphereGeometry args={[0.36, 20, 16]} /><meshStandardMaterial color={dx < 0 ? "#FDE68A" : "#93C5FD"} /></mesh>
-      ))}
-      {/* coffee bar on the back wall */}
-      <RoundedBox args={[2.2, 0.9, 0.5]} radius={0.05} position={[1.6, 0.45, 0.4]} castShadow receiveShadow><meshStandardMaterial color="#FFFFFF" /></RoundedBox>
-      <mesh position={[1.1, 1.08, 0.4]} castShadow><boxGeometry args={[0.4, 0.36, 0.3]} /><meshStandardMaterial color="#3A3150" /></mesh>
-      <mesh position={[1.1, 1.08, 0.56]}><circleGeometry args={[0.06, 16]} /><meshStandardMaterial color={brand.star} emissive={brand.star} emissiveIntensity={0.6} /></mesh>
-      {[1.7, 1.95, 2.2].map((x, i) => (
-        <mesh key={x} position={[x, 0.96, 0.4]} castShadow><cylinderGeometry args={[0.06, 0.05, 0.12, 12]} /><meshStandardMaterial color={[brand.pink, brand.lavender, "#86EFAC"][i]} /></mesh>
-      ))}
+      {[-2.3, 2.3].map((dx) => <MushroomStool key={dx} position={[cx + dx, 0, cz]} color={dx < 0 ? "#F472B6" : "#A78BFA"} />)}
+      {/* potion bar on the back wall */}
+      <RoundedBox args={[2.2, 0.9, 0.5]} radius={0.05} position={[1.6, 0.45, 0.4]} castShadow receiveShadow><meshStandardMaterial color={WOOD} /></RoundedBox>
+      <mesh position={[1.1, 0.95, 0.4]}><cylinderGeometry args={[0.08, 0.12, 0.1, 12]} /><meshStandardMaterial color={GOLD} /></mesh>
+      <mesh position={[1.1, 1.13, 0.4]} castShadow>
+        <sphereGeometry args={[0.15, 24, 16]} />
+        <meshStandardMaterial color="#DDD6FE" emissive="#A78BFA" emissiveIntensity={0.8} transparent opacity={0.88} />
+      </mesh>
+      {[1.7, 1.95, 2.2].map((x, i) => {
+        const color = [brand.pink, "#A78BFA", "#34D399"][i];
+        return (
+          <group key={x} position={[x, 0.9, 0.4]}>
+            <mesh position-y={0.07} castShadow><sphereGeometry args={[0.07, 14, 10]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} /></mesh>
+            <mesh position-y={0.17}><cylinderGeometry args={[0.022, 0.025, 0.08, 8]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.4} /></mesh>
+            <mesh position-y={0.22}><cylinderGeometry args={[0.028, 0.028, 0.03, 8]} /><meshStandardMaterial color={WOOD_DARK} /></mesh>
+          </group>
+        );
+      })}
       {/* bookshelf on the left wall */}
       <group position={[0.35, 0, L.d - 1.4]}>
-        <mesh position-y={0.6} castShadow><boxGeometry args={[0.4, 1.2, 1.2]} /><meshStandardMaterial color="#FFFFFF" /></mesh>
+        <mesh position-y={0.6} castShadow><boxGeometry args={[0.4, 1.2, 1.2]} /><meshStandardMaterial color={WOOD_DARK} /></mesh>
         {[0.3, 0.7, 1.05].map((y, r) =>
           [-0.4, -0.15, 0.1, 0.35].map((dz, k) => (
             <mesh key={`${r}-${k}`} position={[0.08, y, dz]}><boxGeometry args={[0.28, 0.26, 0.16]} /><meshStandardMaterial color={["#C4B5FD", "#F9A8D4", "#93C5FD", "#FDE68A"][(k + r) % 4]} /></mesh>
           )))}
       </group>
-      <Plant position={[L.w - 0.4, 0, 0.45]} scale={1.4} />
-      <Plant position={[0.45, 0, 0.45]} scale={1.2} />
+      <Mushrooms position={[L.w - 0.4, 0, 0.45]} scale={1.4} />
     </group>
   );
 }
 
+/** Slowly turning rings of runes on the lounge floor. */
+function MagicCircle({ position }: { position: [number, number, number] }) {
+  const runes = useRef<THREE.Group>(null);
+  useFrame((_, dt) => { if (runes.current) runes.current.rotation.z += dt * 0.15; });
+  const glow = <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.7} />;
+  return (
+    <group position={position} rotation-x={-Math.PI / 2}>
+      <mesh receiveShadow><circleGeometry args={[1.9, 48]} /><meshStandardMaterial color="#FBCFE8" /></mesh>
+      <group ref={runes} position-z={0.003}>
+        <mesh><ringGeometry args={[1.62, 1.7, 64]} />{glow}</mesh>
+        <mesh><ringGeometry args={[1.15, 1.19, 64]} />{glow}</mesh>
+        {Array.from({ length: 8 }, (_, i) => {
+          const a = (i / 8) * Math.PI * 2;
+          return <mesh key={i} position={[Math.cos(a) * 1.42, Math.sin(a) * 1.42, 0]} rotation-z={a}><circleGeometry args={[0.09, [3, 4, 5, 6][i % 4]]} />{glow}</mesh>;
+        })}
+      </group>
+    </group>
+  );
+}
+
+/** A bubbling cauldron over a small fire, lighting up the lounge. */
+function Cauldron({ position }: { position: [number, number, number] }) {
+  const bubbles = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    bubbles.current?.children.forEach((b, i) => {
+      const k = (clock.elapsedTime * 0.6 + i * 0.27) % 1;
+      b.position.y = 0.76 + k * 0.2;
+      b.scale.setScalar(1 - k);
+    });
+  });
+  return (
+    <group position={position}>
+      {[0, 1, 2].map((i) => {
+        const a = (i / 3) * Math.PI * 2;
+        return <mesh key={i} position={[Math.cos(a) * 0.25, 0.1, Math.sin(a) * 0.25]}><cylinderGeometry args={[0.03, 0.03, 0.2, 6]} /><meshStandardMaterial color="#2F2745" /></mesh>;
+      })}
+      {[0, 1, 2].map((i) => {
+        const a = (i / 3) * Math.PI * 2 + 0.5;
+        return <mesh key={i} position={[Math.cos(a) * 0.08, 0.08, Math.sin(a) * 0.08]}><coneGeometry args={[0.07, 0.18, 6]} /><meshBasicMaterial color="#FB923C" /></mesh>;
+      })}
+      <mesh position-y={0.5} castShadow>
+        <sphereGeometry args={[0.4, 28, 18, 0, Math.PI * 2, Math.PI * 0.22, Math.PI * 0.78]} />
+        <meshStandardMaterial color="#2F2745" roughness={0.5} metalness={0.3} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position-y={0.808} rotation-x={Math.PI / 2}><torusGeometry args={[0.255, 0.035, 10, 28]} /><meshStandardMaterial color="#3A3150" /></mesh>
+      <mesh position-y={0.76} rotation-x={-Math.PI / 2}><circleGeometry args={[0.29, 28]} /><meshStandardMaterial color="#86EFAC" emissive="#4ADE80" emissiveIntensity={1} /></mesh>
+      <group ref={bubbles}>
+        {[0, 1, 2, 3].map((i) => (
+          <mesh key={i} position={[Math.cos(i * 1.7) * 0.14, 0.76, Math.sin(i * 1.7) * 0.14]}>
+            <sphereGeometry args={[0.04, 10, 8]} />
+            <meshStandardMaterial color="#BBF7D0" emissive="#4ADE80" emissiveIntensity={0.8} />
+          </mesh>
+        ))}
+      </group>
+      <pointLight position-y={1.1} color="#A7F3D0" intensity={4} distance={5} decay={1.6} />
+      <Sparkles count={24} scale={[0.6, 1.2, 0.6]} position-y={1.3} size={4} speed={0.6} color="#BBF7D0" />
+    </group>
+  );
+}
+
+/** A wooden bench with cushions. */
 function Sofa({ position, facing, color }: { position: [number, number, number]; facing: 1 | -1; color: string }) {
   return (
     <group position={position} rotation-y={facing === 1 ? 0 : Math.PI}>
-      <RoundedBox args={[2.4, 0.28, 0.75]} radius={0.1} position={[0, 0.16, 0]} castShadow receiveShadow><meshStandardMaterial color={color} /></RoundedBox>
-      <RoundedBox args={[2.4, 0.5, 0.2]} radius={0.08} position={[0, 0.45, -0.38]} castShadow><meshStandardMaterial color={color} /></RoundedBox>
+      <RoundedBox args={[2.4, 0.22, 0.75]} radius={0.06} position={[0, 0.12, 0]} castShadow receiveShadow><meshStandardMaterial color={WOOD} /></RoundedBox>
+      <RoundedBox args={[2.3, 0.1, 0.68]} radius={0.04} position={[0, 0.27, 0.02]} castShadow><meshStandardMaterial color={color} /></RoundedBox>
+      <RoundedBox args={[2.4, 0.55, 0.14]} radius={0.05} position={[0, 0.5, -0.36]} castShadow><meshStandardMaterial color={WOOD} /></RoundedBox>
+      <RoundedBox args={[2.2, 0.36, 0.08]} radius={0.04} position={[0, 0.52, -0.27]}><meshStandardMaterial color={color} /></RoundedBox>
       {[-1.2, 1.2].map((x) => (
-        <RoundedBox key={x} args={[0.2, 0.42, 0.75]} radius={0.08} position={[x, 0.3, 0]} castShadow><meshStandardMaterial color={color} /></RoundedBox>
+        <RoundedBox key={x} args={[0.16, 0.4, 0.75]} radius={0.06} position={[x, 0.3, 0]} castShadow><meshStandardMaterial color={WOOD_DARK} /></RoundedBox>
       ))}
+    </group>
+  );
+}
+
+/** A giant spotted mushroom to sit on. */
+function MushroomStool({ position, color }: { position: [number, number, number]; color: string }) {
+  return (
+    <group position={position}>
+      <mesh position-y={0.07}><cylinderGeometry args={[0.14, 0.18, 0.14, 14]} /><meshStandardMaterial color="#FFF4E0" /></mesh>
+      <mesh position-y={0.08} scale={[1, 0.35, 1]} castShadow><sphereGeometry args={[0.38, 24, 14]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.15} /></mesh>
+      {[0, 1, 2, 3].map((i) => {
+        const a = (i / 4) * Math.PI * 2 + 0.4;
+        return <mesh key={i} position={[Math.cos(a) * 0.18, 0.19, Math.sin(a) * 0.18]} scale={[1, 0.4, 1]}><sphereGeometry args={[0.05, 10, 8]} /><meshStandardMaterial color="#FFFFFF" /></mesh>;
+      })}
     </group>
   );
 }
