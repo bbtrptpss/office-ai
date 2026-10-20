@@ -37,8 +37,7 @@ const DESK_COLS = 3;
 const DESK_DX = 1.7;
 const DESK_DZ = 1.9;
 const ROOM_GAP = 1.6; // grass between neighbouring rooms, and the side street
-const STREET = 2.6; // the cobbled street the rooms face
-const ROOMS_PER_ROW = 4;
+const STREET = 2.6; // the cobbled ring road the rooms face
 const WALK_SPEED = 1.1;
 const RUSH_SPEED = 2.6; // back to the desk when work arrives
 
@@ -96,71 +95,89 @@ const ACTIVITY_BUBBLE = { lounge: { icon: "☕", bg: "#FCE7F3" }, visit: { icon:
 // ---------- layout and walking routes (all in office coordinates) ----------
 
 type V2 = [number, number];
-/** A room's plot. `flip` rooms sit below their street and are turned around, so every gate opens onto the street. */
-interface Cell { x0: number; z0: number; col: number; row: number; flip: boolean; streetZ: number }
+/** A room's plot: where its back-left corner is, and the turn (yaw) that points its gate at the fountain. */
+interface Cell { px: number; pz: number; yaw: number }
 interface Seat { key: string; x: number; z: number; y: number; face: V2 }
-interface Layout { w: number; d: number; cells: Cell[]; lounge: Cell; seats: Seat[]; streets: number[]; cols: number; totalW: number; totalD: number }
+interface Layout {
+  w: number; d: number; cells: Cell[]; lounge: Cell; seats: Seat[];
+  /** Centre of the square, the circle the gates sit on, the middle of the ring road, and the paved plaza round the fountain. */
+  cx: number; cz: number; inner: number; ring: number; plaza: number;
+  totalW: number; totalD: number;
+}
+
+/** Turns a vector by a room's yaw (the same turn three.js gives a group with rotation-y = yaw). */
+function turn(yaw: number, x: number, z: number): V2 {
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  return [x * c + z * s, -x * s + z * c];
+}
 
 /**
- * A village street: rooms stand in pairs of rows on both sides of a cobbled street, every gate facing it; with more
- * rooms than one street holds, the next pair of rows gets its own street and a side street joins them on the left.
- * Inside a room everything is in room coordinates: z = 0 is the back wall, z = d the gate side.
+ * A village square: rooms stand in a circle round a ring road with a fountain in the middle, every gate facing the
+ * fountain. Inside a room everything is in room coordinates: z = 0 is the back wall, z = d the gate side.
  */
 function buildLayout(roomCount: number, maxPeople: number): Layout {
   const rows = Math.max(1, Math.ceil(maxPeople / DESK_COLS));
   const w = DESK_COLS * DESK_DX + 1.6;
   const d = Math.max(rows * DESK_DZ + 1.8, 5.6); // tall enough for the lounge furniture
   const count = roomCount + 1; // the last cell is the lounge
-  const cols = Math.min(ROOMS_PER_ROW, Math.ceil(count / 2));
-  const pairH = 2 * d + STREET + ROOM_GAP;
+  // the gates' circle is just big enough for neighbouring rooms to keep a gap at their inner corners
+  const inner = Math.max(7.5, (w + ROOM_GAP) / (2 * Math.sin(Math.PI / Math.max(3, count))));
+  const outer = Math.hypot(inner + d, w / 2);
+  const cx = outer + ROOM_GAP, cz = cx;
   const cells = Array.from({ length: count }, (_, i) => {
-    const pair = Math.floor(i / (2 * cols)), k = i % (2 * cols);
-    const flip = k >= cols, col = k % cols;
-    const top = pair * pairH;
-    return { col, row: pair * 2 + (flip ? 1 : 0), flip, x0: col * (w + ROOM_GAP), z0: flip ? top + d + STREET : top, streetZ: top + d + STREET / 2 };
+    const phi = -Math.PI / 2 + (i / count) * Math.PI * 2; // the first room at the back, then round clockwise
+    const ux = Math.cos(phi), uz = Math.sin(phi);
+    const yaw = Math.atan2(-ux, -uz); // room +z (the gate side) points at the centre
+    const [ox, oz] = turn(yaw, w / 2, d / 2);
+    return { px: cx + ux * (inner + d / 2) - ox, pz: cz + uz * (inner + d / 2) - oz, yaw };
   });
   const lounge = cells[count - 1];
-  const at = (lx: number, lz: number) => toWorld({ w, d } as Layout, lounge, lx, lz);
-  const turn = (f: V2): V2 => (lounge.flip ? [-f[0], -f[1]] : f);
-  const cx = w / 2, cz = d / 2;
+  const cxL = w / 2, czL = d / 2;
   const seat = (key: string, lx: number, lz: number, y: number, face: V2): Seat => {
-    const [x, z] = at(lx, lz);
-    return { key, x, z, y, face: turn(face) };
+    const [x, z] = toWorld({ w, d } as Layout, lounge, lx, lz);
+    return { key, x, z, y, face: turn(lounge.yaw, ...face) };
   };
   const seats: Seat[] = [
-    ...[-0.75, 0, 0.75].map((dx, i) => seat(`sofa-a${i}`, cx + dx, cz - 1.25, 0.3, [0, 1])),
-    ...[-0.75, 0, 0.75].map((dx, i) => seat(`sofa-b${i}`, cx + dx, cz + 1.25, 0.3, [0, -1])),
-    seat("bean-l", cx - 2.3, cz, 0.18, [1, 0]),
-    seat("bean-r", cx + 2.3, cz, 0.18, [-1, 0]),
+    ...[-0.75, 0, 0.75].map((dx, i) => seat(`sofa-a${i}`, cxL + dx, czL - 1.25, 0.3, [0, 1])),
+    ...[-0.75, 0, 0.75].map((dx, i) => seat(`sofa-b${i}`, cxL + dx, czL + 1.25, 0.3, [0, -1])),
+    seat("bean-l", cxL - 2.3, czL, 0.18, [1, 0]),
+    seat("bean-r", cxL + 2.3, czL, 0.18, [-1, 0]),
   ];
-  const streets = [...new Set(cells.map((c) => c.streetZ))];
-  const last = streets[streets.length - 1];
   return {
-    w, d, cells, lounge, seats, streets, cols,
-    totalW: cols * w + (cols - 1) * ROOM_GAP,
-    totalD: Math.max(...cells.map((c) => c.z0 + d), last + STREET / 2),
+    w, d, cells, lounge, seats, cx, cz, inner,
+    ring: inner - STREET / 2,
+    plaza: Math.max(3, (inner - STREET) * 0.6),
+    totalW: 2 * cx, totalD: 2 * cz,
   };
 }
 
-/** Room coordinates to office coordinates (a flipped room is turned 180° inside its plot). */
+/** Room coordinates to office coordinates. */
 function toWorld(L: Layout, c: Cell, lx: number, lz: number): V2 {
-  return c.flip ? [c.x0 + L.w - lx, c.z0 + L.d - lz] : [c.x0 + lx, c.z0 + lz];
+  const [x, z] = turn(c.yaw, lx, lz);
+  return [c.px + x, c.pz + z];
 }
-const toLocal = toWorld; // turning 180° twice is the identity, so the same formula maps back
+function toLocal(L: Layout, c: Cell, x: number, z: number): V2 {
+  return turn(-c.yaw, x - c.px, z - c.pz);
+}
 
 const AISLE = 0.45; // the free aisle runs inside the right-hand wall, from the desks to the gate
-const SIDE_STREET_X = -ROOM_GAP / 2;
 
-/** Out along the aisle, through the gate, along the street (and the side street between streets), in through the other gate. */
+const ringPoint = (L: Layout, a: number): V2 => [L.cx + Math.cos(a) * L.ring, L.cz + Math.sin(a) * L.ring];
+const angleOf = (L: Layout, q: V2) => Math.atan2(q[1] - L.cz, q[0] - L.cx);
+
+/** Out along the aisle and through the gate, round the ring road the short way, in through the other gate. */
 function route(L: Layout, from: Cell, p: V2, to: Cell, q: V2): V2[] {
   const ax = L.w - AISLE;
   const pz = toLocal(L, from, p[0], p[1])[1], qz = toLocal(L, to, q[0], q[1])[1];
   if (from === to) return [toWorld(L, from, ax, pz), toWorld(L, from, ax, qz), q];
   const outGate = toWorld(L, from, ax, L.d), inGate = toWorld(L, to, ax, L.d);
-  const path: V2[] = [toWorld(L, from, ax, pz), outGate, [outGate[0], from.streetZ]];
-  if (from.streetZ !== to.streetZ) path.push([SIDE_STREET_X, from.streetZ], [SIDE_STREET_X, to.streetZ]);
-  path.push([inGate[0], to.streetZ], inGate, toWorld(L, to, ax, qz), q);
-  return path;
+  const a0 = angleOf(L, outGate);
+  let da = angleOf(L, inGate) - a0;
+  while (da > Math.PI) da -= Math.PI * 2;
+  while (da < -Math.PI) da += Math.PI * 2;
+  const steps = Math.max(1, Math.ceil(Math.abs(da) / 0.2));
+  const arc = Array.from({ length: steps + 1 }, (_, i) => ringPoint(L, a0 + (da * i) / steps));
+  return [toWorld(L, from, ax, pz), outGate, ...arc, inGate, toWorld(L, to, ax, qz), q];
 }
 
 /** Shared between all characters: who sits where in the lounge. */
@@ -185,7 +202,7 @@ export default function Office3D({ rooms, selectedId, onSelect, onRoomClick, lab
   useEffect(() => () => { Object.values(kit).forEach((x) => x.dispose()); }, [kit]);
 
   return (
-    <Canvas shadows={{ type: THREE.PCFShadowMap }} flat dpr={[1, 2]} camera={{ position: [span * 0.32, span * 0.5, span * 0.62], fov: 40, far: span * 20 }} onPointerMissed={() => onSelect(null)}>
+    <Canvas shadows={{ type: THREE.PCFShadowMap }} flat dpr={[1, 2]} camera={{ position: [span * 0.2, span * 0.62, span * 0.82], fov: 40, far: span * 20 }} onPointerMissed={() => onSelect(null)}>
       <fog attach="fog" args={["#D9C6F2", span * 1.8, span * 5]} />
       <SkyDome radius={span * 8} />
       <Stars radius={span * 4} depth={span * 2} count={1800} factor={5} saturation={0.4} fade speed={0.6} />
@@ -201,18 +218,7 @@ export default function Office3D({ rooms, selectedId, onSelect, onRoomClick, lab
       <Clouds span={span} />
       <KitContext.Provider value={kit}>
         <group position={[-L.totalW / 2, 0, -L.totalD / 2]}>
-          {/* cobbled streets between the rows, and the side street joining them */}
-          {L.streets.map((z) => (
-            <RoundedBox key={z} args={[L.totalW + ROOM_GAP * 2, 0.04, STREET]} radius={0.02} position={[L.totalW / 2, -0.03, z]} receiveShadow>
-              <meshStandardMaterial color="#EEE6F7" map={kit.path} />
-            </RoundedBox>
-          ))}
-          {L.streets.length > 1 && (
-            <RoundedBox args={[ROOM_GAP, 0.04, L.streets[L.streets.length - 1] - L.streets[0]]} radius={0.02}
-              position={[SIDE_STREET_X, -0.03, (L.streets[0] + L.streets[L.streets.length - 1]) / 2]} receiveShadow>
-              <meshStandardMaterial color="#EEE6F7" map={kit.sidePath} />
-            </RoundedBox>
-          )}
+          <VillageSquare L={L} />
           {rooms.map((room, i) => (
             <Room key={room.id} room={room} index={i} cell={L.cells[i]} L={L} hint={roomHint}
               onClick={onRoomClick && (() => onRoomClick(room.id))} />
@@ -227,7 +233,7 @@ export default function Office3D({ rooms, selectedId, onSelect, onRoomClick, lab
       </KitContext.Provider>
       {/* fireflies drifting over the whole island */}
       <Sparkles count={Math.round(60 + span * 6)} scale={[L.totalW + 4, 3, L.totalD + 4]} position={[0, 1.6, 0]} size={5} speed={0.35} opacity={0.9} color={brand.star} />
-      <OrbitControls makeDefault enableDamping maxPolarAngle={Math.PI / 2.3} minDistance={4} maxDistance={span * 1.6} target={[0, 0, 0]} />
+      <OrbitControls makeDefault enableDamping maxPolarAngle={Math.PI / 2.3} minDistance={4} maxDistance={span * 1.6} target={[0, 0, span * 0.1]} />
     </Canvas>
   );
 }
@@ -239,11 +245,8 @@ interface Kit {
   floor: THREE.Texture;
   wallBack: THREE.Texture;
   wallSide: THREE.Texture;
-  path: THREE.Texture;
-  sidePath: THREE.Texture;
-  /** Battlements on the tall walls: rooms whose back faces away from the camera, and turned-around rooms. */
-  merlons: THREE.BufferGeometry;
-  merlonsFlip: THREE.BufferGeometry;
+  ring: THREE.Texture;
+  plaza: THREE.Texture;
 }
 const KitContext = createContext<Kit | null>(null);
 
@@ -307,28 +310,28 @@ function makeKit(L: Layout): Kit {
       }
     }
   });
-  const battlements = (flip: boolean) => {
-    const parts: THREE.BufferGeometry[] = [];
-    const add = (x: number, z: number, alongX: boolean) =>
-      parts.push(new THREE.BoxGeometry(alongX ? 0.24 : 0.14, 0.16, alongX ? 0.14 : 0.24).translate(x, 0.98, z));
-    // the tall long wall is the back one, or for a turned-around room the gate wall (up to the gate)
-    if (flip) for (let x = 0.75; x < L.w - 1.1; x += 0.5) add(x, L.d - 0.05, true);
-    else for (let x = 0.75; x < L.w - 0.1; x += 0.5) add(x, 0.05, true);
-    for (let z = flip ? 0.25 : 0.75; z < L.d - (flip ? 0.75 : 0.1); z += 0.5) add(0.05, z, false);
-    for (let z = 0.25; z < L.d - 0.1; z += 0.5) add(L.w - 0.05, z, false);
-    const g = mergeGeometries(parts)!;
-    parts.forEach((p) => p.dispose());
-    return g;
-  };
   return {
     floor: planks([L.w / 2, L.d / 2]),
     wallBack: bricks([L.w / 1.6, 1]),
     wallSide: bricks([L.d / 1.6, 1]),
-    path: cobbles([(L.totalW + ROOM_GAP * 2) / 2.5, STREET / 2.5]),
-    sidePath: cobbles([ROOM_GAP / 2.5, Math.max(1, (L.streets[L.streets.length - 1] - L.streets[0]) / 2.5)]),
-    merlons: battlements(false),
-    merlonsFlip: battlements(true),
+    ring: cobbles([(2 * (L.inner + 0.3)) / 2.2, (2 * (L.inner + 0.3)) / 2.2]),
+    plaza: cobbles([(2 * L.plaza) / 1.4, (2 * L.plaza) / 1.4]),
   };
+}
+
+/** Battlements along the tall walls of one room. */
+function battlements(L: Layout, tall: { back: boolean; front: boolean; left: boolean; right: boolean }) {
+  const parts: THREE.BufferGeometry[] = [];
+  const add = (x: number, z: number, alongX: boolean) =>
+    parts.push(new THREE.BoxGeometry(alongX ? 0.24 : 0.14, 0.16, alongX ? 0.14 : 0.24).translate(x, 0.98, z));
+  if (tall.back) for (let x = 0.25; x < L.w - 0.1; x += 0.5) add(x, 0.05, true);
+  if (tall.front) for (let x = 0.25; x < L.w - 1.1; x += 0.5) add(x, L.d - 0.05, true); // up to the gate
+  if (tall.left) for (let z = 0.25; z < L.d - 0.1; z += 0.5) add(0.05, z, false);
+  if (tall.right) for (let z = 0.25; z < L.d - 0.1; z += 0.5) add(L.w - 0.05, z, false);
+  if (parts.length === 0) return new THREE.BufferGeometry();
+  const g = mergeGeometries(parts)!;
+  parts.forEach((x) => x.dispose());
+  return g;
 }
 
 /** Twilight sky: deep violet overhead, pink at the horizon, lavender haze below the island. */
@@ -378,12 +381,11 @@ interface Prop { kind: "tree" | "mushroom" | "crystal"; x: number; z: number; s:
 /** Trees, glowing mushrooms and crystals on the grass around the paving; the side facing the camera stays low. */
 function scatter(L: Layout, a: number, b: number): Prop[] {
   const r = rng(L.cells.length * 977 + 13);
-  const hx = L.totalW / 2 + ROOM_GAP + 0.35, hz = L.totalD / 2 + ROOM_GAP + 0.35;
+  const r0 = L.totalW / 2 + 0.4; // outside the ring of rooms
   const out: Prop[] = [];
   for (let tries = 0; tries < 400 && out.length < 34; tries++) {
-    const th = r() * Math.PI * 2, k = 0.55 + r() * 0.38;
+    const th = r() * Math.PI * 2, k = r0 / a + r() * (0.93 - r0 / a);
     const x = Math.cos(th) * a * k, z = Math.sin(th) * b * k;
-    if (Math.abs(x) < hx && Math.abs(z) < hz) continue;
     if (out.some((p) => Math.hypot(p.x - x, p.z - z) < 0.9)) continue;
     const roll = r();
     const kind = z > 0 ? (roll < 0.6 ? "mushroom" : "crystal") : roll < 0.55 ? "tree" : roll < 0.8 ? "mushroom" : "crystal";
@@ -394,7 +396,7 @@ function scatter(L: Layout, a: number, b: number): Prop[] {
 
 /** The office floats on a grassy island in the sky, with a few small islets drifting around it. */
 function Island({ L }: { L: Layout }) {
-  const a = (L.totalW / 2 + ROOM_GAP) * 1.45, b = (L.totalD / 2 + ROOM_GAP) * 1.45;
+  const a = L.totalW / 2 + 4.5, b = a;
   const depth = Math.max(a, b) * 0.9;
   const props = useMemo(() => scatter(L, a, b), [L, a, b]);
   const islets = useMemo(() => [0.7, 2.3, 3.7, 5.3].map((th, i) => {
@@ -459,12 +461,13 @@ function Clouds({ span }: { span: number }) {
   );
 }
 
-/** Lamp posts at the mouths of the gaps between rooms, and lanterns floating over the streets. */
+/** Lamp posts on both edges of the ring road between the rooms, and lanterns floating over it in front of every gate. */
 function Lanterns({ L }: { L: Layout }) {
-  const floating = useMemo(() => L.streets.flatMap((z) => Array.from({ length: L.cols }, (_, c) => [c * (L.w + ROOM_GAP) + L.w / 2, z] as V2)), [L]);
+  const floating = useMemo(() => L.cells.map((c) => ringPoint(L, angleOf(L, toWorld(L, c, L.w / 2, L.d)))), [L]);
   const posts = useMemo(() => {
-    const xs = [...Array.from({ length: L.cols - 1 }, (_, c) => (c + 1) * (L.w + ROOM_GAP) - ROOM_GAP / 2), L.totalW + ROOM_GAP * 0.6];
-    return L.streets.flatMap((z) => xs.flatMap((x) => [[x, z - STREET / 2 + 0.2], [x, z + STREET / 2 - 0.2]] as V2[]));
+    const n = L.cells.length;
+    return Array.from({ length: n }, (_, i) => -Math.PI / 2 + ((i + 0.5) / n) * Math.PI * 2).flatMap((a) =>
+      [L.inner - 0.3, L.inner - STREET + 0.3].map((rad) => [L.cx + Math.cos(a) * rad, L.cz + Math.sin(a) * rad] as V2));
   }, [L]);
   const refs = useRef<(THREE.Group | null)[]>([]);
   useFrame(({ clock }) => refs.current.forEach((g, i) => {
@@ -487,6 +490,83 @@ function Lanterns({ L }: { L: Layout }) {
         </group>
       ))}
     </>
+  );
+}
+
+/** The middle of the village: the cobbled ring road, grass, four paths in to a paved plaza and the fountain. */
+function VillageSquare({ L }: { L: Layout }) {
+  const kit = useContext(KitContext);
+  const pathLen = L.inner - STREET - L.plaza + 0.1;
+  const bed = (L.plaza + L.inner - STREET) / 2;
+  return (
+    <group position={[L.cx, 0, L.cz]}>
+      <mesh rotation-x={-Math.PI / 2} position-y={-0.01} receiveShadow>
+        <ringGeometry args={[L.inner - STREET, L.inner + 0.3, 96]} />
+        <meshStandardMaterial color="#EEE6F7" map={kit?.ring} />
+      </mesh>
+      <mesh rotation-x={-Math.PI / 2} position-y={-0.005} receiveShadow>
+        <circleGeometry args={[L.plaza, 64]} />
+        <meshStandardMaterial color="#F5EBDD" map={kit?.plaza} />
+      </mesh>
+      {[0, 1, 2, 3].map((k) => (
+        <group key={k} rotation-y={-(Math.PI / 4 + (k * Math.PI) / 2)}>
+          <mesh rotation-x={-Math.PI / 2} position={[L.plaza + pathLen / 2 - 0.05, -0.008, 0]} receiveShadow>
+            <planeGeometry args={[pathLen, 1.3]} />
+            <meshStandardMaterial color="#F5EBDD" />
+          </mesh>
+          {/* flower beds between the paths */}
+          <group rotation-y={Math.PI / 4} position={[0, 0, 0]}>
+            <Mushrooms position={[bed, -0.08, -0.6]} scale={0.9} hue={k} />
+            <Crystal position={[bed, -0.08, 0.6]} scale={0.9} hue={k + 1} />
+          </group>
+        </group>
+      ))}
+      <Fountain />
+    </group>
+  );
+}
+
+/** A stone basin with a two-tier column, glowing water falling from the upper bowl and a crystal on top. */
+function Fountain() {
+  const water = useRef<THREE.MeshStandardMaterial>(null);
+  const streams = useRef<THREE.Group>(null);
+  const crystal = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    if (water.current) water.current.emissiveIntensity = 0.45 + Math.sin(t * 2) * 0.12;
+    if (streams.current) streams.current.rotation.y = t * 0.4;
+    if (crystal.current) {
+      crystal.current.rotation.y = t * 0.8;
+      crystal.current.position.y = 2.35 + Math.sin(t * 1.4) * 0.06;
+    }
+  });
+  const waterMat = (opacity: number) => <meshStandardMaterial color="#BAE6FD" emissive="#7DD3FC" emissiveIntensity={0.5} transparent opacity={opacity} />;
+  return (
+    <group>
+      <mesh position-y={0.2} castShadow receiveShadow><cylinderGeometry args={[1.9, 2.05, 0.4, 40]} /><meshStandardMaterial color={STONE} /></mesh>
+      <mesh position-y={0.4} rotation-x={Math.PI / 2}><torusGeometry args={[1.9, 0.1, 10, 48]} /><meshStandardMaterial color="#CFC2E6" /></mesh>
+      <mesh position-y={0.36} rotation-x={-Math.PI / 2}>
+        <circleGeometry args={[1.82, 40]} />
+        <meshStandardMaterial ref={water} color="#A5D8FF" emissive="#7DD3FC" emissiveIntensity={0.5} transparent opacity={0.92} />
+      </mesh>
+      <mesh position-y={0.95} castShadow><cylinderGeometry args={[0.22, 0.3, 1.2, 16]} /><meshStandardMaterial color={STONE} /></mesh>
+      <mesh position-y={1.5} castShadow><cylinderGeometry args={[0.78, 0.35, 0.24, 28]} /><meshStandardMaterial color={STONE} /></mesh>
+      <mesh position-y={1.63} rotation-x={-Math.PI / 2}><circleGeometry args={[0.7, 28]} />{waterMat(0.92)}</mesh>
+      <mesh position-y={1.85}><cylinderGeometry args={[0.08, 0.13, 0.45, 12]} /><meshStandardMaterial color={STONE} /></mesh>
+      <mesh ref={crystal} position-y={2.35} scale={[0.16, 0.3, 0.16]} castShadow>
+        <octahedronGeometry args={[1]} />
+        <meshStandardMaterial color="#DDD6FE" emissive="#A78BFA" emissiveIntensity={0.9} flatShading />
+      </mesh>
+      {/* water falling from the rim of the upper bowl */}
+      <group ref={streams}>
+        {Array.from({ length: 10 }, (_, i) => {
+          const a = (i / 10) * Math.PI * 2;
+          return <mesh key={i} position={[Math.cos(a) * 0.76, 0.98, Math.sin(a) * 0.76]}><cylinderGeometry args={[0.022, 0.04, 1.2, 6]} />{waterMat(0.55)}</mesh>;
+        })}
+      </group>
+      <Sparkles count={36} scale={[3, 1.8, 3]} position-y={1.2} size={3} speed={0.5} color="#BAE6FD" />
+      <pointLight position-y={1.9} color="#93C5FD" intensity={5} distance={8} decay={1.6} />
+    </group>
   );
 }
 
@@ -550,39 +630,54 @@ function deskSpot(j: number): V2 {
   return [0.9 + col * DESK_DX + DESK_DX / 2 - 0.1, 1.35 + row * DESK_DZ];
 }
 
-/** A guild hall: plank floor, stone walls all round with a gate onto the street, and a tower in the corner away from the camera. */
-function Walls({ L, floor, banner, flip }: { L: Layout; floor: string; banner: string; flip: boolean }) {
+/** Which way, from a room's own point of view, the camera is: the office's +z turned into room coordinates. */
+const cameraSide = (yaw: number) => turn(-yaw, 0, 1);
+
+/** Walls whose outside faces the camera stay low, like a dollhouse cut open toward the viewer. */
+function tallWalls(yaw: number) {
+  const [camX, camZ] = cameraSide(yaw);
+  return { back: -camZ < 0.3, front: camZ < 0.3, left: -camX < 0.3, right: camX < 0.3 };
+}
+
+/** A guild hall: plank floor, stone walls all round with a gate toward the fountain, and a tower in the corner away from the camera. */
+function Walls({ L, floor, banner, yaw }: { L: Layout; floor: string; banner: string; yaw: number }) {
   const kit = useContext(KitContext);
-  // the wall on the camera side stays low, like a dollhouse cut open toward the viewer
-  const backH = flip ? 0.45 : 0.9, frontH = flip ? 0.9 : 0.45;
+  const [camX, camZ] = cameraSide(yaw);
+  const tall = tallWalls(yaw);
+  const h = (isTall: boolean) => (isTall ? 0.9 : 0.45);
+  const merlons = useMemo(() => battlements(L, tallWalls(yaw)), [L, yaw]);
+  useEffect(() => () => merlons.dispose(), [merlons]);
   const gateL = L.w - 0.85; // the gate wall runs from the left corner to the gate
+  // the tower stands in whichever corner (not the gate's) is farthest from the camera
+  const tower = ([[0.1, 0.1], [L.w - 0.1, 0.1], [0.1, L.d - 0.1]] as V2[])
+    .reduce((best, c) => (c[0] * camX + c[1] * camZ < best[0] * camX + best[1] * camZ ? c : best));
   return (
     <>
       <RoundedBox args={[L.w, 0.12, L.d]} radius={0.05} position={[L.w / 2, -0.06, L.d / 2]} receiveShadow>
         <meshStandardMaterial color={floor} map={kit?.floor} />
       </RoundedBox>
-      <mesh position={[L.w / 2, backH / 2, 0.05]} castShadow receiveShadow>
-        <boxGeometry args={[L.w, backH, 0.1]} />
+      <mesh position={[L.w / 2, h(tall.back) / 2, 0.05]} castShadow receiveShadow>
+        <boxGeometry args={[L.w, h(tall.back), 0.1]} />
         <meshStandardMaterial color={STONE} map={kit?.wallBack} />
       </mesh>
-      <mesh position={[gateL / 2, frontH / 2, L.d - 0.05]} castShadow receiveShadow>
-        <boxGeometry args={[gateL, frontH, 0.1]} />
+      <mesh position={[gateL / 2, h(tall.front) / 2, L.d - 0.05]} castShadow receiveShadow>
+        <boxGeometry args={[gateL, h(tall.front), 0.1]} />
         <meshStandardMaterial color={STONE} map={kit?.wallBack} />
       </mesh>
-      {[0.05, L.w - 0.05].map((x) => (
-        <mesh key={x} position={[x, 0.45, L.d / 2]} castShadow receiveShadow>
-          <boxGeometry args={[0.1, 0.9, L.d]} />
+      {([[0.05, tall.left], [L.w - 0.05, tall.right]] as const).map(([x, isTall]) => (
+        <mesh key={x} position={[x, h(isTall) / 2, L.d / 2]} castShadow receiveShadow>
+          <boxGeometry args={[0.1, h(isTall), L.d]} />
           <meshStandardMaterial color="#DCD1EE" map={kit?.wallSide} />
         </mesh>
       ))}
-      {kit && <mesh geometry={flip ? kit.merlonsFlip : kit.merlons} dispose={null} castShadow><meshStandardMaterial color={STONE} /></mesh>}
+      <mesh geometry={merlons} castShadow><meshStandardMaterial color={STONE} /></mesh>
       <Gate position={[L.w - AISLE, 0, L.d - 0.05]} color={banner} />
-      <group position={[0.1, 0, flip ? L.d - 0.1 : 0.1]}>
+      <group position={[tower[0], 0, tower[1]]}>
         <mesh position-y={0.85} castShadow><cylinderGeometry args={[0.36, 0.42, 1.7, 14]} /><meshStandardMaterial color={STONE} /></mesh>
         <mesh position-y={1.72}><cylinderGeometry args={[0.45, 0.45, 0.1, 14]} /><meshStandardMaterial color="#CFC2E6" /></mesh>
         <mesh position-y={2.18} castShadow><coneGeometry args={[0.52, 0.85, 14]} /><meshStandardMaterial color={ROOF} /></mesh>
         {/* window toward the camera */}
-        <mesh position={[0.27, 1.25, flip ? -0.27 : 0.27]} rotation-y={flip ? (Math.PI * 3) / 4 : Math.PI / 4}>
+        <mesh position={[camX * 0.38, 1.25, camZ * 0.38]} rotation-y={Math.atan2(camX, camZ)}>
           <planeGeometry args={[0.14, 0.22]} />
           <meshStandardMaterial color="#FFE7A8" emissive="#FFC75A" emissiveIntensity={0.9} />
         </mesh>
@@ -591,6 +686,19 @@ function Walls({ L, floor, banner, flip }: { L: Layout; floor: string; banner: s
       </group>
     </>
   );
+}
+
+/** Where a room's banner hangs: inside the wall farthest from the camera, so its face looks at the viewer. */
+function bannerSpot(L: Layout, yaw: number): { position: [number, number, number]; rotation: number } {
+  const [camX, camZ] = cameraSide(yaw);
+  const walls = [
+    { away: camZ, position: [L.w * 0.5, 0.66, 0.115], rotation: 0 }, // back
+    { away: -camZ, position: [(L.w - 0.85) / 2, 0.66, L.d - 0.115], rotation: Math.PI }, // gate wall
+    { away: camX, position: [0.115, 0.66, L.d / 2], rotation: Math.PI / 2 }, // left
+    { away: -camX, position: [L.w - 0.115, 0.66, L.d / 2], rotation: -Math.PI / 2 }, // right
+  ] as const;
+  const best = walls.reduce((a, b) => (b.away > a.away ? b : a));
+  return { position: [...best.position], rotation: best.rotation };
 }
 
 /** Stone gate posts under a slate arch with a glowing keystone and a lantern, opening onto the street. */
@@ -614,9 +722,9 @@ function Gate({ position, color }: { position: [number, number, number]; color: 
 }
 
 /** The room's banner on the back wall, with a golden star emblem. */
-function Banner({ position, color, turn = false }: { position: [number, number, number]; color: string; turn?: boolean }) {
+function Banner({ position, color, rotation }: { position: [number, number, number]; color: string; rotation: number }) {
   return (
-    <group position={position} rotation-y={turn ? Math.PI : 0}>
+    <group position={position} rotation-y={rotation}>
       <mesh position-y={0.24} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.02, 0.02, 0.62, 6]} /><meshStandardMaterial color={GOLD} /></mesh>
       <mesh><planeGeometry args={[0.5, 0.42]} /><meshStandardMaterial color={color} /></mesh>
       <mesh position-y={-0.2825} rotation-z={-Math.PI / 2} scale={[0.5, 1, 1]}><circleGeometry args={[0.29, 3]} /><meshStandardMaterial color={color} /></mesh>
@@ -694,10 +802,10 @@ function Label({ position, text, onClick, hint }: { position: [number, number, n
   );
 }
 
-/** A room's own coordinates: z = 0 at the back wall, the gate at z = d; turned-around rooms face the street from below. */
-function Plot({ L, cell, children }: { L: Layout; cell: Cell; children: ReactNode }) {
+/** A room's own coordinates: z = 0 at the back wall, the gate at z = d, turned to face the fountain. */
+function Plot({ cell, children }: { L: Layout; cell: Cell; children: ReactNode }) {
   return (
-    <group position={cell.flip ? [cell.x0 + L.w, 0, cell.z0 + L.d] : [cell.x0, 0, cell.z0]} rotation-y={cell.flip ? Math.PI : 0}>
+    <group position={[cell.px, 0, cell.pz]} rotation-y={cell.yaw}>
       {children}
     </group>
   );
@@ -708,9 +816,8 @@ function Room({ room, index, cell, L, onClick, hint }: { room: OfficeRoom; index
   const banner = BANNERS[index % BANNERS.length];
   return (
     <Plot L={L} cell={cell}>
-      <Walls L={L} floor={FLOORS[index % FLOORS.length]} banner={banner} flip={cell.flip} />
-      {/* the banner hangs on whichever tall wall the camera looks at */}
-      <Banner position={cell.flip ? [L.w * 0.4, 0.66, L.d - 0.115] : [L.w * 0.62, 0.66, 0.115]} color={banner} turn={cell.flip} />
+      <Walls L={L} floor={FLOORS[index % FLOORS.length]} banner={banner} yaw={cell.yaw} />
+      <Banner {...bannerSpot(L, cell.yaw)} color={banner} />
       <Crystal position={[L.w - 0.35, 0, 0.4]} hue={index} />
       <Label position={[L.w - AISLE, 2.3, L.d]} text={`${room.name} · ${working}/${room.people.length}`} onClick={onClick} hint={hint} />
       {room.people.map((p, j) => {
@@ -771,7 +878,7 @@ function Lounge({ L, name }: { L: Layout; name: string }) {
   const cx = L.w / 2, cz = L.d / 2;
   return (
     <Plot L={L} cell={c}>
-      <Walls L={L} floor="#FFE9F3" banner={brand.star} flip={c.flip} />
+      <Walls L={L} floor="#FFE9F3" banner={brand.star} yaw={c.yaw} />
       <Label position={[L.w - AISLE, 2.3, L.d]} text={name} />
       <MagicCircle position={[cx, 0.006, cz]} />
       <Cauldron position={[cx, 0, cz]} />
@@ -918,9 +1025,10 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
   const phase = (seed % 1000) / 160;
   const status = person.status;
   const dim = status === "Inactive";
-  const toward = homeCell.flip ? -1 : 1; // which way along z the desk (and the gate) is from the chair
-  const facing0 = homeCell.flip ? 0 : Math.PI; // turn that faces the desk
-  const stand: V2 = [home[0], home[1] - 0.85 * toward];
+  const [fx, fz] = turn(homeCell.yaw, 0, 1); // from the chair toward the desk (and the gate)
+  const [sideX, sideZ] = turn(homeCell.yaw, 1, 0); // along the row of desks
+  const facing0 = homeCell.yaw + Math.PI; // turn that faces the desk
+  const stand: V2 = [home[0] - 0.85 * fx, home[1] - 0.85 * fz];
 
   const st = useRef({
     mode: "home" as Mode, after: "home" as Mode, path: [] as V2[], speed: WALK_SPEED, rushing: false,
@@ -950,6 +1058,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
       s.rushing = true;
     }
 
+    g.rotation.order = "YXZ"; // turn first, then lean about the figure's own x axis
     g.rotation.set(0, facing0, 0);
     g.scale.setScalar(1);
     armL.current?.rotation.set(0, 0, 0);
@@ -1010,7 +1119,8 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
     // At the desk: the pose follows the live status.
     const seated = status === "Working" || status === "Blocked" || status === "Failed" || status === "Inactive";
     s.x = stand[0]; s.z = stand[1];
-    g.position.set(home[0], seated ? 0.42 : 0, seated ? home[1] - 0.25 * toward : stand[1]);
+    if (seated) g.position.set(home[0] - 0.25 * fx, 0.42, home[1] - 0.25 * fz);
+    else g.position.set(stand[0], 0, stand[1]);
     if (status === "Working") {
       g.position.y += Math.abs(Math.sin(t * 6)) * 0.03;
       if (armL.current) armL.current.rotation.x = -1.2 + Math.sin(t * 14) * 0.25;
@@ -1019,8 +1129,8 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
     } else if (available) {
       // strolls a small loop beside the desk, then now and then heads out
       const a = t * 0.6;
-      s.x = stand[0] + Math.cos(a) * 0.5;
-      s.z = stand[1] + Math.sin(a) * 0.15;
+      s.x = stand[0] + Math.cos(a) * 0.5 * sideX + Math.sin(a) * 0.15 * fx;
+      s.z = stand[1] + Math.cos(a) * 0.5 * sideZ + Math.sin(a) * 0.15 * fz;
       g.position.set(s.x, Math.abs(Math.sin(t * 5)) * 0.05, s.z);
       g.rotation.y = -a + facing0;
       if (armL.current) armL.current.rotation.x = Math.sin(t * 5) * 0.5;
@@ -1054,7 +1164,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
       if (p) p.scale.y = 0.94;
     } else {
       // blocked / inactive: slumped over the desk, slow breathing
-      g.rotation.x = (status === "Inactive" ? 0.5 : 0.2) * toward; // Euler XYZ: the tilt is about world X, so it leans toward the desk
+      g.rotation.x = -(status === "Inactive" ? 0.5 : 0.2); // about the figure's own x axis: negative leans toward the desk
       g.scale.setScalar(1 + Math.sin(t * 1.5) * 0.015);
       if (armL.current) armL.current.rotation.x = -0.9;
       if (armR.current) armR.current.rotation.x = -0.9;
