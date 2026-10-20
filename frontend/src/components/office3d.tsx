@@ -10,8 +10,9 @@ import type { EmployeeKind, EmployeeStatus } from "@/lib/api";
 import { art } from "@/lib/characters";
 import { brand } from "@/theme";
 
-/** Cut-out figure from the character pack; when set, people are this picture (always facing the camera) instead of chibis. */
-const SPRITE = art("kuromi_3d");
+/** Cut-out figures from the character pack; when set, people are pictures (always facing the camera) instead of chibis. */
+const SPRITE = art("kuromi_3d"); // department heads
+const TEAM_SPRITES = [art("mymelody_3d"), art("pompompurin_3d"), art("cinnamoroll_3d")]; // everyone else, picked from the name
 const SPRITE_H = 1.15;
 
 /** One person in the 3D office. Status and task come from the live API; everything else is decoration. */
@@ -20,6 +21,8 @@ export interface OfficePerson {
   name: string;
   jobTitle: string;
   kind: EmployeeKind;
+  /** Heads their department (shown as the head figure). */
+  head?: boolean;
   status: EmployeeStatus;
   taskTitle?: string;
 }
@@ -911,6 +914,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
   const [activity, setActivity] = useState<"lounge" | "visit" | null>(null);
   const seed = useMemo(() => hash(person.name), [person.name]);
   const sp = SPECIES[seed % SPECIES.length];
+  const sprite = person.head ? SPRITE : TEAM_SPRITES[seed % TEAM_SPRITES.length] ?? SPRITE;
   const phase = (seed % 1000) / 160;
   const status = person.status;
   const dim = status === "Inactive";
@@ -1089,7 +1093,7 @@ function Character({ person, home, homeCell, world, selected, onSelect, label }:
           <group ref={facing}>
             <group ref={pose}>
               <Suspense fallback={null}>
-                <SpriteBody src={SPRITE} dim={dim} glow={person.kind === "AI" ? (status === "Working" ? 1 : 0.2) : null} />
+                <SpriteBody src={sprite!} dim={dim} glow={person.kind === "AI" ? (status === "Working" ? 1 : 0.2) : null} />
               </Suspense>
             </group>
           </group>

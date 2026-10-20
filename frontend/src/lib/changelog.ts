@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.24.5",
+    date: "2026-10-20",
+    title: { th: "ตัวละครออฟฟิศ 3D ตามตำแหน่ง", en: "3D office figures by position" },
+    changes: [
+      { type: "changed", th: "หัวหน้าแผนกในออฟฟิศ 3D เป็นรูป kuromi_3d.png ส่วนคนอื่นสุ่มจาก mymelody_3d.png, pompompurin_3d.png, cinnamoroll_3d.png (แต่ละคนได้ตัวเดิมเสมอ)", en: "Department heads in the 3D office use kuromi_3d.png; everyone else gets one of mymelody_3d.png, pompompurin_3d.png, cinnamoroll_3d.png (each person always the same one)" },
+      { type: "changed", th: "หัวหน้าแผนก = คนที่ตำแหน่งสูงสุดระดับ Head ขึ้นไปในแผนก ถ้าเท่ากันเลือกคนที่รายงานตรงต่อคนนอกแผนก (ฝ่ายบริหาร = CEO) แผนกที่มีแต่พนักงานระดับ Staff จะไม่มีหัวหน้า", en: "A department head is its most senior Head-or-above person, and among equals the one reporting outside the department (Executive = the CEO); a department of staff has no head" },
+    ],
+  },
+  {
     version: "0.24.4",
     date: "2026-10-20",
     title: { th: "แก้ error หน้าโปรเจกต์", en: "Project page error fixed" },

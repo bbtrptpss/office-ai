@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Box, Button, Card, CardContent, Chip, IconButton, Stack, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/CloseRounded";
-import { AgentRun, api, Department, Employee, EmployeeStatus } from "@/lib/api";
+import { AgentRun, api, Department, Employee, EmployeeStatus, OrgLevel, RoleDefinition } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -26,17 +26,40 @@ const LEGEND: { status: EmployeeStatus; icon: string }[] = [
   { status: "Inactive", icon: "💤" },
 ];
 
+const RANK: Partial<Record<OrgLevel, number>> = { Executive: 2, Head: 1 };
+
+/**
+ * Who heads each department: the most senior Head- or Executive-level people in it, and among equals the one who
+ * reports outside the department (the CEO, not the other executives). A department of staff has no head.
+ */
+function departmentHeads(employees: Employee[], roles: RoleDefinition[]) {
+  const level = new Map(roles.map((r) => [r.id, r.level]));
+  const departmentOf = new Map(employees.map((e) => [e.id, e.departmentId]));
+  const rank = (e: Employee) => RANK[level.get(e.roleDefinitionId) ?? "Staff"] ?? 0;
+  const heads = new Set<string>();
+  for (const dept of new Set(employees.map((e) => e.departmentId))) {
+    const people = employees.filter((e) => e.departmentId === dept);
+    const top = Math.max(0, ...people.map(rank));
+    if (top === 0) continue;
+    const senior = people.filter((e) => rank(e) === top);
+    const outside = senior.filter((e) => !e.managerId || departmentOf.get(e.managerId) !== dept);
+    for (const e of outside.length > 0 ? outside : senior) heads.add(e.id);
+  }
+  return heads;
+}
+
 export default function OfficePage() {
   const { t, label } = useI18n();
   const { can } = useAuth();
   const canRuns = can("agent.read");
   const { data, error, reload } = useLoad(async () => {
-    const [departments, employees, runs] = await Promise.all([
+    const [departments, employees, roles, runs] = await Promise.all([
       api.get<Department[]>("/api/departments"),
       api.get<Employee[]>("/api/employees"),
+      api.get<RoleDefinition[]>("/api/role-definitions"),
       canRuns ? api.get<AgentRun[]>("/api/agent-runs?take=100") : Promise.resolve([] as AgentRun[]),
     ]);
-    return { departments, employees, runs };
+    return { departments, employees, roles, runs };
   }, String(canRuns));
   // Statuses change when runs start and finish; both events refresh the scene.
   useRealtime("organizationChanged", () => void reload());
@@ -47,6 +70,7 @@ export default function OfficePage() {
 
   const rooms = useMemo<OfficeRoom[]>(() => {
     if (!data) return [];
+    const heads = departmentHeads(data.employees, data.roles);
     const activeTask = new Map(data.runs.filter((r) => r.status === "Queued" || r.status === "Running").map((r) => [r.employeeId, r.taskTitle]));
     return [...data.departments]
       .filter((d) => d.isActive)
@@ -56,6 +80,7 @@ export default function OfficePage() {
         name: d.name,
         people: data.employees.filter((e) => e.departmentId === d.id).map((e) => ({
           id: e.id, name: e.displayName, jobTitle: e.jobTitle, kind: e.kind, status: e.status, taskTitle: activeTask.get(e.id),
+          head: heads.has(e.id),
         })),
       }))
       .filter((r) => r.people.length > 0);
