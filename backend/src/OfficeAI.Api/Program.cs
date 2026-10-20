@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
@@ -14,6 +15,10 @@ using OpenTelemetry.Trace;
 using OfficeAI.Infrastructure;
 using OfficeAI.Infrastructure.Identity;
 using OfficeAI.Infrastructure.Persistence;
+
+// Server-written text (documents, emails, calendar files, AI prompts) uses fixed formats; the web app localizes for display.
+// Without this a Thai-culture host writes Buddhist-era years (2569) into dates.
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
@@ -52,6 +57,7 @@ builder.Services.AddSingleton<IChatReplyQueue>(sp => sp.GetRequiredService<ChatR
 builder.Services.AddHostedService<ChatReplyWorker>();
 builder.Services.AddHostedService<WorkflowEngineWorker>();
 builder.Services.AddHostedService<IntegrationWorker>();
+builder.Services.AddHostedService<EmailWorker>();
 builder.Services.AddHostedService<RetentionWorker>();
 
 // ---------- Identity + cookie auth ----------
@@ -95,6 +101,9 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = config.GetValue("RateLimits:LoginPerMinute", 20), Window = TimeSpan.FromMinutes(1) }));
+    o.AddPolicy("calendar", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = config.GetValue("RateLimits:CalendarPerMinute", 30), Window = TimeSpan.FromMinutes(1) }));
 });
 
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p

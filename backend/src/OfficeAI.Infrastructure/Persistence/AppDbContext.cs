@@ -66,6 +66,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<ProjectDocument> Documents => Set<ProjectDocument>();
     public DbSet<IntegrationConfiguration> Integrations => Set<IntegrationConfiguration>();
     public DbSet<IntegrationDelivery> IntegrationDeliveries => Set<IntegrationDelivery>();
+    public DbSet<UserPreference> UserPreferences => Set<UserPreference>();
+    public DbSet<EmailDelivery> EmailDeliveries => Set<EmailDelivery>();
     public DbSet<ChatChannel> ChatChannels => Set<ChatChannel>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<ChannelReadState> ChannelReadStates => Set<ChannelReadState>();

@@ -164,6 +164,11 @@ public static class DependencyInjection
         services.AddHttpClient("integrations", c => c.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<OfficeAI.Application.Integrations.IntegrationService>();
         services.AddScoped<OfficeAI.Application.Integrations.IntegrationDispatcher>();
+        services.Configure<OfficeAI.Infrastructure.Email.EmailOptions>(config.GetSection("Email"));
+        services.AddSingleton<IEmailSender, OfficeAI.Infrastructure.Email.SmtpEmailSender>();
+        services.AddScoped<IUserDirectory, OfficeAI.Infrastructure.Identity.UserDirectory>();
+        services.AddScoped<OfficeAI.Application.Integrations.EmailCalendarService>();
+        services.AddScoped<OfficeAI.Application.Integrations.EmailDispatcher>();
         return services;
     }
 }

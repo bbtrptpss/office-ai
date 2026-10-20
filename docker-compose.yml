@@ -42,6 +42,14 @@ services:
       Repositories__Root: /data/repos
       Sandbox__RunnerUrl: http://sandbox-runner:8080
       Sandbox__RunnerToken: ${SANDBOX_RUNNER_TOKEN:-dev-runner-token}
+      Integrations__AppBaseUrl: ${APP_BASE_URL:-http://localhost:3000}
+      # Email notifications are off until EMAIL_HOST and EMAIL_FROM are set.
+      Email__Host: ${EMAIL_HOST:-}
+      Email__Port: ${EMAIL_PORT:-587}
+      Email__Security: ${EMAIL_SECURITY:-StartTls}
+      Email__Username: ${EMAIL_USERNAME:-}
+      Email__Password: ${EMAIL_PASSWORD:-}
+      Email__FromAddress: ${EMAIL_FROM:-}
     volumes:
       - repos:/data/repos
     extra_hosts:

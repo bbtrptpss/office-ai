@@ -1075,3 +1075,42 @@ export interface DeliveryPackage {
   changeTaskId: string | null;
   version: number;
 }
+
+export interface EmailDelivery {
+  id: number;
+  subject: string;
+  status: "Sent" | "Failed";
+  attempts: number;
+  error: string | null;
+  createdAt: string;
+  sentAt: string | null;
+}
+
+export interface DeliverySettings {
+  emailConfigured: boolean;
+  fromAddress: string | null;
+  myEmail: string | null;
+  emailNotifications: boolean;
+  emailNotificationsSince: string | null;
+  calendarFeedActive: boolean;
+  calendarFeedCreatedAt: string | null;
+  recentEmails: EmailDelivery[];
+}
+
+export interface CalendarFeed {
+  url: string;
+  createdAt: string;
+}
+
+/** Downloads a file from the API with the session cookie, using the server's file name when it sends one. */
+export async function downloadFile(path: string, fallbackName: string) {
+  const res = await fetch(`${API_URL}${path}`, { credentials: "include", headers: { "X-Requested-With": "officeai" } });
+  if (!res.ok) throw new Error(res.statusText);
+  const name = /filename="?([^";]+)"?/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}

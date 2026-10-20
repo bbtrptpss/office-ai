@@ -245,7 +245,9 @@ public class WorkflowTests(ApiFixture fx)
         Assert.Equal(ApprovalKind.Plan, plan.Kind);
         Assert.Equal(planner.Id, plan.RequestedByEmployeeId);
         Assert.Contains("\"requiredSkills\"", plan.PayloadJson); // the UI reads camelCase
-        Assert.Contains("\"priority\":\"", plan.PayloadJson); // enums as names, not numbers
+        // Enums as names, not numbers. (Parsed: jsonb normalizes spacing, and a culture-aware Contains only matched under Thai collation.)
+        Assert.Equal(System.Text.Json.JsonValueKind.String,
+            System.Text.Json.JsonDocument.Parse(plan.PayloadJson).RootElement.GetProperty("tasks")[0].GetProperty("priority").ValueKind);
 
         // Wrong hash: the approver must have seen exactly this payload.
         var res = await ceo.PostAsJsonAsync($"/api/approvals/{plan.Id}/decision", new { approve = true, payloadHash = new string('0', 64) });

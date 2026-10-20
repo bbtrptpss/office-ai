@@ -31,6 +31,19 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.24.0",
+    date: "2026-10-20",
+    title: { th: "อีเมลแจ้งเตือนและปฏิทิน", en: "Email notifications and calendar" },
+    changes: [
+      { type: "added", th: "หน้า “การตั้งค่าของฉัน” ใหม่: แต่ละคนเปิดรับสำเนาการแจ้งเตือนทางอีเมลได้เอง (ถูก @ ถึง เชิญประชุม งานจากที่ประชุม) ส่งเฉพาะที่เกิดหลังเปิดใช้ พร้อมปุ่มส่งอีเมลทดสอบและรายการอีเมลล่าสุด", en: "New “My settings” page: each person can opt in to email copies of their notifications (mentions, meeting invites, action items); only what happens after opting in is sent; test email button and recent emails" },
+      { type: "added", th: "อีเมลเชิญประชุมแนบไฟล์ปฏิทิน (.ics) ให้กด “เพิ่มลงปฏิทิน” ได้จาก Gmail / Outlook", en: "Meeting invite emails carry a calendar invitation (.ics) that Gmail / Outlook can add to the calendar" },
+      { type: "added", th: "ลิงก์ปฏิทินส่วนตัวสำหรับ subscribe ใน Google Calendar / Outlook / Apple Calendar: การประชุมของฉันและวันกำหนดส่งของงานที่ฉันรับผิดชอบ สร้างใหม่หรือปิดลิงก์ได้ทุกเมื่อ", en: "Private calendar link to subscribe to in Google Calendar / Outlook / Apple Calendar: my meetings and the due dates of my tasks; create a new link or turn it off at any time" },
+      { type: "added", th: "ปุ่ม “เพิ่มลงปฏิทิน (.ics)” ในหน้าการประชุม", en: "“Add to calendar (.ics)” button on a meeting" },
+      { type: "security", th: "ระบบไม่ส่งอีเมลใดๆ จนกว่าผู้ดูแลจะตั้งบัญชี SMTP ใน .env; รหัสผ่านอยู่ใน environment เท่านั้น ลิงก์ปฏิทินเก็บแค่ค่า hash และแสดงลิงก์ครั้งเดียว", en: "Nothing is emailed until an administrator sets an SMTP account in .env; the password lives only in the environment; calendar links are stored as hashes and shown once" },
+      { type: "fixed", th: "เซิร์ฟเวอร์ที่ตั้งภาษาไทยเขียนปี พ.ศ. (2569) ลงในวันที่ของเอกสาร บันทึกการประชุม และข้อความถึง AI ตอนนี้ใช้รูปแบบสากลเสมอ", en: "A Thai-culture server wrote Buddhist-era years (2569) into documents, meeting minutes and AI prompts; server text now always uses invariant formats" },
+    ],
+  },
+  {
     version: "0.23.1",
     date: "2026-10-20",
     title: { th: "ปุ่ม “ลองใหม่” ให้ AI ที่ทำงานล้มเหลว", en: "“Try again” for failed AI runs" },
@@ -567,7 +580,7 @@ export const TODO: Todo[] = [
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
-  { status: "planned", area: { th: "เชื่อมต่อ", en: "Integrations" }, th: "เชื่อมอีเมลและปฏิทิน (ตอนนี้แจ้งออกภายนอกผ่าน webhook)", en: "Email and calendar integrations (outbound notices use webhooks today)" },
+  { status: "waitingCeo", area: { th: "เชื่อมต่อ", en: "Integrations" }, th: "ถ้าต้องการอีเมลแจ้งเตือน: ใส่บัญชี SMTP ใน .env (EMAIL_HOST, EMAIL_FROM, EMAIL_USERNAME, EMAIL_PASSWORD — Gmail ใช้ App Password) แล้ว restart", en: "For email notifications: put an SMTP account in .env (EMAIL_HOST, EMAIL_FROM, EMAIL_USERNAME, EMAIL_PASSWORD — Gmail needs an App Password) and restart" },
   { status: "planned", area: { th: "โครงสร้าง", en: "Infrastructure" }, th: "Redis และที่เก็บไฟล์แบบ S3 — ทำเมื่อเลือกที่ deploy แล้ว", en: "Redis and S3-compatible storage — once the deploy target is chosen" },
   { status: "planned", area: { th: "AI", en: "AI" }, th: "1 ม.ค. 2027: แก้ราคา Gemini 3.8 Flash ในหน้าตั้งค่า AI เป็น $1.50 / $7.50 ต่อล้าน token (ราคาโปรหมด)", en: "1 Jan 2027: update Gemini 3.8 Flash prices in AI settings to $1.50 / $7.50 per million tokens (intro pricing ends)" },
 ];

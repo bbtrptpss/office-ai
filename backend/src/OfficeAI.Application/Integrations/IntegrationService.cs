@@ -21,6 +21,9 @@ public class IntegrationSettings
     /// <summary>Public base URL of the web app, used for links in notifications.</summary>
     public string? AppBaseUrl { get; set; }
 
+    /// <summary>Public base URL of the API, used for calendar subscription links. Defaults to the address of the request.</summary>
+    public string? ApiBaseUrl { get; set; }
+
     /// <summary>Plain http targets are refused unless allowed (development and tests only).</summary>
     public bool AllowHttp { get; set; }
 }
