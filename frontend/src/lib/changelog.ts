@@ -31,6 +31,14 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.24.4",
+    date: "2026-10-20",
+    title: { th: "แก้ error หน้าโปรเจกต์", en: "Project page error fixed" },
+    changes: [
+      { type: "fixed", th: "หน้าโปรเจกต์ไม่ขึ้น error “<div> cannot be a descendant of <p>” อีก (คำอธิบายใต้หัวข้อหน้าที่มีชิปสถานะ ตอนนี้ไม่ได้อยู่ในย่อหน้าแล้ว)", en: "The project page no longer logs “<div> cannot be a descendant of <p>” (page header subtitles holding status chips are no longer inside a paragraph)" },
+    ],
+  },
+  {
     version: "0.24.3",
     date: "2026-10-20",
     title: { th: "ออฟฟิศ 3D แบบถนนหมู่บ้านแฟนตาซี", en: "3D office as a fantasy village street" },

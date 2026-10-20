@@ -45,7 +45,8 @@ export function PageHeader({ title, actions, subtitle }: { title: string; subtit
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography variant="h5">{title}</Typography>
         {subtitle && (
-          <Typography color="text.secondary" variant="body2">
+          // a div, not a p: some pages pass chips or layout boxes, which may not sit inside a paragraph
+          <Typography component="div" color="text.secondary" variant="body2">
             {subtitle}
           </Typography>
         )}
