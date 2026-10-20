@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.24.6",
+    date: "2026-10-20",
+    title: { th: "ออฟฟิศ 3D ลานน้ำพุกลางหมู่บ้าน", en: "3D office village square with a fountain" },
+    changes: [
+      { type: "changed", th: "ห้องทุกห้องเรียงเป็นวงกลมรอบถนนวงแหวนปูหิน ประตูทุกห้องหันเข้าหาศูนย์กลาง กลางวงเป็นลานหินมีน้ำพุเวทมนตร์ (น้ำเรืองแสง คริสตัลลอยหมุนบนยอด) ทางเดิน 4 ทางจากถนนเข้าลาน และแปลงเห็ด/คริสตัล", en: "Rooms stand in a circle round a cobbled ring road with every gate facing the middle: a paved plaza with a magic fountain (glowing water, a floating crystal on top), four paths in from the road, and mushroom / crystal beds" },
+      { type: "changed", th: "ตัวละครเดินออกประตู ไปตามถนนวงแหวนทางที่ใกล้กว่า แล้วเข้าประตูห้องอื่น มีเสาไฟสองข้างถนนระหว่างห้องและโคมลอยหน้าประตูทุกห้อง กำแพงด้านที่หันเข้ากล้องของแต่ละห้องเตี้ยลงตามมุมห้อง กล้องเริ่มต้นเห็นทั้งหมู่บ้าน", en: "Characters leave through their gate, take the shorter way round the ring road and enter the other gate; lamp posts line the road between rooms and a lantern floats before every gate; each room's walls facing the camera stay low whatever its angle, and the starting view shows the whole village" },
+    ],
+  },
+  {
     version: "0.24.5",
     date: "2026-10-20",
     title: { th: "ตัวละครออฟฟิศ 3D ตามตำแหน่ง", en: "3D office figures by position" },
