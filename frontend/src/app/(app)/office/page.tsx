@@ -82,7 +82,7 @@ export default function OfficePage() {
       </Stack>
 
       <Card sx={{ position: "relative", height: { xs: "70vh", md: "calc(100vh - 210px)" }, minHeight: 420, overflow: "hidden", p: 0,
-        background: "linear-gradient(180deg, #EDE6FA 0%, #F8E4EF 100%)" }}>
+        background: "linear-gradient(180deg, #2B1B58 0%, #8E6BD6 50%, #F7B9D7 100%)" }}>
         <Office3D rooms={rooms} selectedId={selectedId} onSelect={setSelectedId} labels={(s) => label(s)} loungeName={t.officeLounge} roomHint={t.officeRoomHint}
           onRoomClick={canOrder ? (id) => {
             const dept = data.departments.find((d) => d.id === id);
