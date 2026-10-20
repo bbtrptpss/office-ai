@@ -31,6 +31,7 @@ import HistoryIcon from "@mui/icons-material/HistoryOutlined";
 import SmartToyIcon from "@mui/icons-material/SmartToyOutlined";
 import BusinessIcon from "@mui/icons-material/BusinessCenterOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
+import TuneIcon from "@mui/icons-material/TuneOutlined";
 import DarkModeIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeIcon from "@mui/icons-material/LightModeOutlined";
 import { useAuth } from "@/lib/auth";
@@ -65,7 +66,7 @@ const glassPanel = (th: import("@mui/material/styles").Theme) => ({
 type NavKey =
   | "navDashboard" | "navOffice" | "navOrganization" | "navEmployees" | "navDepartments" | "navLeads" | "navProjects" | "navTaskBoard" | "navActivity"
   | "navApprovals" | "navChat" | "navAnnouncements" | "navMeetings" | "navKnowledge" | "navFinance" | "navQuality" | "navIntegrations"
-  | "navSecurity" | "navAudit" | "aiSettings" | "companySettings" | "navUpdates";
+  | "navSecurity" | "navAudit" | "aiSettings" | "companySettings" | "navMySettings" | "navUpdates";
 
 interface NavItem {
   key: NavKey;
@@ -98,6 +99,7 @@ const NAV: NavItem[] = [
   { key: "aiSettings", href: "/ai-settings", icon: <SmartToyIcon />, permission: "agent.read" },
   { key: "navSecurity", href: "/security", icon: <AdminPanelSettingsIcon />, permission: "security.manage" },
   { key: "navAudit", href: "/audit", icon: <HistoryIcon />, permission: "audit.read" },
+  { key: "navMySettings", href: "/settings", icon: <TuneIcon /> },
   { key: "navUpdates", href: "/updates", icon: <NewReleasesIcon /> },
 ];
 

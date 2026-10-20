@@ -10,7 +10,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import WarningIcon from "@mui/icons-material/WarningAmber";
 import DownloadIcon from "@mui/icons-material/DownloadOutlined";
-import { api, API_URL, DeliveryPackage, DeliveryPackageStatus, ProjectDocument, Release } from "@/lib/api";
+import { api, DeliveryPackage, DeliveryPackageStatus, downloadFile, ProjectDocument, Release } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { Loading, StatusChip, useErrorMessage, useLoad } from "./common";
@@ -23,17 +23,7 @@ type Form = { id?: string; version?: number; releaseId: string; title: string; d
 type Step = { pkg: DeliveryPackage; action: "delivered" | "accepted" | "changes"; text: string };
 
 /** Downloads the package's Markdown export with the session cookie. */
-async function download(pkg: DeliveryPackage) {
-  const res = await fetch(`${API_URL}/api/delivery-packages/${pkg.id}/export`, { credentials: "include", headers: { "X-Requested-With": "officeai" } });
-  if (!res.ok) throw new Error(res.statusText);
-  const name = /filename="?([^";]+)"?/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? `${pkg.code}.md`;
-  const url = URL.createObjectURL(await res.blob());
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+const download = (pkg: DeliveryPackage) => downloadFile(`/api/delivery-packages/${pkg.id}/export`, `${pkg.code}.md`);
 
 /** Customer delivery (Master Prompt §7 stage 8): package the deployed release, documents and test evidence; record delivery and the customer's answer. */
 export function DeliveryPackagesPanel({ projectId, onOpenTask }: { projectId: string; onOpenTask: (taskId: string) => void }) {

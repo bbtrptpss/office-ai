@@ -7,7 +7,8 @@ import {
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddTaskIcon from "@mui/icons-material/AddTaskOutlined";
-import { api, Attendance, Employee, Meeting } from "@/lib/api";
+import EventIcon from "@mui/icons-material/EventOutlined";
+import { api, Attendance, downloadFile, Employee, Meeting } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -50,11 +51,14 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
       <Button component={Link} href="/meetings" startIcon={<ArrowBackIcon />} size="small" sx={{ mb: 1 }}>{t.navMeetings}</Button>
       <PageHeader title={m.title}
         subtitle={<>{fmt.format(new Date(m.scheduledAt))} · {m.durationMinutes} min{m.location ? ` · ${m.location}` : ""}{m.organizerName ? ` · ${t.organizer}: ${m.organizerName}` : ""}</>}
-        actions={canManage && !cancelled && (
+        actions={(
           <>
+            {!cancelled && <Button startIcon={<EventIcon />} onClick={() => downloadFile(`/api/meetings/${id}/ics`, "meeting.ics").catch((e) => setMessage({ ok: false, text: errorMessage(e) }))}>{t.addToCalendar}</Button>}
+            {canManage && !cancelled && <>
             <Button onClick={() => setEditing(true)}>{t.edit}</Button>
             {m.status === "Scheduled" && <Button onClick={() => act(() => api.post(`/api/meetings/${id}/status`, { status: "Held" }))}>{t.markHeld}</Button>}
             {m.minutesStatus !== "Approved" && <Button color="error" onClick={() => act(() => api.post(`/api/meetings/${id}/status`, { status: "Cancelled" }))}>{t.cancelMeeting}</Button>}
+            </>}
           </>
         )} />
       <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap", rowGap: 1 }}>

@@ -52,3 +52,36 @@ public static class IntegrationEvents
     public static readonly IReadOnlySet<string> All = new HashSet<string> { ApprovalRequested, WorkflowCompleted, WorkflowEscalated, RunFailed, BudgetReached };
     public const string EnvPrefix = "INTEGRATION_";
 }
+
+/// <summary>A person's own delivery choices. One row per user, created the first time they change something.</summary>
+public class UserPreference
+{
+    public Guid UserId { get; set; }
+
+    /// <summary>Email copies of personal notifications created from this moment on; null = off.</summary>
+    public DateTimeOffset? EmailNotificationsSince { get; set; }
+
+    /// <summary>SHA-256 of the secret in the personal calendar feed URL; the secret itself is shown once and never stored.</summary>
+    public string? CalendarTokenHash { get; set; }
+    public DateTimeOffset? CalendarTokenCreatedAt { get; set; }
+}
+
+public enum EmailStatus
+{
+    Sent = 1,
+    Failed = 2,
+}
+
+/// <summary>An email copy of one personal notification. At most one row per notification; failures are retried a few times.</summary>
+public class EmailDelivery
+{
+    public long Id { get; set; }
+    public long NotificationId { get; set; }
+    public Guid UserId { get; set; }
+    public required string Subject { get; set; }
+    public EmailStatus Status { get; set; }
+    public int Attempts { get; set; }
+    public string? Error { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? SentAt { get; set; }
+}

@@ -23,6 +23,7 @@ public sealed class ApiFixture : IAsyncLifetime
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
     public ScriptedProvider Scripted { get; } = new();
     public FakeClaudeBridge Claude { get; } = new();
+    public FakeEmailSender Email { get; } = new();
     public string RepoRoot { get; } = Path.Combine(Path.GetTempPath(), "officeai-tests", Guid.NewGuid().ToString("N"));
     public string ConnectionString => _db.GetConnectionString();
 
@@ -48,11 +49,14 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("Sandbox:TestTimeoutSeconds", "8");
             b.UseSetting("Integrations:AutoDispatch", "false");
             b.UseSetting("Integrations:AllowHttp", "true");
+            b.UseSetting("Integrations:AppBaseUrl", "https://office.test");
+            b.UseSetting("Email:AutoDispatch", "false"); // tests drive the email dispatcher explicitly
             b.ConfigureTestServices(s =>
             {
                 s.AddSingleton<IAiProvider>(Scripted);
                 s.AddSingleton<IAgentTool, ApprovalRequiredTool>();
                 s.AddSingleton<OfficeAI.Application.Communication.IClaudeBridge>(Claude);
+                s.AddSingleton<OfficeAI.Application.Abstractions.IEmailSender>(Email);
             });
         });
         _ = Factory.Server; // start host: runs migrations + seed

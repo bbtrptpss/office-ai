@@ -2550,6 +2550,53 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OfficeAI.Domain.Integrations.EmailDelivery", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("NotificationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NotificationId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "Id");
+
+                    b.ToTable("EmailDeliveries", (string)null);
+                });
+
             modelBuilder.Entity("OfficeAI.Domain.Integrations.IntegrationConfiguration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2644,6 +2691,29 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                     b.HasIndex("IntegrationId", "Id");
 
                     b.ToTable("IntegrationDeliveries", (string)null);
+                });
+
+            modelBuilder.Entity("OfficeAI.Domain.Integrations.UserPreference", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CalendarTokenCreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CalendarTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("EmailNotificationsSince")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("CalendarTokenHash")
+                        .IsUnique();
+
+                    b.ToTable("UserPreferences", (string)null);
                 });
 
             modelBuilder.Entity("OfficeAI.Domain.Knowledge.KnowledgeEntry", b =>
@@ -4207,11 +4277,29 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("OfficeAI.Domain.Integrations.EmailDelivery", b =>
+                {
+                    b.HasOne("OfficeAI.Domain.Communication.Notification", null)
+                        .WithMany()
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("OfficeAI.Domain.Integrations.IntegrationDelivery", b =>
                 {
                     b.HasOne("OfficeAI.Domain.Integrations.IntegrationConfiguration", null)
                         .WithMany()
                         .HasForeignKey("IntegrationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OfficeAI.Domain.Integrations.UserPreference", b =>
+                {
+                    b.HasOne("OfficeAI.Infrastructure.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -57,6 +57,8 @@ public interface IAppDbContext
     DbSet<ProjectDocument> Documents { get; }
     DbSet<IntegrationConfiguration> Integrations { get; }
     DbSet<IntegrationDelivery> IntegrationDeliveries { get; }
+    DbSet<UserPreference> UserPreferences { get; }
+    DbSet<EmailDelivery> EmailDeliveries { get; }
     DbSet<ChatChannel> ChatChannels { get; }
     DbSet<ChatMessage> ChatMessages { get; }
     DbSet<ChannelReadState> ChannelReadStates { get; }
@@ -132,6 +134,25 @@ public static class ActingAs
     {
         public void Dispose() => undo();
     }
+}
+
+public record EmailAttachment(string FileName, string ContentType, byte[] Content);
+public record OutgoingEmail(string To, string ToName, string Subject, string TextBody, EmailAttachment? Attachment = null);
+
+/// <summary>Sends email through the server's SMTP account. Not configured = nothing is ever sent.</summary>
+public interface IEmailSender
+{
+    bool IsConfigured { get; }
+
+    /// <summary>The From address, for display and as the organizer of calendar invites.</summary>
+    string? FromAddress { get; }
+    Task SendAsync(OutgoingEmail email, CancellationToken ct);
+}
+
+/// <summary>Login accounts live outside the application layer; this reads what it needs from them.</summary>
+public interface IUserDirectory
+{
+    Task<Dictionary<Guid, (string Email, string Name)>> ContactsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken ct);
 }
 
 /// <summary>Hands AI chat replies to the background worker.</summary>

@@ -9,6 +9,7 @@ using OfficeAI.Domain.Communication;
 using OfficeAI.Application.Knowledge;
 using OfficeAI.Domain.Knowledge;
 using OfficeAI.Application.Delivery;
+using OfficeAI.Application.Integrations;
 using OfficeAI.Application.Organization;
 using OfficeAI.Application.Work;
 using OfficeAI.Application.Workflows;
@@ -407,6 +408,21 @@ public static class Endpoints
         api.MapGet("/integrations", (OfficeAI.Application.Integrations.IntegrationService s, CancellationToken ct) => s.ListAsync(ct)).RequirePermission(Permissions.SecurityManage);
         api.MapPost("/integrations", (OfficeAI.Application.Integrations.SaveIntegrationRequest r, OfficeAI.Application.Integrations.IntegrationService s, CancellationToken ct) => s.CreateAsync(r, ct)).RequirePermission(Permissions.SecurityManage);
         api.MapPut("/integrations/{id:guid}", (Guid id, OfficeAI.Application.Integrations.SaveIntegrationRequest r, OfficeAI.Application.Integrations.IntegrationService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(Permissions.SecurityManage);
+        // Personal email and calendar settings: every signed-in person changes only their own.
+        api.MapGet("/me/delivery-settings", (EmailCalendarService s, CancellationToken ct) => s.GetAsync(ct)).RequireAuthorization();
+        api.MapPut("/me/email-notifications", (SetEmailNotificationsRequest r, EmailCalendarService s, CancellationToken ct) => s.SetEmailNotificationsAsync(r, ct)).RequireAuthorization();
+        api.MapPost("/me/email-test", (EmailCalendarService s, CancellationToken ct) => s.SendTestAsync(ct)).RequireAuthorization();
+        api.MapPost("/me/calendar-feed", (HttpContext http, EmailCalendarService s, CancellationToken ct) =>
+            s.CreateFeedAsync($"{http.Request.Scheme}://{http.Request.Host}", ct)).RequireAuthorization();
+        api.MapDelete("/me/calendar-feed", (EmailCalendarService s, CancellationToken ct) => s.RevokeFeedAsync(ct)).RequireAuthorization();
+        // The secret in the link is the credential, so calendar apps can subscribe without signing in.
+        api.MapGet("/calendar/feed/{token}.ics", async (string token, EmailCalendarService s, CancellationToken ct) =>
+            await s.FeedAsync(token, ct) is { } ics ? Results.Text(ics, Ics.ContentType) : Results.NotFound()).AllowAnonymous().RequireRateLimiting("calendar");
+        api.MapGet("/meetings/{id:guid}/ics", async (Guid id, EmailCalendarService s, CancellationToken ct) =>
+        {
+            var file = await s.MeetingIcsAsync(id, ct);
+            return Results.File(file.Content, Ics.ContentType, file.FileName);
+        }).RequirePermission(Permissions.OrgRead);
         api.MapGet("/integrations/{id:guid}/deliveries", (Guid id, OfficeAI.Application.Integrations.IntegrationService s, CancellationToken ct) => s.DeliveriesAsync(id, ct)).RequirePermission(Permissions.SecurityManage);
     }
 

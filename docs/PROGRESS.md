@@ -280,3 +280,19 @@ Fix tasks are ordinary tasks, not part of a workflow, so the engine does not sta
 | “Try again” button with an optional note in the run drawer and next to “Run with AI” on the task's latest run | done (verified in browser 2026-10-20: failed run → note saved, attempt #2 on Gemini succeeded, task moved to InReview) |
 
 215 tests.
+
+## Phase 20 — Email notifications and calendar ✅ (2026-10-20)
+
+| Item | Status |
+| --- | --- |
+| `UserPreference` (per user: `EmailNotificationsSince`, calendar token hash) and `EmailDelivery` (one per notification, Sent/Failed, attempts) | done |
+| `IEmailSender` (MailKit SMTP; `Email:Host/Port/Security/Username/Password/FromAddress`, compose `EMAIL_*`); not configured = nothing is sent | done |
+| `EmailDispatcher` + `EmailWorker` (every 20 s): emails each opted-in person their notifications created after opting in and within the last day; meeting invites attach an iCalendar REQUEST; failures retried up to 3 times | done |
+| `/api/me/delivery-settings`, `PUT /me/email-notifications`, `POST /me/email-test`, `POST/DELETE /me/calendar-feed` (own settings only) | done |
+| `GET /api/calendar/feed/{token}.ics` (anonymous, rate-limited, token = 32 random bytes, SHA-256 stored): my meetings −60 d…+365 d and due dates of open tasks assigned to me; `GET /meetings/{id}/ics` | done |
+| “My settings” page (nav, all users), “Add to calendar (.ics)” on a meeting | done (verified in browser: page, link creation, feed and meeting .ics content) |
+| Fixed: API process now runs with invariant culture (a Thai-culture host wrote Buddhist-era years into server text); a workflow test only passed under Thai collation and now parses the JSON | done |
+
+Open: an SMTP account (waiting on the CEO). On localhost the calendar link only works for calendar apps on the same computer; online Google/Outlook need the deployed address (`Integrations:ApiBaseUrl`).
+
+220 tests.
