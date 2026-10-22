@@ -10,7 +10,8 @@ using OfficeAI.Domain.Workflows;
 namespace OfficeAI.Application.Agents;
 
 /// <param name="KeySource">"settings" (saved on the AI settings page), "environment" (server .env) or null.</param>
-public record ProviderDto(string Name, bool IsAvailable, bool IsSimulated, string? KeySource = null, string? KeyLast4 = null);
+/// <param name="IsFlatRate">Runs on our own hardware or a flat-rate plan (Ollama, Claude Code): no API key is needed.</param>
+public record ProviderDto(string Name, bool IsAvailable, bool IsSimulated, string? KeySource = null, string? KeyLast4 = null, bool IsFlatRate = false);
 public record SetProviderKeyRequest(string ApiKey);
 public record VerifyProviderDto(bool Ok, string? Problem);
 public record CreateAiModelRequest(string Provider, string ModelId, string DisplayName, ModelTier Tier, decimal InputUsdPerMTok, decimal OutputUsdPerMTok,
@@ -52,7 +53,7 @@ public class AgentAdminService(IAppDbContext db, AiProviderRegistry providers, T
         {
             var last4 = p.IsSimulated ? null : credentials.Last4(p.Name);
             var source = p.IsSimulated ? null : last4 is not null ? "settings" : p.IsAvailable ? "environment" : null;
-            return new ProviderDto(p.Name, p.IsAvailable, p.IsSimulated, source, last4);
+            return new ProviderDto(p.Name, p.IsAvailable, p.IsSimulated, source, last4, p.IsFlatRate);
         }).ToList();
 
     private IAiProvider RealProvider(string name)

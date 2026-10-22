@@ -37,6 +37,7 @@ public class DailyReportTests(ApiFixture fx)
         Assert.Equal(before.Deliverables + 1, report.Deliverables);
         Assert.Contains("## ✅ งานที่เสร็จ", report.Text);
         Assert.Contains("## 📦 ผลงานที่ AI ส่งมอบ", report.Text);
+        Assert.DoesNotContain("InReview", report.Text); // open tasks use the task board's Thai status names
 
         using (ActingAs.Use(new ActingIdentity(null, "Daily report", IsAgent: false, "test")))
         {

@@ -401,11 +401,44 @@ function Conversation({ channel, canManage, onBack, onChanged }: { channel: Chat
   );
 }
 
-/** Message text with the @mentions of known people highlighted. */
+/**
+ * Message text with light Markdown (AI replies and the daily report use it): "# "–"### " headings, "- " / "* " bullets,
+ * **bold** and `code`, plus the @mentions of known people highlighted. Built from React elements only, never HTML.
+ */
 function MentionText({ body, names }: { body: string; names: string[] }) {
-  if (names.length === 0) return <>{body}</>;
+  return (
+    <>
+      {body.split("\n").map((line, i) => {
+        const heading = /^(#{1,3}) (.*)$/.exec(line);
+        if (heading)
+          return <Box key={i} component="span" sx={{ display: "block", fontWeight: 700, fontSize: heading[1].length === 1 ? "1.05em" : "1em", mt: i > 0 ? 0.5 : 0 }}><Inline text={heading[2]} names={names} /></Box>;
+        const bullet = /^\s*[-*] (.*)$/.exec(line);
+        if (bullet)
+          return <Box key={i} component="span" sx={{ display: "block", pl: 2, textIndent: "-0.9em" }}>•&nbsp;<Inline text={bullet[1]} names={names} /></Box>;
+        return <Box key={i} component="span" sx={{ display: "block", minHeight: "1.43em" }}><Inline text={line} names={names} /></Box>;
+      })}
+    </>
+  );
+}
+
+/** One line: **bold** and `code` spans, @mentions inside the plain text. */
+function Inline({ text, names }: { text: string; names: string[] }) {
+  return (
+    <>
+      {text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
+        if (part.length > 4 && part.startsWith("**") && part.endsWith("**")) return <strong key={i}><Mentions text={part.slice(2, -2)} names={names} /></strong>;
+        if (part.length > 2 && part.startsWith("`") && part.endsWith("`"))
+          return <Box key={i} component="code" sx={{ fontFamily: "monospace", fontSize: "0.9em", bgcolor: "action.hover", borderRadius: 0.5, px: 0.5 }}>{part.slice(1, -1)}</Box>;
+        return <Mentions key={i} text={part} names={names} />;
+      })}
+    </>
+  );
+}
+
+function Mentions({ text, names }: { text: string; names: string[] }) {
+  if (names.length === 0) return <>{text}</>;
   const escaped = [...names].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const parts = body.split(new RegExp(`(@(?:${escaped.join("|")}))`, "g"));
+  const parts = text.split(new RegExp(`(@(?:${escaped.join("|")}))`, "g"));
   return (
     <>
       {parts.map((part, i) => (part.startsWith("@") && names.includes(part.slice(1))

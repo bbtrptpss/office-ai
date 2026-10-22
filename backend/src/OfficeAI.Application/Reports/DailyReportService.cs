@@ -131,7 +131,7 @@ public class DailyReportService(IAppDbContext db, IRealtimeNotifier notifier, Ti
                 .Concat(failedRuns.Select(r => $"{Who(r.EmployeeId)} ทำ \"{Clip(failedTitles.GetValueOrDefault(r.TaskId, "?"), 60)}\" ไม่สำเร็จ: {Clip(r.Error ?? r.Status.ToString(), 100)}")).ToList());
         }
         if (open.Count > 0)
-            sb.AppendLine().AppendLine("## 🔜 งานที่ยังเปิดอยู่").AppendLine(string.Join(" · ", open.OrderBy(o => o.Key).Select(o => $"{o.Key} {o.Count}")));
+            sb.AppendLine().AppendLine("## 🔜 งานที่ยังเปิดอยู่").AppendLine(string.Join(" · ", open.OrderBy(o => o.Key).Select(o => $"{ChatCommandService.StatusText(o.Key)} {o.Count}")));
 
         var text = sb.ToString().TrimEnd();
         if (text.Length > ChatService.MaxBody) text = text[..(ChatService.MaxBody - 40)] + "\n…(ตัดเพราะยาวเกิน ดูรายละเอียดในระบบ)";

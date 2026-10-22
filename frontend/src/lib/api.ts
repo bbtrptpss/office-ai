@@ -209,6 +209,8 @@ export interface AiProvider {
   /** "settings" (saved on the AI settings page), "environment" (server .env) or null. */
   keySource: "settings" | "environment" | null;
   keyLast4: string | null;
+  /** Our own hardware or a flat-rate plan (Ollama, Claude Code): no API key needed, models may be free. */
+  isFlatRate: boolean;
 }
 
 export interface AiModel {

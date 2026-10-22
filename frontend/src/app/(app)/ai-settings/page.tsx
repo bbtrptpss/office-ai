@@ -131,15 +131,17 @@ function ProviderKey({ provider, canManage, onChanged }: { provider: AiProvider;
     onChanged();
   }
 
-  const source = provider.keySource === "settings" ? `${t.keyFromSettings} ••••${provider.keyLast4}`
+  const source = provider.isFlatRate ? (provider.isAvailable ? t.noKeyNeeded : t.notConnected)
+    : provider.keySource === "settings" ? `${t.keyFromSettings} ••••${provider.keyLast4}`
     : provider.keySource === "environment" ? t.keyFromEnv : t.notConfigured;
+  const works = provider.isFlatRate ? t.connectionWorks : t.keyWorks;
 
   return (
     <Stack spacing={1} sx={{ mt: 1.5 }}>
-      <Typography variant="body2" color="text.secondary">🔑 {source}</Typography>
+      <Typography variant="body2" color="text.secondary">{provider.isFlatRate ? "🖥️" : "🔑"} {source}</Typography>
       {canManage && (
         <>
-          <Stack direction="row" spacing={1}>
+          {!provider.isFlatRate && <Stack direction="row" spacing={1}>
             <TextField size="small" fullWidth type="password" autoComplete="off" label={provider.keySource === "settings" ? t.replaceKey : t.apiKey}
               value={value} onChange={(e) => setValue(e.target.value)} slotProps={{ htmlInput: { "data-lpignore": "true", spellCheck: false } }} />
             <Button variant="contained" disabled={busy || value.trim().length < 10} onClick={() => run(async () => {
@@ -148,11 +150,11 @@ function ProviderKey({ provider, canManage, onChanged }: { provider: AiProvider;
               const check = await api.post<{ ok: boolean; problem: string | null }>(`/api/ai/providers/${provider.name}/verify`);
               setResult(check.ok ? { ok: true, text: t.keyWorks } : { ok: false, text: `${t.keySavedButFailed}: ${check.problem}` });
             })}>{t.save}</Button>
-          </Stack>
+          </Stack>}
           <Stack direction="row" spacing={1}>
             <Button size="small" disabled={busy || !provider.isAvailable} onClick={() => run(async () => {
               const check = await api.post<{ ok: boolean; problem: string | null }>(`/api/ai/providers/${provider.name}/verify`);
-              setResult(check.ok ? { ok: true, text: t.keyWorks } : { ok: false, text: check.problem ?? "" });
+              setResult(check.ok ? { ok: true, text: works } : { ok: false, text: check.problem ?? "" });
             })}>{t.testKey}</Button>
             {provider.keySource === "settings" && (
               <Button size="small" color="error" disabled={busy} onClick={() => run(async () => { await api.del(`/api/ai/providers/${provider.name}/key`); })}>
