@@ -81,6 +81,11 @@ public static class DependencyInjection
         services.AddHttpClient(AnthropicProvider.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
         services.AddSingleton<IAiProvider, OpenAiProvider>();
         services.AddSingleton<IAiProvider, GeminiProvider>();
+        services.Configure<OllamaOptions>(config.GetSection("AiProviders:Ollama"));
+        services.AddHttpClient(OllamaProvider.HttpClientName, c => c.Timeout = Timeout.InfiniteTimeSpan);
+        services.AddSingleton<IAiProvider, OllamaProvider>();
+        services.AddHttpClient(ClaudeCodeProvider.HttpClientName, c => c.Timeout = Timeout.InfiniteTimeSpan);
+        services.AddSingleton<IAiProvider, ClaudeCodeProvider>(); // uses the ClaudeBridge options configured below
         services.AddSingleton<AiProviderRegistry>();
 
         services.AddSingleton<IAgentTool, TaskContextTool>();
@@ -149,6 +154,8 @@ public static class DependencyInjection
         services.AddScoped<CodeService>();
         services.AddScoped<OfficeAI.Application.Reports.ReportsService>();
         services.AddScoped<OfficeAI.Application.Reports.CloseoutService>();
+        services.Configure<OfficeAI.Application.Reports.DailyReportOptions>(config.GetSection("Reports:Daily"));
+        services.AddScoped<OfficeAI.Application.Reports.DailyReportService>();
         services.AddScoped<OfficeAI.Application.Knowledge.KnowledgeService>();
         services.AddScoped<OfficeAI.Application.Communication.ChatService>();
         services.AddScoped<OfficeAI.Application.Communication.AnnouncementService>();

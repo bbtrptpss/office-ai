@@ -1,5 +1,6 @@
 // Lets the Office AI API (in Docker) ask the Claude Code CLI that is signed in on this Windows machine.
-// Claude Code runs with every tool and MCP server disabled, in an empty folder, one question at a time; the API carries out the <action> blocks it writes.
+// Claude Code runs with every tool and MCP server disabled, in an empty folder, one question at a time; the API carries out the <action> blocks
+// (dashboard chat) or <tool_call> blocks (AI employees on the "claude-code" provider) it writes.
 // POST /run is the dashboard terminal: one PowerShell command in the project folder (the API sends it for the CEO only).
 //   node scripts/windows/claude-bridge.mjs        (start-office-ai.ps1 starts it; token from .env CLAUDE_BRIDGE_TOKEN)
 import { createServer } from "node:http";
@@ -34,12 +35,16 @@ const sameToken = (given) => {
 let queue = Promise.resolve();
 const serialized = (job) => (queue = queue.then(job, job));
 
-function ask({ prompt, system, sessionId }) {
+// Claude Code model aliases or ids the API may ask for (AI employees on the "claude-code" provider); validated before it reaches the shell.
+const MODEL = /^[a-z0-9][a-z0-9.-]{0,60}$/i;
+
+function ask({ prompt, system, sessionId, model }) {
   return new Promise((resolve, reject) => {
     const systemFile = join(work, `system-${randomUUID()}.txt`);
     writeFileSync(systemFile, system ?? "", "utf8");
     const args = ["-p", "--output-format", "json", "--tools", '""', "--strict-mcp-config", "--system-prompt-file", systemFile];
     if (sessionId) args.push("--resume", sessionId);
+    if (model) args.push("--model", model);
     // claude is an npm shim (.cmd) on Windows, so it needs a shell; every argument here is fixed or validated.
     const child = spawn("claude", args, { cwd: work, shell: true, windowsHide: true });
     let out = "", err = "";
@@ -53,7 +58,12 @@ function ask({ prompt, system, sessionId }) {
       try {
         const json = JSON.parse(out.trim().split(/\r?\n/).pop());
         if (json.is_error) return reject(new Error(json.result || "Claude returned an error."));
-        resolve({ reply: json.result ?? "", sessionId: json.session_id, costUsd: json.total_cost_usd ?? 0 });
+        const u = json.usage ?? {};
+        resolve({
+          reply: json.result ?? "", sessionId: json.session_id, costUsd: json.total_cost_usd ?? 0,
+          inputTokens: u.input_tokens ?? 0, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0,
+          outputTokens: u.output_tokens ?? 0,
+        });
       } catch {
         reject(new Error((err || out || `claude exited with ${code}`).slice(0, 500)));
       }
@@ -169,6 +179,7 @@ const server = createServer((req, res) => {
     try { input = JSON.parse(body); } catch { return send(400, { error: "invalid json" }); }
     if (typeof input.prompt !== "string" || !input.prompt.trim()) return send(400, { error: "prompt is required" });
     if (input.sessionId && !/^[0-9a-f-]{36}$/i.test(input.sessionId)) return send(400, { error: "invalid sessionId" });
+    if (input.model != null && (typeof input.model !== "string" || !MODEL.test(input.model))) return send(400, { error: "invalid model" });
     try {
       send(200, await serialized(() => ask(input)));
     } catch (e) {

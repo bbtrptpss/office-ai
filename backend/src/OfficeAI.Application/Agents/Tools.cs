@@ -236,6 +236,12 @@ public sealed class RequestReviewTool : IAgentTool
 
     public async Task<ToolResult> ExecuteAsync(ToolContext ctx, JsonElement input, CancellationToken ct)
     {
+        // A task that delegated work is only finished once that work is done; it is resumed then.
+        var waitingFor = await ctx.Db.TaskDependencies.Where(d => d.TaskId == ctx.TaskId)
+            .Join(ctx.Db.Tasks, d => d.DependsOnTaskId, t => t.Id, (_, t) => t)
+            .Where(t => t.Status != WorkTaskStatus.Done && t.Status != WorkTaskStatus.Cancelled).Select(t => t.Title).ToListAsync(ct);
+        if (waitingFor.Count > 0)
+            return ToolResult.Fail($"Waiting for: {string.Join("; ", waitingFor)}. End your turn now; you will be resumed when they are done.");
         if (!await ctx.Db.Deliverables.AnyAsync(d => d.TaskId == ctx.TaskId && d.RunId == ctx.RunId, ct))
             return ToolResult.Fail("Submit a deliverable with deliverable.submit before requesting review.");
         var task = await ctx.Db.Tasks.FirstAsync(t => t.Id == ctx.TaskId, ct);

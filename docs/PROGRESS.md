@@ -298,3 +298,19 @@ Open: an SMTP account (waiting on the CEO). On localhost the calendar link only 
 220 tests.
 
 Browser check 2026-10-20 (CEO, real data): Defects, Release, Customer delivery and Repository tabs of AI-DEMO open with their empty states and no console errors; Update log shows v0.24.0. Not exercised with new records (that would add test data to the live company); their API paths are covered by the automated tests.
+
+## Phase 21 — Free AI providers and the daily report ✅ (2026-10-22)
+
+| Item | Status |
+| --- | --- |
+| `OllamaProvider` (OpenAI-compatible API, `AiProviders:Ollama:BaseUrl`, compose `OLLAMA_URL`, default `http://host.docker.internal:11434/v1`, 900 s timeout) | done |
+| `ClaudeCodeProvider`: AI employees on the Claude Code CLI through `claude-bridge.mjs` (company tools described in the prompt, `<tool_call>` blocks, whole conversation per turn, validated `--model`, token usage returned) | done |
+| `IAiProvider.IsFlatRate`: models of Ollama / Claude Code may have zero prices | done |
+| `DailyReportService` + `DailyReportWorker`: yesterday's tasks done, deliverables, runs/failures, pending approvals and cost, built from records only (no model call), posted to the company channel after midnight `Asia/Bangkok`; `GET /api/reports/daily?date=` | done |
+| Chat replies get up to 3 validated knowledge entries matching the question; knowledge search matches tags contained in the query (Thai has no word spaces); excerpts up to 900 chars | done |
+| A run ends once the task is handed on (delegate, request review, report blocked, plan/review submit); request review fails while delegated sub-tasks are open | done |
+| `TrainingPromptDumpTests`: writes the agents' real requests as OpenAI-style JSON when `OFFICEAI_DUMP_DIR` is set (fine-tuning data, `D:\FreeAi\train`) | done |
+
+Open: fine-tuned Qwen3-8B (training in `D:\FreeAi\train`) → GGUF → Ollama → evaluate → add in AI settings. Not yet checked in the browser.
+
+231 tests.

@@ -101,6 +101,87 @@ public class ProviderAdapterTests
         if (Environment.GetEnvironmentVariable("GEMINI_API_KEY") is null) Assert.False(Gemini(HttpStatusCode.OK, "{}", key: null).Item1.IsAvailable);
     }
 
+    // ---------------- Ollama ----------------
+
+    [Fact]
+    public async Task Ollama_needs_no_key_and_sends_max_tokens()
+    {
+        var handler = new FakeHandler(HttpStatusCode.OK, """
+            {"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"done"}}],"usage":{"prompt_tokens":50,"completion_tokens":5}}
+            """);
+        var provider = new OllamaProvider(new Factory(handler), Options.Create(new OllamaOptions { BaseUrl = "http://ollama.test:11434/v1/" }));
+        Assert.True(provider.IsAvailable);
+        Assert.True(((IAiProvider)provider).IsFlatRate);
+
+        var response = await provider.CompleteAsync(Conversation(), CancellationToken.None);
+
+        Assert.Equal("http://ollama.test:11434/v1/chat/completions", handler.Request!.RequestUri!.ToString());
+        Assert.Null(handler.Request.Headers.Authorization);
+        using var sent = JsonDocument.Parse(handler.RequestBody!);
+        Assert.Equal(1000, sent.RootElement.GetProperty("max_tokens").GetInt32());
+        Assert.False(sent.RootElement.TryGetProperty("max_completion_tokens", out _));
+        Assert.Equal("done", Assert.IsType<AiText>(Assert.Single(response.Content)).Text);
+        Assert.Equal(AiStopReason.EndTurn, response.StopReason);
+
+        Assert.False(new OllamaProvider(new Factory(handler), Options.Create(new OllamaOptions())).IsAvailable);
+    }
+
+    // ---------------- Claude Code (via the bridge) ----------------
+
+    private static (ClaudeCodeProvider, FakeHandler) ClaudeCode(string reply) =>
+        ClaudeCodeWith(new FakeHandler(HttpStatusCode.OK, JsonSerializer.Serialize(new { reply, sessionId = Guid.NewGuid(), costUsd = 0.01, inputTokens = 300, outputTokens = 40, cacheReadTokens = 1000, cacheWriteTokens = 5 })));
+
+    private static (ClaudeCodeProvider, FakeHandler) ClaudeCodeWith(FakeHandler handler) =>
+        (new ClaudeCodeProvider(new Factory(handler), Options.Create(new ClaudeBridgeOptions { Url = "http://bridge.test:8765", Token = new string('t', 32) })), handler);
+
+    [Fact]
+    public async Task Claude_code_describes_the_tools_replays_the_conversation_and_reads_tool_call_blocks()
+    {
+        var (provider, handler) = ClaudeCode("""
+            ค้นต่ออีกครั้งครับ
+            <tool_call>
+            {"name": "knowledge_search", "arguments": {"query": "api"}}
+            </tool_call>
+            """);
+        Assert.True(((IAiProvider)provider).IsFlatRate);
+        var response = await provider.CompleteAsync(Conversation() with { ModelId = "sonnet" }, CancellationToken.None);
+
+        Assert.Equal("http://bridge.test:8765/ask", handler.Request!.RequestUri!.ToString());
+        Assert.Equal(new string('t', 32), handler.Request.Headers.GetValues("x-bridge-token").Single());
+        using var sent = JsonDocument.Parse(handler.RequestBody!);
+        Assert.Equal("sonnet", sent.RootElement.GetProperty("model").GetString());
+        var system = sent.RootElement.GetProperty("system").GetString()!;
+        Assert.StartsWith("You are a test agent.", system);
+        Assert.Contains("\"name\":\"knowledge_search\"", system);
+        Assert.Contains("<tool_call>", system);
+        var prompt = sent.RootElement.GetProperty("prompt").GetString()!;
+        Assert.Contains("Find the spec", prompt);
+        Assert.Contains("\"name\":\"knowledge_search\",\"arguments\":{\"query\":\"spec\"}", prompt); // the earlier call is replayed
+        Assert.Contains("[tool result call_1]", prompt);
+
+        Assert.Equal(AiStopReason.ToolUse, response.StopReason);
+        Assert.Equal("ค้นต่ออีกครั้งครับ", Assert.IsType<AiText>(response.Content[0]).Text);
+        var call = Assert.IsType<AiToolCall>(response.Content[1]);
+        Assert.Equal("knowledge_search", call.Name);
+        Assert.Equal("api", call.Input.GetProperty("query").GetString());
+        Assert.Equal(new AiUsage(300, 40, 1000, 5), response.Usage);
+    }
+
+    [Fact]
+    public async Task Claude_code_without_blocks_ends_the_turn_and_a_broken_block_is_not_lost()
+    {
+        var (done, _) = ClaudeCode("งานเสร็จแล้วครับ");
+        var end = await done.CompleteAsync(Conversation(), CancellationToken.None);
+        Assert.Equal(AiStopReason.EndTurn, end.StopReason);
+        Assert.Equal("งานเสร็จแล้วครับ", Assert.IsType<AiText>(Assert.Single(end.Content)).Text);
+
+        var (broken, _) = ClaudeCode("<tool_call>{not json</tool_call>");
+        var bad = await broken.CompleteAsync(Conversation(), CancellationToken.None);
+        Assert.Equal("invalid_tool_call", Assert.IsType<AiToolCall>(Assert.Single(bad.Content)).Name); // the executor answers it with an error
+
+        Assert.False(new ClaudeCodeProvider(new Factory(new FakeHandler(HttpStatusCode.OK, "{}")), Options.Create(new ClaudeBridgeOptions())).IsAvailable);
+    }
+
     // ---------------- Gemini ----------------
 
     private static (GeminiProvider, FakeHandler) Gemini(HttpStatusCode status, string body, string? key = "g-test")

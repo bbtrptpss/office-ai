@@ -42,6 +42,7 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("AiProviders:Simulated:Enabled", "true");
             b.UseSetting("AiProviders:Anthropic:ApiKey", "");
             b.UseSetting("AiProviders:OpenAI:BaseUrl", "http://127.0.0.1:9/v1"); // key checks fail fast, never reach the internet
+            b.UseSetting("AiProviders:Ollama:BaseUrl", Environment.GetEnvironmentVariable("OFFICEAI_LIVE_OLLAMA") ?? ""); // live tests only
             b.UseSetting("Workflow:AutoTick", "false"); // tests drive the engine explicitly
             b.UseSetting("Repositories:Root", RepoRoot);
             b.UseSetting("Repositories:AllowLocalRemotes", "true"); // tests use local bare repositories as "GitHub"
@@ -52,6 +53,7 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("Integrations:AllowHttp", "true");
             b.UseSetting("Integrations:AppBaseUrl", "https://office.test");
             b.UseSetting("Email:AutoDispatch", "false"); // tests drive the email dispatcher explicitly
+            b.UseSetting("Reports:Daily:Enabled", "false"); // tests publish daily reports explicitly
             b.ConfigureTestServices(s =>
             {
                 s.AddSingleton<IAiProvider>(Scripted);
