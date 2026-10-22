@@ -56,6 +56,9 @@ public interface IAiProvider
     /// <summary>Configured and allowed to run (e.g. an API key is present).</summary>
     bool IsAvailable { get; }
 
+    /// <summary>Not billed per token (our own hardware such as Ollama, or a flat-rate plan such as Claude Code): its models may be listed with zero prices.</summary>
+    bool IsFlatRate => false;
+
     Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct);
 
     /// <summary>Checks the configured key with a free call (no tokens). Returns null when it works, otherwise the problem.</summary>

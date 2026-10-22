@@ -51,7 +51,7 @@ public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, Re
 
         try
         {
-            var request = new AiRequest(config.ModelId, SystemPrompt(employee, channel) + await CompanyFactsAsync(ct),
+            var request = new AiRequest(config.ModelId, SystemPrompt(employee, channel) + await CompanyFactsAsync(ct) + await KnowledgeAsync(reply, channel, ct),
                 [new AiMessage(AiRole.User, [new AiText(await TranscriptAsync(reply, employee, ct))])], [],
                 Math.Min(MaxReplyTokens, config.MaxTokensPerCall), Effort.Low);
             var response = await CallAsync(provider, request, ct);
@@ -118,6 +118,24 @@ public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, Re
     private async Task<string> CompanyFactsAsync(CancellationToken ct) =>
         "\nCompany snapshot (live data from the system; use it when asked about progress, work or priorities, and say when it does not cover the question):\n"
         + await AssistantService.SnapshotAsync(db, ct);
+
+    public const int KnowledgeEntries = 3;
+
+    /// <summary>
+    /// Validated company knowledge matching the question (policies, laws, SLAs), so a chat answer can rest on it.
+    /// Chat has no tools, so the search is done here with the same matching the agents' knowledge_search uses.
+    /// </summary>
+    private async Task<string> KnowledgeAsync(ChatReply reply, ChatChannel channel, CancellationToken ct)
+    {
+        var question = await db.ChatMessages.AsNoTracking().Where(m => m.Id == reply.TriggerMessageId).Select(m => m.Body).FirstAsync(ct);
+        var hits = await Knowledge.KnowledgeService.SearchQuery(db, question, channel.ProjectId)
+            .Where(k => k.Status == Domain.Knowledge.KnowledgeStatus.Validated).Take(KnowledgeEntries).ToListAsync(ct);
+        if (hits.Count == 0) return "";
+        var sb = new StringBuilder("\nCompany knowledge that may answer the question (validated; answer from it and name the topic; if it does not cover the question, say so):\n");
+        foreach (var k in hits)
+            sb.Append("\n### ").AppendLine(k.Title).AppendLine(k.Body.Length > 1500 ? k.Body[..1500] + "…" : k.Body);
+        return sb.ToString();
+    }
 
     /// <summary>The recent conversation in the channel, oldest first, ending with the message that mentioned this employee.</summary>
     private async Task<string> TranscriptAsync(ChatReply reply, Domain.Organization.EmployeeProfile employee, CancellationToken ct)

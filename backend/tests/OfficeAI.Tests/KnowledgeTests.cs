@@ -78,6 +78,17 @@ public class KnowledgeTests(ApiFixture fx)
     }
 
     [Fact]
+    public async Task A_tag_inside_a_thai_question_finds_the_entry()
+    {
+        var ceo = await fx.CeoAsync();
+        var tag = $"ลาพิเศษ{Guid.NewGuid():N}"[..14];
+        var entry = await ceo.PostAsync<KnowledgeDto>("/api/knowledge", new { kind = "Policy", title = "สิทธิลาพิเศษ", body = "ลาได้ 3 วันต่อปี", tags = new[] { tag } });
+
+        var (_, task, _) = await AgentTaskAsync("BACKEND", [Search($"พนักงาน{tag}ได้กี่วัน")]);
+        Assert.Contains(entry.Id.ToString(), Assert.Single((await RunAsync(ceo, task)).ToolExecutions).Output);
+    }
+
+    [Fact]
     public async Task Project_knowledge_stays_inside_its_project()
     {
         var ceo = await fx.CeoAsync();

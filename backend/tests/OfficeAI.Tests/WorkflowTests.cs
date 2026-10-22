@@ -459,7 +459,8 @@ public class WorkflowTests(ApiFixture fx)
     {
         var ceo = await fx.CeoAsync();
         var leadModel = await ScriptedModelAsync(ScriptedProvider.Sequence(
-            ScriptedProvider.Call("task_delegate", new { title = "Write SQL schema", description = "Tables for bookings", requiredSkills = "postgresql" })));
+            ScriptedProvider.Call("task_delegate", new { title = "Write SQL schema", description = "Tables for bookings", requiredSkills = "postgresql" }),
+            ScriptedProvider.Call("task_delegate", new { title = "Duplicate", description = "A small model that does not stop" })));
         var lead = await NewAgentAsync(ceo, "ARCH", ScriptedProvider.ProviderName, leadModel);
         var dba = await NewAgentAsync(ceo, "DBENG");
         var (_, workflow, project) = await ApprovedOneTaskWorkflowAsync(lead);
@@ -471,6 +472,8 @@ public class WorkflowTests(ApiFixture fx)
         var parent = tasks.Single(t => t.Title == "Only task");
         var child = tasks.Single(t => t.Title == "Write SQL schema");
         Assert.Contains(child.Id, parent.DependsOn);
+        Assert.DoesNotContain(tasks, t => t.Title == "Duplicate"); // the run ended right after delegating
+        Assert.Equal("delegated", Assert.Single(await ceo.GetAsync<List<AgentRunDto>>($"/api/agent-runs?taskId={parent.Id}")).StopReason);
 
         await TickAsync(); // child assigned to the DBA (skill match) and started; parent waits
         await WaitForIdleAsync();
@@ -478,9 +481,15 @@ public class WorkflowTests(ApiFixture fx)
         Assert.Equal(dba.Id, Assert.Single(child.Assignees).EmployeeId);
         Assert.Single(await ceo.GetAsync<List<AgentRunDto>>($"/api/agent-runs?taskId={parent.Id}"));
 
-        // Depth limit: a task already at the maximum depth cannot delegate.
         await using var scope = fx.Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // The parent cannot go to review while its sub-task is open.
+        var review = await new RequestReviewTool().ExecuteAsync(
+            new ToolContext(Guid.NewGuid(), parent.Id, project.Id, lead.Id, false, db, TimeProvider.System), JsonSerializer.SerializeToElement(new { }), default);
+        Assert.False(review.Success);
+        Assert.Contains("Write SQL schema", review.Output);
+
+        // Depth limit: a task already at the maximum depth cannot delegate.
         var deep = new WorkTask { ProjectId = project.Id, WorkflowExecutionId = workflow.Id, Title = "Deep", DelegationDepth = 2 };
         db.Tasks.Add(deep);
         await db.SaveChangesAsync();
@@ -489,6 +498,80 @@ public class WorkflowTests(ApiFixture fx)
             JsonSerializer.SerializeToElement(new { title = "Deeper", description = "x" }), default);
         Assert.False(result.Success);
         Assert.Contains("depth", result.Output);
+        await ceo.PostAsync<WorkflowDto>($"/api/workflows/{workflow.Id}/cancel", new { });
+    }
+
+    /// <summary>
+    /// Live check against a real local model: set OFFICEAI_LIVE_OLLAMA (e.g. http://localhost:11434/v1) to run it, otherwise it does nothing.
+    /// The support agent reads a customer's bug report and should open a sub-task for a developer. The transcript goes to OFFICEAI_LIVE_LOG.
+    /// </summary>
+    [Fact]
+    public async Task Live_support_agent_on_ollama_delegates_a_bug_to_developers()
+    {
+        if (Environment.GetEnvironmentVariable("OFFICEAI_LIVE_OLLAMA") is null) return;
+        var ceo = await fx.CeoAsync();
+        await ceo.PostAsJsonAsync("/api/ai/models", new { provider = "ollama", modelId = "qwen3:8b", displayName = "Qwen3 8B", tier = "Standard", inputUsdPerMTok = 0m, outputUsdPerMTok = 0m }, ApiFixture.Json);
+        (await ceo.PostAsJsonAsync("/api/knowledge", new
+        {
+            kind = "Standard", title = "ซัพพอร์ต: การเปิดงานให้ทีมพัฒนา (task.delegate)",
+            body = "เมื่อยืนยันแล้วว่าเป็นบั๊กที่ต้องแก้โค้ด และมีข้อมูลครบ ให้ใช้ task.delegate สร้างงานย่อย: title = ระดับ + ระบบ + อาการ เช่น \"[P2] ระบบจองคิว: กดยืนยันแล้วขึ้น error 500\"; " +
+                   "description = อาการ ผลที่ควรเป็น ขั้นตอนทำซ้ำ วันเวลา จำนวนผู้ใช้ที่กระทบ; acceptanceCriteria = แก้แล้วต้องเป็นอย่างไร; requiredSkills เช่น backend, frontend",
+            tags = new[] { "บั๊ก", "bug", "error", "แก้บั๊ก", "ทีมพัฒนา", "เปิดงาน" },
+        }, ApiFixture.Json)).EnsureSuccessStatusCode();
+
+        await using (var scope = fx.Factory.Services.CreateAsyncScope())
+        {
+            // Same instructions as the Support role in production.
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.RoleDefinitions.Where(r => r.Code == "SUPPORT").ExecuteUpdateAsync(s => s.SetProperty(r => r.SystemInstructions,
+                "Work in the customer's language (usually Thai). For every customer issue:\n" +
+                "1. Search the support knowledge with knowledge_search first (SLA, severity P1–P4, escalation, warranty, reply templates) and follow it.\n" +
+                "2. Classify the issue as P1–P4 and put the level at the start of any sub-task title, e.g. \"[P2] ...\".\n" +
+                "3. If it is a bug that needs code changes, open a sub-task with task_delegate that carries every detail the customer gave (symptom, steps, time, number of users affected, devices); then end your turn and wait for it.\n" +
+                "4. Write the customer reply as your deliverable: polite, no internal tool or role names, no invented links, no promises of dates, prices or free fixes."));
+        }
+        var support = await NewAgentAsync(ceo, "SUPPORT", "ollama", "qwen3:8b");
+        var config = await ceo.GetAsync<AgentConfigDto>($"/api/agents/{support.Id}/config");
+        (await ceo.PutAsJsonAsync($"/api/agents/{support.Id}/tools", new { tools = config.Tools.Union(["task.delegate", "knowledge.search"]).ToList() }, ApiFixture.Json)).EnsureSuccessStatusCode();
+        var developer = await NewAgentAsync(ceo, "BACKEND");
+        var plan = JsonSerializer.Serialize(new
+        {
+            summary = "customer issue",
+            tasks = new[]
+            {
+                new
+                {
+                    key = "ticket", title = "ลูกค้าแจ้งปัญหา: ระบบจองคิวกดยืนยันแล้ว error",
+                    description = "ข้อความจากลูกค้า (คุณสมศรี, คลินิกฟันดี): ตั้งแต่เช้าวันนี้ 09:15 ผู้ป่วยกดปุ่ม 'ยืนยันการจอง' ในหน้าจองคิวแล้วขึ้น 'Error 500' ทุกครั้ง " +
+                                  "ทั้งบน Chrome และมือถือ ผู้ป่วยจองไม่ได้เลยประมาณ 40 คนแล้ว ส่วนหน้าดูตารางยังใช้ได้ปกติ ขั้นตอน: เลือกแพทย์ > เลือกเวลา > กดยืนยันการจอง > Error 500 แนบภาพหน้าจอมาแล้ว",
+                    acceptanceCriteria = "จัดระดับปัญหา ส่งต่อให้ทีมพัฒนาแก้ และสรุปข้อความตอบลูกค้า",
+                },
+            },
+        });
+        var (_, workflow, project) = await ApprovedOneTaskWorkflowAsync(support, plan);
+        await OnlyTheseAgentsAsync(support.Id); // the ticket goes to support; the developer joins once there is a sub-task
+
+        await TickAsync();
+        var ticket = (await ceo.GetAsync<List<TaskDto>>($"/api/projects/{project.Id}/tasks")).Single(t => t.Title.StartsWith("ลูกค้าแจ้งปัญหา"));
+        AgentRunDetailDto? detail = null;
+        for (var i = 0; i < 600 && detail?.Run.Status is null or AgentRunStatus.Queued or AgentRunStatus.Running; i++)
+        {
+            await Task.Delay(1000);
+            var runs = await ceo.GetAsync<List<AgentRunDto>>($"/api/agent-runs?taskId={ticket.Id}");
+            if (runs.Count > 0) detail = await ceo.GetAsync<AgentRunDetailDto>($"/api/agent-runs/{runs[0].Id}");
+        }
+        await OnlyTheseAgentsAsync(support.Id, developer.Id);
+        await TickAsync(); // the sub-task, if any, is assigned by skill
+        var tasks = await ceo.GetAsync<List<TaskDto>>($"/api/projects/{project.Id}/tasks");
+        if (Environment.GetEnvironmentVariable("OFFICEAI_LIVE_LOG") is { } log)
+            await File.WriteAllTextAsync(log, JsonSerializer.Serialize(new { detail?.Run, detail?.Steps, detail?.ToolExecutions, Tasks = tasks.Select(t => new { t.Id, t.Title, t.Status, t.DependsOn }) },
+                new JsonSerializerOptions(ApiFixture.Json) { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
+
+        Assert.NotNull(detail);
+        Assert.Equal("ollama", detail.Run.Provider);
+        Assert.Contains(detail.ToolExecutions, e => e.ToolId == "task.delegate" && e.Status == ToolExecutionStatus.Succeeded);
+        var parent = tasks.Single(t => t.Id == ticket.Id);
+        Assert.Single(tasks, t => parent.DependsOn.Contains(t.Id));
         await ceo.PostAsync<WorkflowDto>($"/api/workflows/{workflow.Id}/cancel", new { });
     }
 

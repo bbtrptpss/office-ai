@@ -31,6 +31,19 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.26.0",
+    date: "2026-10-22",
+    title: { th: "AI ฟรีบนเครื่อง (Ollama, Claude Code) และรายงานประจำวัน", en: "Free AI on this PC (Ollama, Claude Code) and the daily report" },
+    changes: [
+      { type: "added", th: "ผู้ให้บริการ AI “ollama”: ใช้โมเดลที่รันบนเครื่องนี้ผ่าน Ollama ไม่ต้องมี key ไม่เสียค่า token (ปิดได้โดยตั้ง OLLAMA_URL ให้ว่าง)", en: "“ollama” AI provider: models running on this PC through Ollama, no key, no token cost (empty OLLAMA_URL turns it off)" },
+      { type: "added", th: "ผู้ให้บริการ AI “claude-code”: พนักงาน AI ใช้ Claude Code ที่ล็อกอินไว้บนเครื่องนี้ (คิดเงินตามแพ็กเกจ Claude ไม่ใช่ตาม token) เลือกโมเดลได้", en: "“claude-code” AI provider: AI employees use the Claude Code signed in on this PC (billed to the Claude plan, not per token), with a choice of model" },
+      { type: "changed", th: "โมเดลของผู้ให้บริการที่ไม่คิดเงินตาม token (Ollama, Claude Code) ตั้งราคาเป็น 0 ได้", en: "Models of providers not billed per token (Ollama, Claude Code) may have zero prices" },
+      { type: "added", th: "รายงานประจำวัน: หลังเที่ยงคืน (เวลาไทย) สรุปงานที่ AI ทำเมื่อวาน — งานเสร็จ ผลงาน จำนวนรัน/ล้มเหลว คำขออนุมัติที่รอ และค่าใช้จ่าย — โพสต์ในแชทบริษัทพร้อมแจ้งเตือน (GET /api/reports/daily)", en: "Daily report: after midnight (Bangkok time) a summary of yesterday's AI work — tasks done, deliverables, runs/failures, pending approvals and cost — is posted to the company chat with a notification (GET /api/reports/daily)" },
+      { type: "changed", th: "AI ตอบแชทโดยอ้างอิงคลังความรู้ที่ผ่านการตรวจแล้ว และค้นหาความรู้ภาษาไทยด้วยแท็กได้ (เช่น “ลาป่วยได้กี่วัน” เจอหัวข้อที่แท็ก “ลาป่วย”)", en: "Chat answers draw on validated company knowledge, and Thai questions match knowledge by tag (“ลาป่วยได้กี่วัน” finds the entry tagged “ลาป่วย”)" },
+      { type: "fixed", th: "พนักงาน AI จบรอบทันทีหลังส่งต่องาน (มอบหมาย ขอรีวิว แจ้งติดปัญหา ส่งแผน/รีวิว) และขอรีวิวไม่ได้ขณะงานย่อยที่มอบหมายไว้ยังไม่เสร็จ — โมเดลเล็กเคยทำงานต่อเองหรือมอบหมายซ้ำ", en: "An AI employee's run ends as soon as it hands the task on (delegate, request review, report blocked, submit a plan or review), and it cannot request review while delegated sub-tasks are open — small models used to carry on or delegate twice" },
+    ],
+  },
+  {
     version: "0.25.0",
     date: "2026-10-20",
     title: { th: "แก้ไขและยกเลิกโปรเจกต์", en: "Edit and cancel projects" },
@@ -652,6 +665,7 @@ export const TODO: Todo[] = [
   { status: "waitingCeo", area: { th: "การเงิน", en: "Finance" }, th: "กำหนดงบ AI รายเดือนสำหรับช่วงทดลอง (ตอนนี้ USD 5 ต่อพนักงาน AI)", en: "Set the monthly AI budget for the trial (currently USD 5 per AI employee)" },
   { status: "waitingCeo", area: { th: "Deploy", en: "Deploy" }, th: "เลือกที่ deploy ระบบจริง", en: "Choose where to deploy" },
   { status: "waitingCeo", area: { th: "เชื่อมต่อ", en: "Integrations" }, th: "ถ้าต้องการอีเมลแจ้งเตือน: ใส่บัญชี SMTP ใน .env (EMAIL_HOST, EMAIL_FROM, EMAIL_USERNAME, EMAIL_PASSWORD — Gmail ใช้ App Password) แล้ว restart", en: "For email notifications: put an SMTP account in .env (EMAIL_HOST, EMAIL_FROM, EMAIL_USERNAME, EMAIL_PASSWORD — Gmail needs an App Password) and restart" },
+  { status: "planned", area: { th: "AI", en: "AI" }, th: "โมเดล Qwen3-8B ที่ฝึกกับงานของบริษัท: ฝึกเสร็จแล้วแปลงเป็น GGUF ลงใน Ollama ประเมินผล แล้วเพิ่มในหน้าตั้งค่า AI", en: "Qwen3-8B fine-tuned on the company's work: once trained, convert to GGUF for Ollama, evaluate, and add it in AI settings" },
   { status: "planned", area: { th: "โครงสร้าง", en: "Infrastructure" }, th: "Redis และที่เก็บไฟล์แบบ S3 — ทำเมื่อเลือกที่ deploy แล้ว", en: "Redis and S3-compatible storage — once the deploy target is chosen" },
   { status: "planned", area: { th: "AI", en: "AI" }, th: "1 ม.ค. 2027: แก้ราคา Gemini 3.8 Flash ในหน้าตั้งค่า AI เป็น $1.50 / $7.50 ต่อล้าน token (ราคาโปรหมด)", en: "1 Jan 2027: update Gemini 3.8 Flash prices in AI settings to $1.50 / $7.50 per million tokens (intro pricing ends)" },
 ];

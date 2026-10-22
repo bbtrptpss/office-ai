@@ -15,14 +15,20 @@ public record DocumentDto(Guid Id, Guid ProjectId, DocumentKind Kind, string Tit
 /// <summary>Knowledge base and project documents. Knowledge is trusted only after a person validates it.</summary>
 public class KnowledgeService(IAppDbContext db, ICurrentUser current, TimeProvider clock)
 {
-    /// <summary>Case-insensitive match on title, body and tags, limited to company-wide entries and the given project.</summary>
+    /// <summary>
+    /// Case-insensitive match on title, body and tags, limited to company-wide entries and the given project.
+    /// A tag that appears anywhere in the query also matches: Thai has no spaces between words, so a question such as
+    /// "ลาป่วยได้กี่วัน" finds the entry tagged "ลาป่วย".
+    /// </summary>
     public static IQueryable<KnowledgeEntry> SearchQuery(IAppDbContext db, string q, Guid? projectId)
     {
         var lower = q.ToLowerInvariant();
         return db.KnowledgeEntries.AsNoTracking()
             .Where(k => k.ProjectId == null || k.ProjectId == projectId)
-            .Where(k => k.Title.ToLower().Contains(lower) || k.Body.ToLower().Contains(lower) || k.Tags.Contains(lower))
-            .OrderByDescending(k => k.Title.ToLower().Contains(lower)).ThenByDescending(k => k.ValidatedAt);
+            .Where(k => k.Title.ToLower().Contains(lower) || k.Body.ToLower().Contains(lower) || k.Tags.Any(t => lower.Contains(t)))
+            .OrderByDescending(k => k.Title.ToLower().Contains(lower))
+            .ThenByDescending(k => k.Tags.Count(t => lower.Contains(t)))
+            .ThenByDescending(k => k.ValidatedAt);
     }
 
     internal static async Task<ProjectDocument> AddVersionAsync(IAppDbContext db, Guid projectId, DocumentKind kind, string title, string content, CancellationToken ct)

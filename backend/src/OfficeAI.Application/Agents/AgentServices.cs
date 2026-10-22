@@ -105,7 +105,7 @@ public class AgentAdminService(IAppDbContext db, AiProviderRegistry providers, T
     /// <summary>People add models (e.g. for OpenAI or Gemini) with their list prices; nothing is assumed free.</summary>
     public async Task<AiModelDto> CreateModelAsync(CreateAiModelRequest req, CancellationToken ct)
     {
-        RealProvider(req.Provider);
+        var provider = RealProvider(req.Provider);
         Validate.Required(req.ModelId, "modelId");
         Validate.Required(req.DisplayName, "displayName");
         var modelId = req.ModelId.Trim();
@@ -113,7 +113,7 @@ public class AgentAdminService(IAppDbContext db, AiProviderRegistry providers, T
         if (!Enum.IsDefined(req.Tier)) throw new DomainException("validation", "tier is invalid.");
         if (new[] { req.InputUsdPerMTok, req.OutputUsdPerMTok, req.CacheReadUsdPerMTok, req.CacheWriteUsdPerMTok }.Any(x => x < 0))
             throw new DomainException("validation", "Prices cannot be negative.");
-        if (req.InputUsdPerMTok == 0 && req.OutputUsdPerMTok == 0) throw new DomainException("validation", "Enter the model's prices; real models are never free.");
+        if (req.InputUsdPerMTok == 0 && req.OutputUsdPerMTok == 0 && !provider.IsFlatRate) throw new DomainException("validation", "Enter the model's prices; real models are never free.");
         if (await db.AiModels.AnyAsync(m => m.Provider == req.Provider && m.ModelId == modelId, ct))
             throw new DomainException("validation", "This model is already listed.");
         var model = new AiModel

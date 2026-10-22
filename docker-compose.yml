@@ -32,6 +32,8 @@ services:
       AiProviders__Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}
       AiProviders__OpenAI__ApiKey: ${OPENAI_API_KEY:-}
       AiProviders__Gemini__ApiKey: ${GEMINI_API_KEY:-}
+      # Ollama on this PC (free, no key). Empty OLLAMA_URL turns it off.
+      AiProviders__Ollama__BaseUrl: ${OLLAMA_URL-http://host.docker.internal:11434/v1}
       # Tokens for GitHub/GitLab remotes; a repository names the variable it uses (GIT_REMOTE_* only).
       GIT_REMOTE_GITHUB: ${GIT_REMOTE_GITHUB:-}
       GIT_REMOTE_GITLAB: ${GIT_REMOTE_GITLAB:-}

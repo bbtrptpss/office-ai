@@ -101,6 +101,24 @@ public class ChatAiReplyTests(ApiFixture fx)
     }
 
     [Fact]
+    public async Task A_chat_answer_gets_the_validated_knowledge_that_matches_the_question()
+    {
+        var ceo = await fx.CeoAsync();
+        var tag = $"ลาพักผ่อนพิเศษ{Guid.NewGuid():N}"[..20];
+        await ceo.PostAsync<OfficeAI.Application.Knowledge.KnowledgeDto>("/api/knowledge",
+            new { kind = "Policy", title = "สิทธิลาพักผ่อนพิเศษ", body = "พนักงานลาพักผ่อนพิเศษได้ 2 วันต่อปี", tags = new[] { tag } });
+        AiRequest? seen = null;
+        var ai = await AiAsync(ceo, (req, _) => { seen = req; return Task.FromResult(ScriptedProvider.Text("ได้ 2 วันครับ")); });
+        var general = await GeneralAsync(ceo);
+        await ceo.PostAsync<MessageDto>($"/api/chat/channels/{general.Id}/messages",
+            new { body = $"@{ai.DisplayName} {tag}ได้กี่วันครับ", mentionedEmployeeIds = new[] { ai.Id } });
+
+        await RepliesFromAsync(ceo, general.Id, ai.Id, 1);
+        Assert.Contains("Company knowledge", seen!.SystemPrompt);
+        Assert.Contains("พนักงานลาพักผ่อนพิเศษได้ 2 วันต่อปี", seen.SystemPrompt);
+    }
+
+    [Fact]
     public async Task Without_budget_or_a_working_provider_the_AI_declines_politely_and_nothing_is_charged()
     {
         var ceo = await fx.CeoAsync();

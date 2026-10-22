@@ -17,7 +17,7 @@ internal static class K
     {
         var i = body.IndexOf(query, StringComparison.OrdinalIgnoreCase);
         var start = Math.Max(0, i < 0 ? 0 : i - 120);
-        var len = Math.Min(body.Length - start, 400);
+        var len = Math.Min(body.Length - start, 900); // room for a whole short policy entry, so the agent can answer from it
         return (start > 0 ? "…" : "") + body.Substring(start, len) + (start + len < body.Length ? "…" : "");
     }
 }
