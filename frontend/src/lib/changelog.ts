@@ -31,6 +31,14 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.26.2",
+    date: "2026-10-23",
+    title: { th: "อัปเดตแพ็กเกจที่มีช่องโหว่", en: "Patched a vulnerable package" },
+    changes: [
+      { type: "security", th: "อัปเดต System.Security.Cryptography.Pkcs (ที่ MailKit ใช้ส่งอีเมล) จาก 10.0.0 เป็น 10.0.13 ปิดช่องโหว่ระดับสูง GHSA-846f-f764-76mx และระดับกลาง GHSA-2fmv-rv2c-59x7", en: "Updated System.Security.Cryptography.Pkcs (used by MailKit for email) from 10.0.0 to 10.0.13, closing the high-severity GHSA-846f-f764-76mx and moderate GHSA-2fmv-rv2c-59x7" },
+    ],
+  },
+  {
     version: "0.26.1",
     date: "2026-10-23",
     title: { th: "แชทแสดง Markdown และแก้หน้าตั้งค่า AI", en: "Markdown in chat and AI settings fixes" },
