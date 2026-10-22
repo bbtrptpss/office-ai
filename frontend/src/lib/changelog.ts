@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.26.1",
+    date: "2026-10-23",
+    title: { th: "แชทแสดง Markdown และแก้หน้าตั้งค่า AI", en: "Markdown in chat and AI settings fixes" },
+    changes: [
+      { type: "changed", th: "ข้อความในแชทแสดงหัวข้อ (#, ##, ###), รายการ (-), ตัวหนา (**…**) และ `code` เป็นรูปแบบจริง แทนเครื่องหมายดิบ — เช่นรายงานประจำวันและคำตอบของ AI", en: "Chat messages show headings (#, ##, ###), bullets (-), bold (**…**) and `code` formatted instead of raw marks — e.g. the daily report and AI replies" },
+      { type: "fixed", th: "รายงานประจำวันแสดงสถานะงานที่ยังเปิดอยู่เป็นภาษาไทยแบบกระดานงาน (เช่น “รอตรวจ”) แทนชื่อภาษาอังกฤษ", en: "The daily report names open-task statuses as the task board does (e.g. “รอตรวจ”) instead of the English names" },
+      { type: "fixed", th: "การ์ด ollama และ claude-code ในหน้าตั้งค่า AI ไม่ถาม API key แล้ว แสดงว่าไม่ต้องใช้ key และทดสอบผ่านจะขึ้น “เชื่อมต่อได้”", en: "The ollama and claude-code cards on AI settings no longer ask for an API key; they say none is needed and a passing test shows “Connected”" },
+    ],
+  },
+  {
     version: "0.26.0",
     date: "2026-10-22",
     title: { th: "AI ฟรีบนเครื่อง (Ollama, Claude Code) และรายงานประจำวัน", en: "Free AI on this PC (Ollama, Claude Code) and the daily report" },
