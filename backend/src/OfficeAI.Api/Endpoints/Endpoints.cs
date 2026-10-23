@@ -143,6 +143,16 @@ public static class Endpoints
         TwoFactorEndpoints.MapTerminal(api); // the dashboard terminal: CEO only, behind two-factor sign-in
 
         api.MapGet("/projects", (WorkService s, CancellationToken ct) => s.ListProjectsAsync(ct)).RequirePermission(Permissions.ProjectRead);
+        // Timesheet: people log their own hours; the project scope decides where.
+        api.MapGet("/timesheet", (DateOnly? from, DateOnly? to, TimesheetService s, CancellationToken ct) => s.MineAsync(from, to, ct)).RequirePermission(Permissions.TaskRead);
+        api.MapPost("/timesheet", (SaveTimeEntryRequest r, TimesheetService s, CancellationToken ct) => s.CreateAsync(r, ct)).RequirePermission(Permissions.TaskRead);
+        api.MapPut("/timesheet/{id:guid}", (Guid id, SaveTimeEntryRequest r, TimesheetService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(Permissions.TaskRead);
+        api.MapDelete("/timesheet/{id:guid}", async (Guid id, TimesheetService s, CancellationToken ct) =>
+        {
+            await s.DeleteAsync(id, ct);
+            return Results.NoContent();
+        }).RequirePermission(Permissions.TaskRead);
+        api.MapGet("/projects/{id:guid}/hours", (Guid id, TimesheetService s, CancellationToken ct) => s.ProjectAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/projects/{id:guid}", (Guid id, WorkService s, CancellationToken ct) => s.GetProjectAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapPost("/projects", (SaveProjectRequest r, WorkService s, CancellationToken ct) => s.CreateProjectAsync(r, ct)).RequirePermission(Permissions.ProjectManage);
         api.MapPut("/projects/{id:guid}", (Guid id, SaveProjectRequest r, WorkService s, CancellationToken ct) => s.UpdateProjectAsync(id, r, ct)).RequirePermission(Permissions.ProjectManage);

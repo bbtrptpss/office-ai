@@ -92,3 +92,14 @@ public class TaskAssignment : Entity, IAuditable
     public DateTimeOffset? UnassignedAt { get; set; }
     public bool IsActive => UnassignedAt is null;
 }
+
+/// <summary>Hours a person worked on a project (optionally one task) on one day, entered by that person. Feeds the actual effort in project closeout.</summary>
+public class TimeEntry : Entity, IAuditable
+{
+    public Guid EmployeeId { get; set; }
+    public Guid ProjectId { get; set; }
+    public Guid? TaskId { get; set; }
+    public DateOnly Date { get; set; }
+    public decimal Hours { get; set; }
+    public string? Note { get; set; }
+}

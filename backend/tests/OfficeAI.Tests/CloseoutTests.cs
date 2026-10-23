@@ -69,7 +69,7 @@ public class CloseoutTests(ApiFixture fx)
         Assert.Equal(2, second.Version);
         Assert.Contains(project.Code, first.Content);
         Assert.Contains("1 tasks are overdue", first.Content);
-        Assert.Contains("not recorded", first.Content); // actual human hours are never invented
+        Assert.Contains("none recorded", first.Content); // actual human hours are never invented
 
         var th = await ceo.PostAsync<DocumentDto>($"/api/projects/{project.Id}/closeout/report", new { lang = "th" });
         Assert.StartsWith("รายงานปิดโปรเจกต์", th.Title);
