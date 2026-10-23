@@ -338,7 +338,7 @@ Open: fine-tuned Qwen3-8B (training in `D:\FreeAi\train`) → GGUF → Ollama �
 | Terminal step-up: `/assistant/terminal` needs the CEO role, 2FA on (`terminal.2fa_required`) and an open terminal (`terminal.locked`, 403). `POST /assistant/terminal/unlock {code}` opens it for 15 idle minutes (`TerminalGate`, in memory, bound to the security stamp); `/lock`, `/status`; sign-out locks it | done |
 | UI: login code step (authenticator or recovery code), “Two-factor sign-in” card on My settings (QR via `qrcode`, key to type, recovery codes, turn off), terminal asks for the code inline and then runs the waiting command | done (typecheck/lint clean) |
 
-The authenticator accepts codes from the neighbouring 30-second steps; a code is not blocked from being reused inside that window. 239 tests.
+The authenticator accepts codes from the neighbouring 30-second steps. Since v0.32.1 (`OneTimeAuthenticatorTokenProvider`) each step is accepted once per user (last step kept in UserTokens), so codes cannot be replayed. 239 tests.
 
 ## Phase 24 — Operating costs ✅ (2026-10-23)
 

@@ -57,7 +57,7 @@ public class TwoFactorTests(ApiFixture fx)
         var setup = await c.PostAsync<TwoFactorSetupDto>("/api/auth/2fa/setup", new { });
         Assert.StartsWith("otpauth://totp/Office%20AI%3A", setup.OtpauthUri);
         Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/auth/2fa/enable", new { code = "000000" })).StatusCode);
-        var codes = await c.PostAsync<RecoveryCodesDto>("/api/auth/2fa/enable", new { code = Totp(setup.SharedKey) });
+        var codes = await c.PostAsync<RecoveryCodesDto>("/api/auth/2fa/enable", new { code = Totp(setup.SharedKey, DateTimeOffset.UtcNow.AddSeconds(-30)) });
         return (setup.SharedKey, codes.Codes);
     }
 
@@ -82,8 +82,14 @@ public class TwoFactorTests(ApiFixture fx)
         var bad = await fresh.PostAsJsonAsync("/api/auth/login/2fa", new { code = "123456" });
         Assert.Equal(HttpStatusCode.Unauthorized, bad.StatusCode);
         Assert.Contains("not correct", await bad.Content.ReadAsStringAsync());
-        Assert.Equal(HttpStatusCode.NoContent, (await fresh.PostAsJsonAsync("/api/auth/login/2fa", new { code = Totp(key) })).StatusCode);
+        var loginCode = Totp(key); // computed once: the replay below must be the very same code, even across a 30-second boundary
+        Assert.Equal(HttpStatusCode.NoContent, (await fresh.PostAsJsonAsync("/api/auth/login/2fa", new { code = loginCode })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await fresh.GetAsync("/api/auth/me")).StatusCode);
+
+        // The same code a second time (e.g. seen over a shoulder) is refused.
+        var replay = fx.Anonymous();
+        await replay.PostAsJsonAsync("/api/auth/login", new { email, password = Password });
+        Assert.Equal(HttpStatusCode.Unauthorized, (await replay.PostAsJsonAsync("/api/auth/login/2fa", new { code = loginCode })).StatusCode);
 
         // A code step without the password step first is refused.
         Assert.Equal(HttpStatusCode.Unauthorized, (await fx.Anonymous().PostAsJsonAsync("/api/auth/login/2fa", new { code = Totp(key) })).StatusCode);
@@ -103,8 +109,8 @@ public class TwoFactorTests(ApiFixture fx)
         Assert.DoesNotContain(audit, a => (a.NewValues ?? "").Contains(key.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
 
         // Turning it off needs the password and a code; then the password signs in again.
-        Assert.Equal(HttpStatusCode.BadRequest, (await person.PostAsJsonAsync("/api/auth/2fa/disable", new { password = "wrong-password-1", code = Totp(key) })).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await person.PostAsJsonAsync("/api/auth/2fa/disable", new { password = Password, code = Totp(key) })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await person.PostAsJsonAsync("/api/auth/2fa/disable", new { password = "wrong-password-1", code = Totp(key, DateTimeOffset.UtcNow.AddSeconds(30)) })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await person.PostAsJsonAsync("/api/auth/2fa/disable", new { password = Password, code = Totp(key, DateTimeOffset.UtcNow.AddSeconds(30)) })).StatusCode);
         await fx.LoginAsync(email, Password);
     }
 
@@ -124,8 +130,10 @@ public class TwoFactorTests(ApiFixture fx)
 
         var wrong = await ceo.PostAsJsonAsync("/api/assistant/terminal/unlock", new { code = "000000" });
         Assert.Equal("terminal.bad_code", await CodeOf(wrong));
-        var open = await ceo.PostAsync<TerminalStatusDto>("/api/assistant/terminal/unlock", new { code = Totp(key) });
+        var unlockCode = Totp(key);
+        var open = await ceo.PostAsync<TerminalStatusDto>("/api/assistant/terminal/unlock", new { code = unlockCode });
         Assert.True(open.OpenUntil > DateTimeOffset.UtcNow.AddMinutes(14));
+        Assert.Equal("terminal.bad_code", await CodeOf(await ceo.PostAsJsonAsync("/api/assistant/terminal/unlock", new { code = unlockCode }))); // once only
 
         var result = await ceo.PostAsync<TerminalResultDto>("/api/assistant/terminal", new { command = "git status" });
         Assert.Equal("ran: git status", result.Output);

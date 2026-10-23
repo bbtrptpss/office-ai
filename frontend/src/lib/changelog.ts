@@ -31,6 +31,14 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.32.1",
+    date: "2026-10-23",
+    title: { th: "รหัสจากแอป Authenticator ใช้ได้ครั้งเดียว", en: "Authenticator codes work once" },
+    changes: [
+      { type: "security", th: "รหัส 6 หลักจากแอป Authenticator ใช้ได้ครั้งเดียว (ทั้งเข้าสู่ระบบ เปิด Terminal และตั้งค่า 2FA) — รหัสที่ถูกแอบเห็นหรือถูกส่งซ้ำจะใช้ไม่ได้อีก ยังยอมรับรหัสช่วง 30 วินาทีก่อน/หลังเผื่อนาฬิกาโทรศัพท์คลาดเคลื่อน", en: "A 6-digit authenticator code works once (sign-in, opening the terminal and 2FA settings) — a code seen over a shoulder or replayed is refused. Codes from the 30 seconds before/after are still accepted for phone clock drift" },
+    ],
+  },
+  {
     version: "0.32.0",
     date: "2026-10-23",
     title: { th: "บันทึกเวลาทำงานของคน", en: "Timesheet for people" },
