@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.31.0",
+    date: "2026-10-23",
+    title: { th: "คุณภาพแยกตามโมเดล และข้อมูลฝึกจากงานจริง", en: "Quality by model and training data from real work" },
+    changes: [
+      { type: "added", th: "การเงิน → ผลงาน มีตาราง “คุณภาพแยกตามโมเดล”: จำนวนรัน อัตราสำเร็จ อัตราผ่านรีวิว งานที่คนอนุมัติแล้ว จำนวนรอบเฉลี่ย เวลาเฉลี่ย ต้นทุนต่อรัน และจำนวนครั้งที่ต้องสลับออก/รับช่วงเป็นโมเดลสำรอง — ใช้ตัดสินว่าโมเดลที่ฝึกเองดีพอใช้แทนตัวอื่นหรือยัง", en: "Finance → Performance has “Quality by model”: runs, success rate, review pass rate, tasks people approved, average turns and time, cost per run, and how often it switched away to / took over as a fallback — to judge whether the company's fine-tuned model is good enough to replace the others" },
+      { type: "added", th: "หน้าตั้งค่า AI ดาวน์โหลด “ข้อมูลฝึกโมเดลจากงานจริง” ได้: งานที่คนอนุมัติแล้ว (งานเสร็จและผลงานไม่ถูกตีกลับ หรือแผนที่อนุมัติ) เป็น JSONL รูปแบบเดียวกับชุดฝึกใน D:\FreeAi\train เลือกตั้งแต่วันที่ได้ ไม่รวมงานจำลอง เฉพาะคนที่จัดการ AI และบันทึกในบันทึกการตรวจสอบทุกครั้ง", en: "AI settings can download “Training data from real work”: work people approved (task done and deliverable not rejected, or an approved plan) as JSONL in the format of the training set in D:\FreeAi\train, optionally since a date. Simulated work is never included; people who manage AI only, and every download is audited" },
+    ],
+  },
+  {
     version: "0.30.0",
     date: "2026-10-23",
     title: { th: "ค้นคลังความรู้ด้วยความหมาย", en: "Knowledge search by meaning" },
