@@ -7,7 +7,10 @@ interface Auth {
   me: Me | null;
   loading: boolean;
   can: (permission: string) => boolean;
-  login: (email: string, password: string) => Promise<void>;
+  /** True when the password was right and an authenticator code is needed next (see loginCode). */
+  login: (email: string, password: string) => Promise<boolean>;
+  /** Second sign-in step: an authenticator code, or a recovery code. */
+  loginCode: (code: string, recovery: boolean) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -58,7 +61,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      await api.post("/api/auth/login", { email, password });
+      const res = await api.post<{ requiresTwoFactor: boolean } | undefined>("/api/auth/login", { email, password });
+      if (res?.requiresTwoFactor) return true;
+      await refresh();
+      return false;
+    },
+    [refresh],
+  );
+
+  const loginCode = useCallback(
+    async (code: string, recovery: boolean) => {
+      await api.post("/api/auth/login/2fa", recovery ? { recoveryCode: code } : { code });
       await refresh();
     },
     [refresh],
@@ -72,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // UI convenience only: the API enforces every permission server-side.
   const can = useCallback((p: string) => !!me?.permissions.includes(p), [me]);
 
-  return <AuthContext.Provider value={{ me, loading, can, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ me, loading, can, login, loginCode, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

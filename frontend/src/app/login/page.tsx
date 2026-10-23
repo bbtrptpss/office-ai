@@ -10,23 +10,33 @@ import { useI18n } from "@/lib/i18n";
 import { Mascot, Sparkles } from "@/components/cute";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, loginCode } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Second step when two-factor sign-in is on: a code from the authenticator app, or a recovery code.
+  const [needsCode, setNeedsCode] = useState(false);
+  const [code, setCode] = useState("");
+  const [recovery, setRecovery] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await login(email, password);
-      router.replace("/");
+      if (needsCode) {
+        await loginCode(code.trim(), recovery);
+        router.replace("/");
+      } else if (await login(email, password)) {
+        setNeedsCode(true);
+      } else {
+        router.replace("/");
+      }
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 423 ? t.lockedOut : t.loginFailed);
+      setError(err instanceof ApiError && err.status === 423 ? t.lockedOut : needsCode ? t.codeFailed : t.loginFailed);
     } finally {
       setBusy(false);
     }
@@ -65,11 +75,26 @@ export default function LoginPage() {
             <form onSubmit={submit}>
               <Stack spacing={2}>
                 {error && <Alert severity="error">{error}</Alert>}
-                <TextField label={t.email} type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
-                <TextField label={t.password} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                {!needsCode ? (
+                  <>
+                    <TextField label={t.email} type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+                    <TextField label={t.password} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                  </>
+                ) : (
+                  <>
+                    <Typography variant="body2" color="text.secondary">{recovery ? t.recoveryCodeHint : t.authenticatorCodeHint}</Typography>
+                    <TextField key={recovery ? "recovery" : "code"} label={recovery ? t.recoveryCode : t.authenticatorCode} value={code} onChange={(e) => setCode(e.target.value)} required autoFocus
+                      autoComplete="one-time-code" slotProps={{ htmlInput: recovery ? { spellCheck: false } : { inputMode: "numeric", maxLength: 7 } }} />
+                  </>
+                )}
                 <Button type="submit" variant="contained" size="large" disabled={busy}>
-                  {t.login}
+                  {needsCode ? t.confirm : t.login}
                 </Button>
+                {needsCode && (
+                  <Button size="small" onClick={() => { setRecovery(!recovery); setCode(""); setError(null); }}>
+                    {recovery ? t.useAuthenticatorCode : t.useRecoveryCode}
+                  </Button>
+                )}
               </Stack>
             </form>
           </CardContent>
