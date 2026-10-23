@@ -61,6 +61,7 @@ builder.Services.AddHostedService<EmailWorker>();
 builder.Services.AddHostedService<StaleFailureWorker>();
 builder.Services.AddHostedService<RetentionWorker>();
 builder.Services.AddHostedService<DailyReportWorker>();
+builder.Services.AddHostedService<KnowledgeEmbeddingWorker>();
 
 // ---------- Identity + cookie auth ----------
 builder.Services

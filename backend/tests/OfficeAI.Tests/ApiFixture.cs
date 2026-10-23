@@ -24,6 +24,7 @@ public sealed class ApiFixture : IAsyncLifetime
     public ScriptedProvider Scripted { get; } = new();
     public FakeClaudeBridge Claude { get; } = new();
     public FakeEmailSender Email { get; } = new();
+    public FakeEmbeddings Embeddings { get; } = new();
     public string RepoRoot { get; } = Path.Combine(Path.GetTempPath(), "officeai-tests", Guid.NewGuid().ToString("N"));
     public string ConnectionString => _db.GetConnectionString();
 
@@ -54,12 +55,14 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("Integrations:AppBaseUrl", "https://office.test");
             b.UseSetting("Email:AutoDispatch", "false"); // tests drive the email dispatcher explicitly
             b.UseSetting("Reports:Daily:Enabled", "false"); // tests publish daily reports explicitly
+            b.UseSetting("Knowledge:EmbeddingWorker", "false"); // tests index knowledge explicitly
             b.ConfigureTestServices(s =>
             {
                 s.AddSingleton<IAiProvider>(Scripted);
                 s.AddSingleton<IAgentTool, ApprovalRequiredTool>();
                 s.AddSingleton<OfficeAI.Application.Communication.IClaudeBridge>(Claude);
                 s.AddSingleton<OfficeAI.Application.Abstractions.IEmailSender>(Email);
+                s.AddSingleton<OfficeAI.Application.Knowledge.IEmbeddingProvider>(Embeddings);
             });
         });
         _ = Factory.Server; // start host: runs migrations + seed

@@ -351,3 +351,14 @@ The authenticator accepts codes from the neighbouring 30-second steps; a code is
 | Finance page: operating cards, list with splits, manage table and dialog; profitability column | done (typecheck/lint clean; stack rebuild waits for the r2 training run, which needs the RAM) |
 
 242 tests.
+
+## Phase 25 — Knowledge search by meaning ✅ (2026-10-23)
+
+| Item | Status |
+| --- | --- |
+| §10 “Support search and retrieval with source references”: `IEmbeddingProvider` + `OllamaEmbeddingProvider` (`/api/embed` at the Ollama root, `AiProviders:Ollama:EmbeddingModel`, compose `OLLAMA_EMBED_MODEL`; empty = off) | done |
+| `KnowledgeEmbedding` table (real[] vector, model, content hash; cascade with the entry, not audited). `KnowledgeEmbeddingIndexer` + `KnowledgeEmbeddingWorker` (every 30 s): new/edited entries, model change, archived entries dropped | done |
+| `KnowledgeSearch`: keyword ranking + cosine ranking fused by reciprocal rank; meaning-only hits need cosine ≥ 0.55; scope and status filters as before; any embedding failure → keywords only. Used by `knowledge.search`, chat replies and `GET /knowledge?q=` | done |
+| Tests with deterministic fake embeddings (no shared words, unrelated question, failure fallback, model change, archive) and the Ollama adapter against a fake endpoint | done |
+
+No pgvector: the knowledge base is small, so vectors are compared in memory. The 0.55 floor is set for bge-m3 and not yet tuned on the company's real entries. 245 tests.

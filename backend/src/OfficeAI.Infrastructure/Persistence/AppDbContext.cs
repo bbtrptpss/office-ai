@@ -64,6 +64,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<BudgetAllocation> BudgetAllocations => Set<BudgetAllocation>();
     public DbSet<OperatingCost> OperatingCosts => Set<OperatingCost>();
     public DbSet<KnowledgeEntry> KnowledgeEntries => Set<KnowledgeEntry>();
+    public DbSet<KnowledgeEmbedding> KnowledgeEmbeddings => Set<KnowledgeEmbedding>();
     public DbSet<ProjectDocument> Documents => Set<ProjectDocument>();
     public DbSet<IntegrationConfiguration> Integrations => Set<IntegrationConfiguration>();
     public DbSet<IntegrationDelivery> IntegrationDeliveries => Set<IntegrationDelivery>();

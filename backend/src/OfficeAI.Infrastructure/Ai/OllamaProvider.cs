@@ -12,6 +12,9 @@ public class OllamaOptions
 
     /// <summary>Local models on a small GPU are slow; give them longer than the cloud providers.</summary>
     public int TimeoutSeconds { get; set; } = 900;
+
+    /// <summary>Model for knowledge search by meaning (e.g. bge-m3). Empty = keyword search only.</summary>
+    public string? EmbeddingModel { get; set; }
 }
 
 /// <summary>

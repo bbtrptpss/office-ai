@@ -72,3 +72,16 @@ public class ProjectDocument : Entity, IAuditable
     public Guid? RunId { get; set; }
     public bool IsSimulated { get; set; }
 }
+
+/// <summary>
+/// A knowledge entry's meaning as a vector, for search by meaning. Kept apart from the entry so vectors never reach the audit log;
+/// rebuilt whenever the entry's text (<see cref="ContentHash"/>) or the embedding model changes.
+/// </summary>
+public class KnowledgeEmbedding
+{
+    public Guid KnowledgeId { get; set; }
+    public required string Model { get; set; }
+    public required string ContentHash { get; set; }
+    public required float[] Vector { get; set; }
+    public DateTimeOffset EmbeddedAt { get; set; }
+}

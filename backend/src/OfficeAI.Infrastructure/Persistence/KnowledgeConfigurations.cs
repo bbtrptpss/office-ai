@@ -33,3 +33,16 @@ internal class ProjectDocumentConfig : IEntityTypeConfiguration<ProjectDocument>
         b.HasOne<Project>().WithMany().HasForeignKey(d => d.ProjectId).OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+internal class KnowledgeEmbeddingConfig : IEntityTypeConfiguration<KnowledgeEmbedding>
+{
+    public void Configure(EntityTypeBuilder<KnowledgeEmbedding> b)
+    {
+        b.ToTable("KnowledgeEmbeddings");
+        b.HasKey(x => x.KnowledgeId);
+        b.Property(x => x.Model).HasMaxLength(100);
+        b.Property(x => x.ContentHash).HasMaxLength(64);
+        b.Property(x => x.Vector).HasColumnType("real[]");
+        b.HasOne<KnowledgeEntry>().WithOne().HasForeignKey<KnowledgeEmbedding>(x => x.KnowledgeId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
