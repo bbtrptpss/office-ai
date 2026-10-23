@@ -39,6 +39,15 @@ public record PerformanceRowDto(Guid EmployeeId, string Name, string JobTitle, s
     int ChangesRequested, decimal FirstPassApprovalRate);
 public record PerformanceReportDto(DateOnly Month, List<PerformanceRowDto> Rows);
 
+/// <summary>
+/// How one model did in the month. Runs count on the model that finished them (after any fallback switch). Deliverables are
+/// judged by AI reviewers; tasks done need a person's approval. SwitchedAway / TookOver count fallback switches from / to it.
+/// </summary>
+public record ModelPerformanceRowDto(string Provider, string ModelId, string DisplayName, int Runs, int Succeeded, int Failed, int LimitReached,
+    decimal SuccessRate, int DeliverablesAccepted, int DeliverablesRejected, decimal? AcceptanceRate, int TasksDone, double AvgTurns, double AvgSeconds,
+    long Tokens, decimal CostUsd, decimal CostPerRunUsd, int SwitchedAway, int TookOver, bool IsSimulated);
+public record ModelPerformanceReportDto(DateOnly Month, List<ModelPerformanceRowDto> Rows);
+
 public record CountDto(string Key, int Count);
 public record SecurityEventDto(DateTimeOffset OccurredAt, string Action, string? ActorName, string? EntityId);
 public record FailedTestDto(Guid Id, Guid RepositoryId, string Branch, string Status, DateTimeOffset StartedAt);
@@ -264,6 +273,47 @@ public class ReportsService(IAppDbContext db, TimeProvider clock)
     }
 
     // ---------------- performance ----------------
+
+    private static readonly System.Text.RegularExpressions.Regex Switched = new(@"^Switched from (\S+) to the fallback model (\S+):", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    public async Task<ModelPerformanceReportDto> ModelPerformanceAsync(DateOnly? month, CancellationToken ct)
+    {
+        var m = month ?? CurrentMonth;
+        var (from, to) = BudgetMath.Range(m);
+        var runs = await db.AgentRuns.AsNoTracking().Where(r => r.CreatedAt >= from && r.CreatedAt < to)
+            .Select(r => new { r.Id, r.Provider, r.ModelId, r.Status, r.Turns, r.CostUsd, r.TaskId, r.Purpose, r.IsSimulated, r.StartedAt, r.FinishedAt, Tokens = r.InputTokens + r.OutputTokens })
+            .ToListAsync(ct);
+        var runIds = runs.Select(r => r.Id).ToList();
+        var deliverables = await db.Deliverables.AsNoTracking().Where(d => d.RunId != null && runIds.Contains(d.RunId.Value))
+            .Select(d => new { RunId = d.RunId!.Value, d.Status, d.TaskId }).ToListAsync(ct);
+        var doneTasks = (await db.Tasks.AsNoTracking().Where(t => t.Status == WorkTaskStatus.Done && deliverables.Select(d => d.TaskId).Contains(t.Id)).Select(t => t.Id).ToListAsync(ct)).ToHashSet();
+        var switches = (await db.AgentRunSteps.AsNoTracking().Where(s => runIds.Contains(s.RunId) && s.Kind == RunStepKind.Notice && s.Content.StartsWith("Switched from "))
+            .Select(s => s.Content).ToListAsync(ct)).Select(c => Switched.Match(c)).Where(x => x.Success).Select(x => (From: x.Groups[1].Value, To: x.Groups[2].Value)).ToList();
+        var names = await db.AiModels.AsNoTracking().ToDictionaryAsync(x => $"{x.Provider}/{x.ModelId}", x => x.DisplayName, ct);
+
+        var keys = runs.Select(r => $"{r.Provider}/{r.ModelId}").Concat(switches.Select(s => s.From)).Distinct();
+        var rows = keys.Select(key =>
+        {
+            var mine = runs.Where(r => $"{r.Provider}/{r.ModelId}" == key).ToList();
+            var mineIds = mine.Select(r => r.Id).ToHashSet();
+            var delivered = deliverables.Where(d => mineIds.Contains(d.RunId)).ToList();
+            var accepted = delivered.Count(d => d.Status == DeliverableStatus.Accepted);
+            var rejected = delivered.Count(d => d.Status == DeliverableStatus.Rejected);
+            var finished = mine.Where(r => r.StartedAt != null && r.FinishedAt != null).ToList();
+            var cost = mine.Sum(r => r.CostUsd);
+            var slash = key.IndexOf('/');
+            return new ModelPerformanceRowDto(key[..slash], key[(slash + 1)..], names.GetValueOrDefault(key, key[(slash + 1)..]), mine.Count,
+                mine.Count(r => r.Status == AgentRunStatus.Succeeded), mine.Count(r => r.Status == AgentRunStatus.Failed), mine.Count(r => r.Status == AgentRunStatus.LimitReached),
+                mine.Count == 0 ? 0 : Math.Round(100m * mine.Count(r => r.Status == AgentRunStatus.Succeeded) / mine.Count, 1),
+                accepted, rejected, accepted + rejected == 0 ? null : Math.Round(100m * accepted / (accepted + rejected), 1),
+                delivered.Select(d => d.TaskId).Distinct().Count(doneTasks.Contains),
+                mine.Count == 0 ? 0 : Math.Round(mine.Average(r => r.Turns), 1),
+                finished.Count == 0 ? 0 : Math.Round(finished.Average(r => (r.FinishedAt!.Value - r.StartedAt!.Value).TotalSeconds), 0),
+                mine.Sum(r => r.Tokens), cost, mine.Count == 0 ? 0 : Math.Round(cost / mine.Count, 6),
+                switches.Count(s => s.From == key), switches.Count(s => s.To == key), mine.Count > 0 && mine.All(r => r.IsSimulated));
+        }).OrderBy(r => r.IsSimulated).ThenByDescending(r => r.Runs).ToList();
+        return new ModelPerformanceReportDto(m, rows);
+    }
 
     public async Task<PerformanceReportDto> PerformanceAsync(DateOnly? month, CancellationToken ct)
     {

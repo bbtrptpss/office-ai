@@ -6,7 +6,7 @@ import {
   MenuItem, Paper, Stack, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography,
 } from "@mui/material";
 import {
-  AiProvider, api, Budget, BudgetScope, Department, FinanceReport, OperatingAllocation, OperatingCost, PerformanceRow, ProfitabilityReport, Project, Scenario,
+  AiProvider, api, Budget, BudgetScope, Department, FinanceReport, ModelPerformanceRow, OperatingAllocation, OperatingCost, PerformanceRow, ProfitabilityReport, Project, Scenario,
   ScenarioResult, thb, usd,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -499,12 +499,64 @@ function ScenarioPanel({ projects }: { projects: { id: string; label: string }[]
   );
 }
 
+/** Quality per model, to judge a model (e.g. the company's fine-tuned one) against the others on real work. */
+function ModelPerformance({ month }: { month: string }) {
+  const { t } = useI18n();
+  const { data } = useLoad(() => api.get<{ rows: ModelPerformanceRow[] }>(`/api/reports/models?month=${month}-01`), month);
+  if (!data || data.rows.length === 0) return null;
+  return (
+    <Box sx={{ mb: 3 }}>
+      <Typography variant="h6">{t.byModel}</Typography>
+      <Typography variant="body2" color="text.secondary" gutterBottom>{t.byModelHint}</Typography>
+      <TableContainer component={Paper} variant="outlined">
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>{t.model}</TableCell>
+              <TableCell align="right">{t.runs}</TableCell>
+              <TableCell align="right">{t.successRate}</TableCell>
+              <TableCell align="right">{t.reviewPassRate}</TableCell>
+              <TableCell align="right">{t.tasksDoneShort}</TableCell>
+              <TableCell align="right">{t.turns}</TableCell>
+              <TableCell align="right">{t.avgTime}</TableCell>
+              <TableCell align="right">{t.costPerRun}</TableCell>
+              <TableCell align="right">{t.fallbackSwitches}</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {data.rows.map((r) => (
+              <TableRow key={`${r.provider}/${r.modelId}`}>
+                <TableCell>
+                  <Typography variant="body2" fontWeight={600}>{r.isSimulated ? "🧪 " : ""}{r.displayName}</Typography>
+                  <Typography variant="caption" color="text.secondary">{r.provider}/{r.modelId}</Typography>
+                </TableCell>
+                <TableCell align="right">{r.runs}</TableCell>
+                <TableCell align="right">{r.runs > 0 ? `${r.successRate}%` : "—"}</TableCell>
+                <TableCell align="right">{r.acceptanceRate != null ? `${r.acceptanceRate}% (${r.deliverablesAccepted}/${r.deliverablesAccepted + r.deliverablesRejected})` : "—"}</TableCell>
+                <TableCell align="right">{r.tasksDone}</TableCell>
+                <TableCell align="right">{r.avgTurns}</TableCell>
+                <TableCell align="right">{r.avgSeconds > 0 ? `${Math.round(r.avgSeconds)} s` : "—"}</TableCell>
+                <TableCell align="right">{usd(r.costPerRunUsd)}</TableCell>
+                <TableCell align="right" sx={{ color: r.switchedAway > 0 ? "warning.main" : undefined }}>
+                  {r.switchedAway || r.tookOver ? `↗${r.switchedAway} · ↙${r.tookOver}` : "—"}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
+  );
+}
+
 function Performance({ month }: { month: string }) {
   const { t } = useI18n();
   const { data, error } = useLoad(() => api.get<{ rows: PerformanceRow[] }>(`/api/reports/performance?month=${month}-01`), month);
   if (!data) return <Loading error={error} />;
-  if (data.rows.length === 0) return <Typography color="text.secondary">{t.empty}</Typography>;
   return (
+    <>
+    <ModelPerformance month={month} />
+    {data.rows.length === 0 ? <Typography color="text.secondary">{t.empty}</Typography> : (
     <TableContainer component={Paper} variant="outlined">
       <Table size="small">
         <TableHead>
@@ -543,5 +595,7 @@ function Performance({ month }: { month: string }) {
         </TableBody>
       </Table>
     </TableContainer>
+    )}
+    </>
   );
 }

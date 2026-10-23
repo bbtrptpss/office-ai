@@ -692,6 +692,15 @@ export interface OperatingCost {
   provider: string | null; notes: string | null; version: number;
 }
 
+/** One model's month: runs count on the model that finished them; switchedAway / tookOver are fallback switches. */
+export interface ModelPerformanceRow {
+  provider: string; modelId: string; displayName: string; runs: number; succeeded: number; failed: number; limitReached: number; successRate: number;
+  deliverablesAccepted: number; deliverablesRejected: number; acceptanceRate: number | null; tasksDone: number; avgTurns: number; avgSeconds: number;
+  tokens: number; costUsd: number; costPerRunUsd: number; switchedAway: number; tookOver: number; isSimulated: boolean;
+}
+
+export interface TrainingExportSummary { workRuns: number; planRuns: number; oldest: string | null; newest: string | null }
+
 export interface PerformanceRow {
   employeeId: string; name: string; jobTitle: string; department: string; runs: number; succeeded: number; failed: number; limitReached: number;
   successRate: number; costUsd: number; costPerRunUsd: number; avgTurns: number; toolCalls: number; toolDenied: number; tasksDone: number;

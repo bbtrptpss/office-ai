@@ -9,7 +9,8 @@ import AddIcon from "@mui/icons-material/Add";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import CloseIcon from "@mui/icons-material/Close";
-import { api, AiModel, AiProvider } from "@/lib/api";
+import DownloadIcon from "@mui/icons-material/Download";
+import { api, AiModel, AiProvider, downloadFile, TrainingExportSummary } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { Loading, PageHeader, useErrorMessage, useLoad } from "@/components/common";
@@ -114,8 +115,38 @@ export default function AiSettingsPage() {
           </TableBody>
         </Table>
       </TableContainer>
+      {canManage && <TrainingExport />}
       {adding && <AddModelDialog providers={data.providers.filter((x) => !x.isSimulated).map((x) => x.name)} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); void reload(); }} />}
     </>
+  );
+}
+
+/** Real work people approved, downloaded as fine-tuning data for the company's own model (D:\FreeAi\train format). */
+function TrainingExport() {
+  const { t, lang } = useI18n();
+  const errorMessage = useErrorMessage();
+  const [since, setSince] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const { data } = useLoad(() => api.get<TrainingExportSummary>(`/api/training/summary${since ? `?since=${since}` : ""}`), since);
+  const when = (s: string | null) => (s ? new Date(s).toLocaleDateString(lang === "th" ? "th-TH" : "en-GB") : "—");
+  return (
+    <Card variant="outlined" sx={{ mt: 3 }}>
+      <CardContent>
+        <Typography variant="h6">{t.trainingExport}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>{t.trainingExportHint}</Typography>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
+          <TextField size="small" type="date" label={t.since} value={since} onChange={(e) => setSince(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          <Typography variant="body2" sx={{ flex: 1 }}>
+            {data ? `${t.trainingWorkRuns} ${data.workRuns} · ${t.trainingPlanRuns} ${data.planRuns} · ${when(data.oldest)} – ${when(data.newest)}` : "…"}
+          </Typography>
+          <Button variant="outlined" startIcon={<DownloadIcon />} disabled={!data || data.workRuns + data.planRuns === 0}
+            onClick={() => downloadFile(`/api/training/export${since ? `?since=${since}` : ""}`, "officeai-real.jsonl").catch((e) => setProblem(errorMessage(e)))}>
+            {t.download}
+          </Button>
+        </Stack>
+        {problem && <Alert severity="warning" sx={{ mt: 1 }} onClose={() => setProblem(null)}>{problem}</Alert>}
+      </CardContent>
+    </Card>
   );
 }
 

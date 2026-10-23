@@ -362,3 +362,14 @@ The authenticator accepts codes from the neighbouring 30-second steps; a code is
 | Tests with deterministic fake embeddings (no shared words, unrelated question, failure fallback, model change, archive) and the Ollama adapter against a fake endpoint | done |
 
 No pgvector: the knowledge base is small, so vectors are compared in memory. The 0.55 floor is set for bge-m3 and not yet tuned on the company's real entries. 245 tests.
+
+## Phase 26 — Quality by model and training data from real work ✅ (2026-10-23)
+
+| Item | Status |
+| --- | --- |
+| `GET /reports/models?month=` (finance.read): per provider/model — runs (on the model that finished them), success rate, deliverables accepted/rejected by AI reviewers, tasks Done (human approval), average turns and seconds, tokens, cost per run, fallback switches away/in (from the run's “Switched from … to the fallback model …” notices) | done |
+| `TrainingExportService`: Succeeded, non-simulated runs with a saved conversation — Work runs whose task is Done and whose deliverable was not rejected, Plan runs whose plan was approved. One JSONL line each: `tag` (`real-<purpose>-<role>`), `tools` (OpenAI functions from the employee's current grants), `messages` (exact system prompt, conversation via `OpenAiProvider.BuildRequest`, trailing tool results trimmed) | done |
+| `GET /training/summary`, `GET /training/export?since=` (agent.manage, people only; export audited as `TrainingDataExported`) | done |
+| UI: “Quality by model” table on Finance → Performance; “Training data from real work” card on AI settings | done (typecheck/lint clean) |
+
+Tools are rebuilt from today's grants, not stored per run, so a grant changed since the run shows its current tools. Runs whose transcript the retention policy removed cannot be exported.

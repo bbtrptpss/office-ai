@@ -295,6 +295,17 @@ public static class Endpoints
         // Writes project money figures into a project document, so it needs both finance access and the right to manage documents.
         api.MapPost("/projects/{id:guid}/closeout/report", (Guid id, OfficeAI.Application.Reports.CompletionReportRequest req, OfficeAI.Application.Reports.CloseoutService s, CancellationToken ct) => s.WriteCompletionReportAsync(id, req, ct))
             .RequirePermission(Permissions.FinanceRead).RequirePermission(Permissions.KnowledgeManage);
+        api.MapGet("/reports/models", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.ModelPerformanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
+        // Real approved work as fine-tuning data (company data leaves the system as a file): people who manage AI only.
+        api.MapGet("/training/summary", (DateOnly? since, OfficeAI.Infrastructure.Ai.TrainingExportService s, CancellationToken ct) =>
+            s.SummaryAsync(since is { } d ? new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null, ct)).RequirePermission(Permissions.AgentManage);
+        api.MapGet("/training/export", async (DateOnly? since, OfficeAI.Infrastructure.Ai.TrainingExportService s, ICurrentUser me, SecurityAuditWriter audit, CancellationToken ct) =>
+        {
+            if (me.IsAgent) throw new OfficeAI.Domain.Common.ForbiddenException("Only a person can export training data.");
+            var (jsonl, count) = await s.ExportAsync(since is { } d ? new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null, ct);
+            await audit.WriteAsync("TrainingDataExported", "AgentRun", null, null, null, new { count, since }, ct);
+            return Results.File(System.Text.Encoding.UTF8.GetBytes(jsonl), "application/x-ndjson; charset=utf-8", $"officeai-real-{DateTime.UtcNow:yyyyMMdd}.jsonl");
+        }).RequirePermission(Permissions.AgentManage);
         api.MapGet("/reports/performance",(DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.PerformanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
         api.MapGet("/reports/quality-security", (int? days, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.QualitySecurityAsync(days ?? 30, ct)).RequirePermission(Permissions.AuditRead);
         api.MapGet("/operating-costs", (OfficeAI.Application.Reports.OperatingCostService s, CancellationToken ct) => s.ListAsync(ct)).RequirePermission(Permissions.FinanceRead);

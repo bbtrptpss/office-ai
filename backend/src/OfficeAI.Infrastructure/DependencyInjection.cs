@@ -160,6 +160,7 @@ public static class DependencyInjection
         services.AddScoped<CodeService>();
         services.AddScoped<OfficeAI.Application.Reports.ReportsService>();
         services.AddScoped<OfficeAI.Application.Reports.OperatingCostService>();
+        services.AddScoped<TrainingExportService>();
         services.AddScoped<OfficeAI.Application.Reports.CloseoutService>();
         services.Configure<OfficeAI.Application.Reports.DailyReportOptions>(config.GetSection("Reports:Daily"));
         services.AddScoped<OfficeAI.Application.Reports.DailyReportService>();
