@@ -646,8 +646,17 @@ export function CloseoutPanel({ projectId, onOpenDocuments }: { projectId: strin
               <TableRow>
                 <TableCell>{t.hoursLabel}</TableCell>
                 <TableCell align="right">{data.effort.plannedHours != null ? n(data.effort.plannedHours) : "—"}</TableCell>
-                <TableCell align="right"><Typography variant="body2" color="text.secondary">{t.notRecorded}</Typography></TableCell>
+                <TableCell align="right">{data.effort.actualHours != null
+                  ? `${n(data.effort.actualHours)} (${data.effort.people} ${t.peopleUnit})`
+                  : <Typography variant="body2" color="text.secondary">{t.notRecorded}</Typography>}</TableCell>
               </TableRow>
+              {data.effort.actualLabourThb != null && (
+                <TableRow>
+                  <TableCell>{t.laborCost}</TableCell>
+                  <TableCell align="right">{data.effort.plannedLabourThb != null ? thb(data.effort.plannedLabourThb) : "—"}</TableCell>
+                  <TableCell align="right" sx={{ color: m && m.labourOverrunThb > 0 ? "error.main" : undefined }}>{thb(data.effort.actualLabourThb)}</TableCell>
+                </TableRow>
+              )}
               <TableRow>
                 <TableCell>{t.aiCostLabel}</TableCell>
                 <TableCell align="right">{m ? thb(m.plannedAiThb) : "—"}</TableCell>

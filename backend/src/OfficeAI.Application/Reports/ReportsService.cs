@@ -28,7 +28,7 @@ public record FinanceReportDto(DateOnly Month, decimal UsdToThb, decimal TotalUs
 
 public record ProfitabilityRowDto(Guid ProjectId, string Code, string Name, int EstimateRevision, decimal PriceThb, decimal PlannedCostThb,
     decimal PlannedMarginThb, decimal PlannedMarginPercent, decimal PlannedAiThb, decimal ActualAiThb, decimal AiOverrunThb,
-    decimal ForecastCostThb, decimal ForecastMarginThb, decimal ForecastMarginPercent, bool AtRisk, decimal OperatingThb = 0);
+    decimal ForecastCostThb, decimal ForecastMarginThb, decimal ForecastMarginPercent, bool AtRisk, decimal OperatingThb = 0, decimal LabourOverrunThb = 0);
 public record ProfitabilityReportDto(decimal UsdToThb, decimal TotalPriceThb, decimal TotalPlannedMarginThb, decimal TotalForecastMarginThb, List<ProfitabilityRowDto> Projects);
 public record ScenarioRequest(Guid ProjectId, decimal HoursChangePercent = 0m, decimal RateChangePercent = 0m, decimal? AiCostUsd = null,
     decimal? UsdToThb = null, decimal? ContingencyPercent = null, decimal? PriceThb = null, bool RepriceAtTargetMargin = false);
@@ -207,26 +207,30 @@ public class ReportsService(IAppDbContext db, TimeProvider clock)
         var projects = await db.Projects.AsNoTracking().Where(p => p.Status != ProjectStatus.Cancelled && estimates.Keys.Contains(p.Id))
             .OrderBy(p => p.Code).ToListAsync(ct);
         var operating = await OperatingCostService.AllTimeByProjectAsync(db, CurrentMonth, settings.UsdToThb, ct);
+        var labour = new Dictionary<Guid, decimal?>();
+        foreach (var p in projects) labour[p.Id] = (await Work.TimesheetService.ActualAsync(db, p.Id, ct)).LabourThb;
 
-        var rows = projects.Select(p => Forecast(p, estimates[p.Id], actual.GetValueOrDefault(p.Id), settings.UsdToThb, operating.GetValueOrDefault(p.Id))).ToList();
+        var rows = projects.Select(p => Forecast(p, estimates[p.Id], actual.GetValueOrDefault(p.Id), settings.UsdToThb, operating.GetValueOrDefault(p.Id), labour[p.Id])).ToList();
         return new ProfitabilityReportDto(settings.UsdToThb, rows.Sum(r => r.PriceThb), rows.Sum(r => r.PlannedMarginThb), rows.Sum(r => r.ForecastMarginThb), rows);
     }
 
     /// <summary>
     /// Planned figures from the approved estimate; forecast cost adds any actual AI spend above the planned AI cost, and the
-    /// operating costs (electricity, flat-rate AI plans, hosting...) allocated to the project, which the estimate does not cover.
+    /// operating costs (electricity, flat-rate AI plans, hosting...) allocated to the project, which the estimate does not cover,
+    /// and recorded labour above the planned labour (hours people logged × their position rates; null when not costable).
     /// </summary>
-    internal static ProfitabilityRowDto Forecast(Project p, ProjectEstimate e, decimal actualAiUsd, decimal usdToThb, decimal operatingThb = 0)
+    internal static ProfitabilityRowDto Forecast(Project p, ProjectEstimate e, decimal actualAiUsd, decimal usdToThb, decimal operatingThb = 0, decimal? actualLabourThb = null)
     {
         var actualThb = Math.Round(actualAiUsd * usdToThb, 2, MidpointRounding.AwayFromZero);
         var overrun = Math.Max(0m, actualThb - e.AiCost);
-        var forecastCost = e.TotalCost + overrun + operatingThb;
+        var labourOverrun = actualLabourThb is { } l ? Math.Max(0m, l - e.LaborCost) : 0m;
+        var forecastCost = e.TotalCost + overrun + operatingThb + labourOverrun;
         var forecastMargin = e.Price - forecastCost;
         var forecastPct = e.Price == 0 ? 0 : Math.Round(forecastMargin / e.Price * 100m, 2, MidpointRounding.AwayFromZero);
         // At risk once the forecast margin has lost more than half of the planned margin, or turned negative.
         var atRisk = forecastMargin < 0 || forecastMargin < e.GrossMargin / 2;
         return new ProfitabilityRowDto(p.Id, p.Code, p.Name, e.Revision, e.Price, e.TotalCost, e.GrossMargin, e.GrossMarginPercent,
-            e.AiCost, actualThb, overrun, forecastCost, forecastMargin, forecastPct, atRisk, operatingThb);
+            e.AiCost, actualThb, overrun, forecastCost, forecastMargin, forecastPct, atRisk, operatingThb, labourOverrun);
     }
 
     /// <summary>What-if planning on the latest approved estimate. Read-only: nothing is stored or changed.</summary>

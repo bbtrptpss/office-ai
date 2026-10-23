@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.32.0",
+    date: "2026-10-23",
+    title: { th: "บันทึกเวลาทำงานของคน", en: "Timesheet for people" },
+    changes: [
+      { type: "added", th: "เมนู “บันทึกเวลาทำงาน”: คนบันทึกชั่วโมงที่ทำงานในแต่ละโปรเจกต์ต่อวัน (เลือกงานได้ ทีละ 15 นาที ไม่เกิน 24 ชม./วัน ย้อนหลังได้ 90 วัน) แก้หรือลบได้เฉพาะของตัวเอง และบันทึกได้เฉพาะโปรเจกต์ที่ตัวเองเห็น", en: "“Timesheet” menu: people log the hours they worked per project and day (optionally a task; quarter hours, at most 24 h a day, up to 90 days back), edit or delete only their own, and only on projects they can see" },
+      { type: "changed", th: "รายงานปิดโปรเจกต์แสดงชั่วโมงจริงที่บันทึก (กี่คน) และค่าแรงจริง = ชั่วโมง × อัตราของตำแหน่ง (เมื่อทุกตำแหน่งมีอัตราในตารางอัตราค่าแรง) แทน “ไม่ได้บันทึก” ค่าแรงที่เกินแผนถูกบวกในต้นทุนคาดการณ์ของรายงานกำไรด้วย", en: "Project closeout shows the hours actually logged (and by how many people) and actual labour = hours × position rate (when every position has a rate on the rate card) instead of “not recorded”; labour above plan is added to the profitability forecast cost" },
+    ],
+  },
+  {
     version: "0.31.0",
     date: "2026-10-23",
     title: { th: "คุณภาพแยกตามโมเดล และข้อมูลฝึกจากงานจริง", en: "Quality by model and training data from real work" },

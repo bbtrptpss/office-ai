@@ -17,7 +17,10 @@ namespace OfficeAI.Application.Reports;
 
 public record CloseoutTasksDto(int Total, int Done, int Open, int Overdue, int Failed, int Cancelled);
 public record CloseoutMilestoneDto(string Name, DateOnly? DueDate, int Tasks, int Done);
-public record CloseoutEffortDto(decimal? PlannedHours, int AiRuns, int AiRunsSucceeded, int AiRunsFailed, int SimulatedRuns, decimal AiRunHours, long Tokens);
+/// <param name="ActualHours">Hours people logged on the project; null when nobody has.</param>
+/// <param name="ActualLabourThb">Those hours at each person's position rate; null when any position has no rate.</param>
+public record CloseoutEffortDto(decimal? PlannedHours, int AiRuns, int AiRunsSucceeded, int AiRunsFailed, int SimulatedRuns, decimal AiRunHours, long Tokens,
+    decimal? ActualHours = null, decimal? ActualLabourThb = null, int People = 0, decimal? PlannedLabourThb = null);
 public record CloseoutQualityDto(int TestRuns, int TestsPassed, int MergeRequestsMerged, int MergeRequestsOpen, int ReviewsApproved,
     int ChangesRequested, int DeliverablesAccepted, int DeliverablesRejected);
 public record CloseoutKnowledgeDto(int LessonsProposed, int LessonsValidated, int Documents, int FinalDocuments);
@@ -59,10 +62,11 @@ public class CloseoutService(IAppDbContext db, TimeProvider clock)
         var actualUsd = await db.CostRecords.Where(c => c.Kind == CostKind.Actual && c.ProjectId == projectId).SumAsync(c => (decimal?)c.AmountUsd, ct) ?? 0m;
         var settings = await DeliveryService.SettingsAsync(db, ct);
         var operatingThb = (await OperatingCostService.AllTimeByProjectAsync(db, Domain.Finance.BudgetMath.MonthOf(now), settings.UsdToThb, ct)).GetValueOrDefault(projectId);
-        var money = estimate is null ? null : ReportsService.Forecast(p, estimate, actualUsd, settings.UsdToThb, operatingThb);
+        var (hours, labourThb, people) = await Work.TimesheetService.ActualAsync(db, projectId, ct);
+        var money = estimate is null ? null : ReportsService.Forecast(p, estimate, actualUsd, settings.UsdToThb, operatingThb, labourThb);
         var effort = new CloseoutEffortDto(estimate?.TotalHours, runs.Count, runs.Count(r => r.Status == AgentRunStatus.Succeeded),
             runs.Count(r => r.Status is AgentRunStatus.Failed or AgentRunStatus.LimitReached), runs.Count(r => r.IsSimulated),
-            Math.Round(runHours, 2, MidpointRounding.AwayFromZero), runs.Sum(r => r.Tokens));
+            Math.Round(runHours, 2, MidpointRounding.AwayFromZero), runs.Sum(r => r.Tokens), people > 0 ? hours : null, labourThb, people, estimate?.LaborCost);
 
         var taskIds = tasks.Select(t => t.Id).ToList();
         var repoIds = db.CodeRepositories.Where(r => r.ProjectId == projectId).Select(r => r.Id);
@@ -145,7 +149,11 @@ public static class CompletionReport
         {
             sb.AppendLine($"| | {T("แผน (ใบประเมิน rev", "Planned (estimate rev")} {m2.EstimateRevision}) | {T("จริง / คาดการณ์", "Actual / forecast")} |");
             sb.AppendLine("| --- | ---: | ---: |");
-            sb.AppendLine($"| {T("ชั่วโมงทำงาน", "Hours")} | {N(c.Effort.PlannedHours ?? 0)} | {T("ไม่ได้บันทึกในระบบ", "not recorded")} |");
+            sb.AppendLine($"| {T("ชั่วโมงทำงาน", "Hours")} | {N(c.Effort.PlannedHours ?? 0)} | {(c.Effort.ActualHours is { } h ? $"{N(h)} ({c.Effort.People} {T("คน", "people")})" : T("ยังไม่มีการบันทึก", "none recorded"))} |");
+            if (c.Effort.ActualLabourThb is { } labour)
+                sb.AppendLine($"| {T("ค่าแรง (THB)", "Labour (THB)")} | {N(c.Effort.PlannedLabourThb ?? 0)} | {N(labour)} |");
+            if (m2.LabourOverrunThb > 0)
+                sb.AppendLine($"| {T("ค่าแรงที่เกินแผน (THB)", "Labour above plan (THB)")} | — | {N(m2.LabourOverrunThb)} |");
             sb.AppendLine($"| {T("ค่า AI (THB)", "AI cost (THB)")} | {N(m2.PlannedAiThb)} | {N(m2.ActualAiThb)} |");
             if (m2.OperatingThb > 0)
                 sb.AppendLine($"| {T("ต้นทุนดำเนินงานที่ปันส่วนมา (THB)", "Allocated operating costs (THB)")} | — | {N(m2.OperatingThb)} |");
@@ -153,8 +161,8 @@ public static class CompletionReport
             sb.AppendLine($"| {T("ราคา (THB)", "Price (THB)")} | {N(m2.PriceThb)} | {N(m2.PriceThb)} |");
             sb.AppendLine($"| {T("กำไรขั้นต้น (THB)", "Gross margin (THB)")} | {N(m2.PlannedMarginThb)} ({N(m2.PlannedMarginPercent)}%) | {N(m2.ForecastMarginThb)} ({N(m2.ForecastMarginPercent)}%) |");
             sb.AppendLine();
-            sb.AppendLine(T("ต้นทุนรวมฝั่งจริงคือต้นทุนตามแผนบวกค่า AI จริงส่วนที่เกินแผน และต้นทุนดำเนินงานที่ปันส่วนมา (เช่นค่าไฟ แพ็กเกจ AI) ค่าแรงคนยังใช้ตัวเลขตามแผนเพราะระบบไม่ได้บันทึกชั่วโมงจริง",
-                "Actual total cost is the planned cost plus actual AI spend above plan and the operating costs allocated to the project (e.g. electricity, AI plans); labour stays at plan because actual hours are not recorded."));
+            sb.AppendLine(T("ต้นทุนรวมฝั่งจริงคือต้นทุนตามแผนบวกค่า AI จริงส่วนที่เกินแผน ต้นทุนดำเนินงานที่ปันส่วนมา (เช่นค่าไฟ แพ็กเกจ AI) และค่าแรงที่บันทึกจริงส่วนที่เกินแผน (ชั่วโมงที่บันทึก × อัตราของตำแหน่ง ถ้าทุกตำแหน่งมีอัตรา)",
+                "Actual total cost is the planned cost plus actual AI spend above plan, the operating costs allocated to the project (e.g. electricity, AI plans) and recorded labour above plan (logged hours × position rates, when every position has a rate)."));
         }
         else
         {

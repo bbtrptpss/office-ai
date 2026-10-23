@@ -198,3 +198,19 @@ internal class RetentionPolicyConfig : IEntityTypeConfiguration<Domain.Security.
         b.ToTable("RetentionPolicies");
     }
 }
+
+internal class TimeEntryConfig : IEntityTypeConfiguration<TimeEntry>
+{
+    public void Configure(EntityTypeBuilder<TimeEntry> b)
+    {
+        EntityConfig.Base(b);
+        b.ToTable("TimeEntries", t => t.HasCheckConstraint("CK_TimeEntries_Hours", "\"Hours\" > 0 AND \"Hours\" <= 24"));
+        b.Property(x => x.Hours).HasPrecision(5, 2);
+        b.Property(x => x.Note).HasMaxLength(500);
+        b.HasIndex(x => new { x.EmployeeId, x.Date });
+        b.HasIndex(x => x.ProjectId);
+        b.HasOne<EmployeeProfile>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<WorkTask>().WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.SetNull);
+    }
+}

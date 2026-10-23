@@ -136,6 +136,12 @@ export interface Milestone {
   version: number;
 }
 
+/** Hours a person logged on a project (optionally a task) on one day. */
+export interface TimeEntry {
+  id: string; employeeId: string; employeeName: string; projectId: string; projectCode: string; projectName: string; taskId: string | null; taskTitle: string | null;
+  date: string; hours: number; note: string | null; version: number;
+}
+
 export interface Task {
   id: string;
   projectId: string;
@@ -608,6 +614,8 @@ export interface ProfitabilityRow {
   forecastMarginThb: number;
   forecastMarginPercent: number;
   atRisk: boolean;
+  /** Logged labour (hours × position rates) above the planned labour; part of the forecast cost. */
+  labourOverrunThb: number;
   /** Operating costs (electricity, AI plans, hosting...) allocated to the project so far; part of the forecast cost. */
   operatingThb: number;
 }
@@ -623,7 +631,11 @@ export interface Closeout {
   generatedAt: string;
   tasks: { total: number; done: number; open: number; overdue: number; failed: number; cancelled: number };
   milestones: { name: string; dueDate: string | null; tasks: number; done: number }[];
-  effort: { plannedHours: number | null; aiRuns: number; aiRunsSucceeded: number; aiRunsFailed: number; simulatedRuns: number; aiRunHours: number; tokens: number };
+  effort: {
+    plannedHours: number | null; aiRuns: number; aiRunsSucceeded: number; aiRunsFailed: number; simulatedRuns: number; aiRunHours: number; tokens: number;
+    /** Hours people logged; null when nobody has. */
+    actualHours: number | null; actualLabourThb: number | null; people: number; plannedLabourThb: number | null;
+  };
   money: ProfitabilityRow | null;
   actualAiUsd: number;
   quality: { testRuns: number; testsPassed: number; mergeRequestsMerged: number; mergeRequestsOpen: number; reviewsApproved: number; changesRequested: number; deliverablesAccepted: number; deliverablesRejected: number };

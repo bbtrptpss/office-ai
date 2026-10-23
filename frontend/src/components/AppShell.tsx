@@ -33,6 +33,7 @@ import BusinessIcon from "@mui/icons-material/BusinessCenterOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import TuneIcon from "@mui/icons-material/TuneOutlined";
 import DarkModeIcon from "@mui/icons-material/DarkModeOutlined";
+import ScheduleIcon from "@mui/icons-material/Schedule";
 import LightModeIcon from "@mui/icons-material/LightModeOutlined";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -66,7 +67,7 @@ const glassPanel = (th: import("@mui/material/styles").Theme) => ({
 type NavKey =
   | "navDashboard" | "navOffice" | "navOrganization" | "navEmployees" | "navDepartments" | "navLeads" | "navProjects" | "navTaskBoard" | "navActivity"
   | "navApprovals" | "navChat" | "navAnnouncements" | "navMeetings" | "navKnowledge" | "navFinance" | "navQuality" | "navIntegrations"
-  | "navSecurity" | "navAudit" | "aiSettings" | "companySettings" | "navMySettings" | "navUpdates";
+  | "navSecurity" | "navAudit" | "aiSettings" | "companySettings" | "navMySettings" | "navUpdates" | "navTimesheet";
 
 interface NavItem {
   key: NavKey;
@@ -86,6 +87,7 @@ const NAV: NavItem[] = [
   { key: "navLeads", href: "/leads", icon: <ContactMailIcon />, permission: "project.all" },
   { key: "navProjects", href: "/projects", icon: <ViewKanbanIcon />, permission: "project.read" },
   { key: "navTaskBoard", href: "/tasks", icon: <ChecklistIcon />, permission: "task.read" },
+  { key: "navTimesheet", href: "/timesheet", icon: <ScheduleIcon />, permission: "task.read" },
   { key: "navActivity", href: "/agents", icon: <TimelineIcon />, permission: "agent.read" },
   { key: "navApprovals", href: "/approvals", icon: <TaskAltIcon />, permission: "task.read" },
   { key: "navChat", href: "/chat", icon: <ForumIcon />, permission: "org.read" },

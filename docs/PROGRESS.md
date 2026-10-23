@@ -373,3 +373,14 @@ No pgvector: the knowledge base is small, so vectors are compared in memory. The
 | UI: “Quality by model” table on Finance → Performance; “Training data from real work” card on AI settings | done (typecheck/lint clean) |
 
 Tools are rebuilt from today's grants, not stored per run, so a grant changed since the run shows its current tools. Runs whose transcript the retention policy removed cannot be exported.
+
+## Phase 27 — Timesheet ✅ (2026-10-23)
+
+| Item | Status |
+| --- | --- |
+| `TimeEntry` (employee, project, optional task, date, hours 0.25–24 in quarter hours, note), project-scoped query filter | done |
+| `TimesheetService`: people with a human employee profile log their own hours (no future days, 90 days back, ≤ 24 h a day, task must belong to the project, not on cancelled projects); edit/delete own only. `GET/POST /timesheet`, `PUT/DELETE /timesheet/{id}` (task.read), `GET /projects/{id}/hours` (project.read) | done |
+| Closeout: actual hours, people, actual labour at position rates (null when any position has no rate), planned labour; completion report rows. Profitability forecast adds labour above plan (`LabourOverrunThb`) | done |
+| UI: `/timesheet` (nav “Timesheet”), closeout effort table shows actual hours and labour | done (typecheck/lint clean) |
+
+AI employees never log time: their effort is their runs.
