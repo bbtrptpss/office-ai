@@ -77,7 +77,7 @@ builder.Services
     .AddRoles<AppRole>()
     .AddEntityFrameworkStores<AppDbContext>()
     .AddSignInManager()
-    .AddTokenProvider<AuthenticatorTokenProvider<AppUser>>(TokenOptions.DefaultAuthenticatorProvider) // two-factor sign-in (TOTP)
+    .AddTokenProvider<OneTimeAuthenticatorTokenProvider>(TokenOptions.DefaultAuthenticatorProvider) // two-factor sign-in (TOTP, each code once)
     .AddClaimsPrincipalFactory<AppClaimsFactory>();
 
 builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
