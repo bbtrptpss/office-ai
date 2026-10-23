@@ -31,6 +31,14 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.32.2",
+    date: "2026-10-23",
+    title: { th: "สถานะการค้นด้วยความหมาย", en: "Search-by-meaning status" },
+    changes: [
+      { type: "added", th: "หน้าคลังความรู้บอกว่าค้นด้วยความหมายเปิดอยู่ไหม ใช้โมเดลอะไร และสร้าง vector ไปแล้วกี่รายการจากทั้งหมด (GET /api/knowledge/search-status)", en: "The knowledge page shows whether search by meaning is on, which model it uses and how many entries already have a vector (GET /api/knowledge/search-status)" },
+    ],
+  },
+  {
     version: "0.32.1",
     date: "2026-10-23",
     title: { th: "รหัสจากแอป Authenticator ใช้ได้ครั้งเดียว", en: "Authenticator codes work once" },

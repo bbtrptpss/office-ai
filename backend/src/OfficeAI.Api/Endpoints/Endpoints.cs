@@ -337,6 +337,7 @@ public static class Endpoints
 
     private static void MapKnowledge(RouteGroupBuilder api)
     {
+        api.MapGet("/knowledge/search-status", (KnowledgeEmbeddingIndexer s, CancellationToken ct) => s.StatusAsync(ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/knowledge", (string? q, KnowledgeStatus? status, Guid? projectId, KnowledgeService s, CancellationToken ct) => s.ListAsync(q, status, projectId, ct)).RequirePermission(Permissions.ProjectRead);
         api.MapPost("/knowledge", (SaveKnowledgeRequest r, KnowledgeService s, CancellationToken ct) => s.CreateAsync(r, ct)).RequirePermission(Permissions.KnowledgeManage);
         api.MapPost("/knowledge/{id:guid}/status", (Guid id, SetKnowledgeStatusRequest r, KnowledgeService s, CancellationToken ct) => s.SetStatusAsync(id, r, ct)).RequirePermission(Permissions.KnowledgeManage);

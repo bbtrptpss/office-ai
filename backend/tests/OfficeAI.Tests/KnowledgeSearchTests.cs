@@ -41,10 +41,14 @@ public class KnowledgeSearchTests(ApiFixture fx)
         const string question = "ไปเที่ยวได้กี่วันต่อปีครับ"; // shares no word with the entry
 
         Assert.DoesNotContain(await SearchAsync(ceo, question), k => k.Id == entry.Id); // keywords alone miss it
+        Assert.False((await ceo.GetAsync<KnowledgeSearchStatusDto>("/api/knowledge/search-status")).ByMeaning);
         await WithEmbeddingsAsync(async () =>
         {
             Assert.True(await IndexAsync() >= 1);
             Assert.Equal(0, await IndexAsync()); // nothing changed: nothing re-embedded
+            var status = await ceo.GetAsync<KnowledgeSearchStatusDto>("/api/knowledge/search-status");
+            Assert.True(status.ByMeaning);
+            Assert.Equal(("fake-embed", status.Entries), (status.Model, status.Indexed)); // every non-archived entry has a vector
             Assert.Contains(await SearchAsync(ceo, question), k => k.Id == entry.Id);
             Assert.DoesNotContain(await SearchAsync(ceo, "ค่าส่งพัสดุไปต่างจังหวัดเท่าไร"), k => k.Id == entry.Id); // below the similarity floor
 
