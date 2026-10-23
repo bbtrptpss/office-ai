@@ -311,7 +311,7 @@ Browser check 2026-10-20 (CEO, real data): Defects, Release, Customer delivery a
 | A run ends once the task is handed on (delegate, request review, report blocked, plan/review submit); request review fails while delegated sub-tasks are open | done |
 | `TrainingPromptDumpTests`: writes the agents' real requests as OpenAI-style JSON when `OFFICEAI_DUMP_DIR` is set (fine-tuning data, `D:\FreeAi\train`) | done |
 
-Open: fine-tuned Qwen3-8B (training in `D:\FreeAi\train`) → GGUF → Ollama → evaluate → add in AI settings. Not yet checked in the browser.
+Fine-tuned Qwen3-8B (training in `D:\FreeAi\train`): round 2 is in Ollama as `officeai-qwen3:r2` and scored 23/28 in the agent evaluation (qwen3:8b 20/28, r1 15/28, same session, 2026-10-23). Adding it in AI settings and assigning it is the CEO's choice. Not yet checked in the browser.
 
 231 tests.
 
