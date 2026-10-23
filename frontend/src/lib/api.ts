@@ -225,6 +225,8 @@ export interface AiModel {
   cacheWriteUsdPerMTok: number;
   isEnabled: boolean;
   version: number;
+  /** Place in the company fallback order (1 = tried first); null when not a fallback. */
+  fallbackRank: number | null;
 }
 
 export interface AgentTool {

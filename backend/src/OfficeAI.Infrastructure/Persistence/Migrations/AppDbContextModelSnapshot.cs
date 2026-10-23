@@ -415,6 +415,9 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<int?>("FallbackRank")
+                        .HasColumnType("integer");
+
                     b.Property<decimal>("InputUsdPerMTok")
                         .HasPrecision(18, 6)
                         .HasColumnType("numeric(18,6)");

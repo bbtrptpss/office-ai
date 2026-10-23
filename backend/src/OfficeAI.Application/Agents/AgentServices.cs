@@ -17,7 +17,9 @@ public record VerifyProviderDto(bool Ok, string? Problem);
 public record CreateAiModelRequest(string Provider, string ModelId, string DisplayName, ModelTier Tier, decimal InputUsdPerMTok, decimal OutputUsdPerMTok,
     decimal CacheReadUsdPerMTok = 0, decimal CacheWriteUsdPerMTok = 0);
 public record AiModelDto(Guid Id, string Provider, string ModelId, string DisplayName, ModelTier Tier, decimal InputUsdPerMTok,
-    decimal OutputUsdPerMTok, decimal CacheReadUsdPerMTok, decimal CacheWriteUsdPerMTok, bool IsEnabled, uint Version);
+    decimal OutputUsdPerMTok, decimal CacheReadUsdPerMTok, decimal CacheWriteUsdPerMTok, bool IsEnabled, uint Version, int? FallbackRank = null);
+/// <param name="ModelIds">AiModel ids, tried in this order; an empty list turns fallback off.</param>
+public record SetFallbackOrderRequest(List<Guid> ModelIds);
 public record UpdateAiModelRequest(decimal InputUsdPerMTok, decimal OutputUsdPerMTok, decimal CacheReadUsdPerMTok, decimal CacheWriteUsdPerMTok, bool IsEnabled, uint? Version = null);
 public record ToolDto(string Id, string Version, string Description, bool RequiresApproval, bool HasSideEffects, int TimeoutSeconds);
 
@@ -134,8 +136,32 @@ public class AgentAdminService(IAppDbContext db, AiProviderRegistry providers, T
     public async Task<List<AiModelDto>> ListModelsAsync(CancellationToken ct) =>
         await db.AiModels.AsNoTracking().OrderBy(m => m.Provider).ThenByDescending(m => m.Tier).ThenBy(m => m.ModelId)
             .Select(m => new AiModelDto(m.Id, m.Provider, m.ModelId, m.DisplayName, m.Tier, m.InputUsdPerMTok, m.OutputUsdPerMTok,
-                m.CacheReadUsdPerMTok, m.CacheWriteUsdPerMTok, m.IsEnabled, m.Version))
+                m.CacheReadUsdPerMTok, m.CacheWriteUsdPerMTok, m.IsEnabled, m.Version, m.FallbackRank))
             .ToListAsync(ct);
+
+    /// <summary>Replaces the company-wide fallback order. Only enabled models of real providers; the simulated one never stands in for real work.</summary>
+    public async Task<List<AiModelDto>> SetFallbackOrderAsync(SetFallbackOrderRequest req, CancellationToken ct)
+    {
+        if (current.IsAgent) throw new ForbiddenException("Only a person can change the fallback order.");
+        var ids = req.ModelIds ?? [];
+        if (ids.Count > AiFallback.MaxModels) throw new DomainException("validation", $"At most {AiFallback.MaxModels} fallback models.");
+        if (ids.Distinct().Count() != ids.Count) throw new DomainException("validation", "A model is listed twice.");
+        var models = await db.AiModels.ToListAsync(ct);
+        foreach (var id in ids)
+        {
+            var m = models.FirstOrDefault(x => x.Id == id) ?? throw new NotFoundException("AiModel", id);
+            if (!m.IsEnabled) throw new DomainException("validation", $"{m.DisplayName} is disabled.");
+            if (providers.Find(m.Provider) is not { IsSimulated: false })
+                throw new DomainException("validation", $"{m.DisplayName} cannot be a fallback (unknown or simulated provider).");
+        }
+        foreach (var m in models)
+        {
+            var rank = ids.IndexOf(m.Id) is var i and >= 0 ? i + 1 : (int?)null;
+            if (m.FallbackRank != rank) m.FallbackRank = rank;
+        }
+        await db.SaveChangesAsync(ct);
+        return await ListModelsAsync(ct);
+    }
 
     public async Task<AiModelDto> UpdateModelAsync(Guid id, UpdateAiModelRequest req, CancellationToken ct)
     {
@@ -148,6 +174,7 @@ public class AgentAdminService(IAppDbContext db, AiProviderRegistry providers, T
         model.CacheReadUsdPerMTok = req.CacheReadUsdPerMTok;
         model.CacheWriteUsdPerMTok = req.CacheWriteUsdPerMTok;
         model.IsEnabled = req.IsEnabled;
+        if (!model.IsEnabled) model.FallbackRank = null; // a disabled model is never used, fallback included
         await db.SaveChangesAsync(ct);
         return (await ListModelsAsync(ct)).First(m => m.Id == id);
     }
@@ -221,7 +248,7 @@ public class AgentAdminService(IAppDbContext db, AiProviderRegistry providers, T
 }
 
 /// <summary>Starting, cancelling and inspecting AI runs.</summary>
-public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAgentRunQueue queue, IRealtimeNotifier notifier, ICurrentUser current, TimeProvider clock,
+public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, AiFallback fallback, IAgentRunQueue queue, IRealtimeNotifier notifier, ICurrentUser current, TimeProvider clock,
     Reports.ReportsService reports, Workflows.ApprovalService approvals)
 {
     /// <summary>A person starts a work run on a task assigned to an AI employee.</summary>
@@ -263,12 +290,18 @@ public class AgentRunService(IAppDbContext db, AiProviderRegistry providers, IAg
             ?? throw new DomainException("agent.not_configured", $"{employee.DisplayName} has no AI configuration.");
         if (!config.IsEnabled) throw new DomainException("agent.disabled", $"{employee.DisplayName} is disabled.");
         var provider = providers.Find(config.Provider);
-        if (provider is null || !provider.IsAvailable)
-            throw new DomainException("agent.provider_unavailable", $"AI provider '{config.Provider}' is not configured. Add its API key first.");
         var models = await db.AiModels.AsNoTracking().Where(m => m.Provider == config.Provider && m.IsEnabled).ToListAsync(ct);
         var configured = models.FirstOrDefault(m => m.ModelId == config.ModelId)
             ?? throw new DomainException("agent.model_unavailable", $"Model '{config.ModelId}' is not enabled or has no price.");
         var model = ModelRouter.Pick(configured, task.Complexity, models);
+        if (provider is null || !provider.IsAvailable)
+        {
+            // The employee's own provider is not set up: the company fallback order can still take the work.
+            var substitute = (await fallback.CandidatesAsync(db, provider?.IsSimulated ?? false, [], ct)).FirstOrDefault();
+            if (substitute.Provider is null)
+                throw new DomainException("agent.provider_unavailable", $"AI provider '{config.Provider}' is not configured. Add its API key first.");
+            (provider, model) = (substitute.Provider, substitute.Model);
+        }
 
         var monthStart = AgentAdminService.MonthStart(clock);
         var spent = await db.CostRecords.Where(c => c.EmployeeId == employeeId && c.Kind == CostKind.Actual && c.OccurredAt >= monthStart).SumAsync(c => c.AmountUsd, ct);

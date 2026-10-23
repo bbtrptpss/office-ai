@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import {
-  Alert, Autocomplete, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid, MenuItem, Paper, Stack, Switch, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, TextField, Typography,
+  Alert, Autocomplete, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid, IconButton, MenuItem, Paper, Stack, Switch, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import CloseIcon from "@mui/icons-material/Close";
 import { api, AiModel, AiProvider } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -67,6 +70,7 @@ export default function AiSettingsPage() {
       </Grid>
 
       {message && <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
+      <FallbackOrder models={data.models} providers={data.providers} canManage={canManage} onError={setMessage} onChanged={() => void reload()} />
       <Stack direction="row" sx={{ alignItems: "center", mb: 1 }}>
         <Typography variant="h6" sx={{ flex: 1 }}>{t.prices}</Typography>
         {canManage && <Button startIcon={<AddIcon />} onClick={() => setAdding(true)}>{t.addModel}</Button>}
@@ -112,6 +116,73 @@ export default function AiSettingsPage() {
       </TableContainer>
       {adding && <AddModelDialog providers={data.providers.filter((x) => !x.isSimulated).map((x) => x.name)} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); void reload(); }} />}
     </>
+  );
+}
+
+/** Company-wide order of models that take over when an employee's own model cannot answer. */
+function FallbackOrder({ models, providers, canManage, onError, onChanged }: {
+  models: AiModel[]; providers: AiProvider[]; canManage: boolean; onError: (m: string) => void; onChanged: () => void;
+}) {
+  const { t } = useI18n();
+  const errorMessage = useErrorMessage();
+  const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState("");
+  const order = models.filter((m) => m.fallbackRank != null).sort((a, b) => a.fallbackRank! - b.fallbackRank!);
+  const ready = (m: AiModel) => providers.some((p) => p.name === m.provider && p.isAvailable);
+  const simulated = new Set(providers.filter((p) => p.isSimulated).map((p) => p.name));
+  const addable = models.filter((m) => m.isEnabled && m.fallbackRank == null && !simulated.has(m.provider));
+
+  async function save(ids: string[]) {
+    setBusy(true);
+    try {
+      await api.put("/api/ai/fallback", { modelIds: ids });
+    } catch (e) {
+      onError(errorMessage(e));
+    }
+    setBusy(false);
+    onChanged();
+  }
+  const ids = order.map((m) => m.id);
+  const move = (i: number, by: number) => {
+    const next = [...ids];
+    [next[i], next[i + by]] = [next[i + by], next[i]];
+    void save(next);
+  };
+
+  return (
+    <Card variant="outlined" sx={{ mb: 3 }}>
+      <CardContent>
+        <Typography variant="h6">{t.fallbackOrder}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>{t.fallbackHint}</Typography>
+        {order.length === 0 && <Typography variant="body2" sx={{ mb: 1 }}>{t.fallbackEmpty}</Typography>}
+        <Stack spacing={0.5} sx={{ mb: canManage ? 1.5 : 0 }}>
+          {order.map((m, i) => (
+            <Stack key={m.id} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Chip size="small" label={i + 1} />
+              <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }} noWrap>
+                <b>{m.displayName}</b> <Typography component="span" variant="caption" color="text.secondary">{m.provider}/{m.modelId}</Typography>
+              </Typography>
+              {!ready(m) && <Chip size="small" color="warning" variant="outlined" label={t.providerNotReady} />}
+              {canManage && (
+                <>
+                  <Tooltip title={t.moveUp}><span><IconButton size="small" disabled={busy || i === 0} onClick={() => move(i, -1)}><ArrowUpwardIcon fontSize="small" /></IconButton></span></Tooltip>
+                  <Tooltip title={t.moveDown}><span><IconButton size="small" disabled={busy || i === order.length - 1} onClick={() => move(i, 1)}><ArrowDownwardIcon fontSize="small" /></IconButton></span></Tooltip>
+                  <Tooltip title={t.remove}><span><IconButton size="small" disabled={busy} onClick={() => void save(ids.filter((x) => x !== m.id))}><CloseIcon fontSize="small" /></IconButton></span></Tooltip>
+                </>
+              )}
+            </Stack>
+          ))}
+        </Stack>
+        {canManage && addable.length > 0 && (
+          <Stack direction="row" spacing={1}>
+            <TextField select size="small" sx={{ minWidth: 260, maxWidth: "100%" }} label={t.addFallback} value={adding} onChange={(e) => setAdding(e.target.value)}>
+              {addable.map((m) => <MenuItem key={m.id} value={m.id}>{m.displayName} · {m.provider}</MenuItem>)}
+            </TextField>
+            <Button disabled={busy || !adding} startIcon={<AddIcon />} onClick={() => { void save([...ids, adding]); setAdding(""); }}>{t.addFallback}</Button>
+          </Stack>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
