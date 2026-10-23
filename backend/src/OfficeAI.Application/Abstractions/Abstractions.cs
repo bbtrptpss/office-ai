@@ -55,6 +55,7 @@ public interface IAppDbContext
     DbSet<BudgetAllocation> BudgetAllocations { get; }
     DbSet<OperatingCost> OperatingCosts { get; }
     DbSet<KnowledgeEntry> KnowledgeEntries { get; }
+    DbSet<KnowledgeEmbedding> KnowledgeEmbeddings { get; }
     DbSet<ProjectDocument> Documents { get; }
     DbSet<IntegrationConfiguration> Integrations { get; }
     DbSet<IntegrationDelivery> IntegrationDeliveries { get; }

@@ -84,6 +84,10 @@ public static class DependencyInjection
         services.Configure<OllamaOptions>(config.GetSection("AiProviders:Ollama"));
         services.AddHttpClient(OllamaProvider.HttpClientName, c => c.Timeout = Timeout.InfiniteTimeSpan);
         services.AddSingleton<IAiProvider, OllamaProvider>();
+        services.AddHttpClient(OllamaEmbeddingProvider.HttpClientName);
+        services.AddSingleton<OfficeAI.Application.Knowledge.IEmbeddingProvider, OllamaEmbeddingProvider>();
+        services.AddScoped<OfficeAI.Application.Knowledge.KnowledgeSearch>();
+        services.AddScoped<OfficeAI.Application.Knowledge.KnowledgeEmbeddingIndexer>();
         services.AddHttpClient(ClaudeCodeProvider.HttpClientName, c => c.Timeout = Timeout.InfiniteTimeSpan);
         services.AddSingleton<IAiProvider, ClaudeCodeProvider>(); // uses the ClaudeBridge options configured below
         services.AddSingleton<AiProviderRegistry>();

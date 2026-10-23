@@ -126,6 +126,25 @@ public class ProviderAdapterTests
         Assert.False(new OllamaProvider(new Factory(handler), Options.Create(new OllamaOptions())).IsAvailable);
     }
 
+    [Fact]
+    public async Task Ollama_embeddings_use_the_server_root_and_are_off_without_a_model()
+    {
+        var handler = new FakeHandler(HttpStatusCode.OK, """{"model":"bge-m3","embeddings":[[0.1,0.2],[0.3,0.4]]}""");
+        var embed = new OllamaEmbeddingProvider(new Factory(handler), Options.Create(new OllamaOptions { BaseUrl = "http://ollama.test:11434/v1/", EmbeddingModel = "bge-m3" }));
+        Assert.True(embed.IsAvailable);
+        var vectors = await embed.EmbedAsync(["ลาพักร้อน", "salary"], CancellationToken.None);
+        Assert.Equal("http://ollama.test:11434/api/embed", handler.Request!.RequestUri!.ToString());
+        using var sent = JsonDocument.Parse(handler.RequestBody!);
+        Assert.Equal("bge-m3", sent.RootElement.GetProperty("model").GetString());
+        Assert.Equal(2, sent.RootElement.GetProperty("input").GetArrayLength());
+        Assert.Equal([0.3f, 0.4f], vectors[1]);
+
+        Assert.False(new OllamaEmbeddingProvider(new Factory(handler), Options.Create(new OllamaOptions { BaseUrl = "http://ollama.test:11434/v1" })).IsAvailable);
+        var missing = new OllamaEmbeddingProvider(new Factory(new FakeHandler(HttpStatusCode.NotFound, """{"error":"model \"bge-m3\" not found"}""")),
+            Options.Create(new OllamaOptions { BaseUrl = "http://ollama.test:11434/v1", EmbeddingModel = "bge-m3" }));
+        await Assert.ThrowsAsync<HttpRequestException>(() => missing.EmbedAsync(["x"], CancellationToken.None));
+    }
+
     // ---------------- Claude Code (via the bridge) ----------------
 
     private static (ClaudeCodeProvider, FakeHandler) ClaudeCode(string reply) =>

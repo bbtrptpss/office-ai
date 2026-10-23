@@ -2797,6 +2797,33 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                     b.ToTable("UserPreferences", (string)null);
                 });
 
+            modelBuilder.Entity("OfficeAI.Domain.Knowledge.KnowledgeEmbedding", b =>
+                {
+                    b.Property<Guid>("KnowledgeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("EmbeddedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.PrimitiveCollection<float[]>("Vector")
+                        .IsRequired()
+                        .HasColumnType("real[]");
+
+                    b.HasKey("KnowledgeId");
+
+                    b.ToTable("KnowledgeEmbeddings", (string)null);
+                });
+
             modelBuilder.Entity("OfficeAI.Domain.Knowledge.KnowledgeEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4389,6 +4416,15 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                     b.HasOne("OfficeAI.Infrastructure.Identity.AppUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OfficeAI.Domain.Knowledge.KnowledgeEmbedding", b =>
+                {
+                    b.HasOne("OfficeAI.Domain.Knowledge.KnowledgeEntry", null)
+                        .WithOne()
+                        .HasForeignKey("OfficeAI.Domain.Knowledge.KnowledgeEmbedding", "KnowledgeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

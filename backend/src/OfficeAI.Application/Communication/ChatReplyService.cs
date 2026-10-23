@@ -13,7 +13,7 @@ namespace OfficeAI.Application.Communication;
 /// Writes an AI employee's answer to a person who @mentioned it in chat. One model call with no tools: the AI can talk,
 /// not act. Every call is priced and recorded as an actual cost, and all the usual budgets apply.
 /// </summary>
-public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, AiFallback fallback, ReportsService reports, IRealtimeNotifier notifier,
+public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, AiFallback fallback, Knowledge.KnowledgeSearch knowledge, ReportsService reports, IRealtimeNotifier notifier,
     TimeProvider clock, ILogger<ChatReplyService> log)
 {
     public const int ContextMessages = 20;
@@ -164,8 +164,7 @@ public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, Ai
     private async Task<string> KnowledgeAsync(ChatReply reply, ChatChannel channel, CancellationToken ct)
     {
         var question = await db.ChatMessages.AsNoTracking().Where(m => m.Id == reply.TriggerMessageId).Select(m => m.Body).FirstAsync(ct);
-        var hits = await Knowledge.KnowledgeService.SearchQuery(db, question, channel.ProjectId)
-            .Where(k => k.Status == Domain.Knowledge.KnowledgeStatus.Validated).Take(KnowledgeEntries).ToListAsync(ct);
+        var hits = await knowledge.SearchAsync(question, channel.ProjectId, Domain.Knowledge.KnowledgeStatus.Validated, KnowledgeEntries, ct);
         if (hits.Count == 0) return "";
         var sb = new StringBuilder("\nCompany knowledge that may answer the question (validated; answer from it and name the topic; if it does not cover the question, say so):\n");
         foreach (var k in hits)

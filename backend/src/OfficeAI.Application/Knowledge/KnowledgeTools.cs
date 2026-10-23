@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using OfficeAI.Application.Abstractions;
 using OfficeAI.Application.Agents;
 using OfficeAI.Domain.Agents;
@@ -22,8 +23,8 @@ internal static class K
     }
 }
 
-/// <summary>Search validated company and project knowledge. Proposed entries are never returned: they are not trusted yet.</summary>
-public sealed class SearchKnowledgeTool : IAgentTool
+/// <summary>Search validated company and project knowledge (by keyword and meaning). Proposed entries are never returned: they are not trusted yet.</summary>
+public sealed class SearchKnowledgeTool(IEmbeddingProvider embeddings, ILogger<KnowledgeSearch> log) : IAgentTool
 {
     public const string ToolId = "knowledge.search";
 
@@ -37,8 +38,7 @@ public sealed class SearchKnowledgeTool : IAgentTool
     {
         var q = (K.Str(input, "query") ?? "").Trim();
         if (q.Length < 2) return ToolResult.Fail("query must have at least 2 characters.");
-        var hits = await KnowledgeService.SearchQuery(ctx.Db, q, ctx.ProjectId)
-            .Where(k => k.Status == KnowledgeStatus.Validated).Take(10).ToListAsync(ct);
+        var hits = await new KnowledgeSearch(ctx.Db, embeddings, log).SearchAsync(q, ctx.ProjectId, KnowledgeStatus.Validated, 10, ct);
         return ToolResult.Ok(hits.Select(k => new
         {
             id = k.Id, kind = k.Kind.ToString(), k.Title, scope = k.ProjectId is null ? "company" : "project", k.Source, snippet = K.Snippet(k.Body, q),

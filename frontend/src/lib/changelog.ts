@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.30.0",
+    date: "2026-10-23",
+    title: { th: "ค้นคลังความรู้ด้วยความหมาย", en: "Knowledge search by meaning" },
+    changes: [
+      { type: "added", th: "ค้นคลังความรู้ด้วยความหมาย (embedding) ร่วมกับการจับคำแบบเดิม: ถามคนละคำก็เจอ เช่น “ไปเที่ยวได้กี่วัน” เจอนโยบาย “วันหยุดประจำปี” ใช้ทั้งในเครื่องมือค้นความรู้ของพนักงาน AI คำตอบในแชท และช่องค้นหาในหน้าคลังความรู้", en: "Knowledge search by meaning (embeddings) alongside the keyword search: a question in other words still finds the entry, e.g. “how many days can I go on holiday” finds the “annual leave” policy. Used by the AI employees' knowledge search, chat answers and the knowledge page search" },
+      { type: "changed", th: "ผลที่เจอด้วยความหมายต้องคล้ายพอ (ไม่ส่งความรู้ที่ไม่เกี่ยวให้ AI) จึงยังตอบได้ว่า “ไม่มีข้อมูล” เมื่อคลังไม่ครอบคลุม ถ้าไม่ได้ตั้งโมเดลหรือเรียกไม่สำเร็จ จะค้นด้วยคำแบบเดิม", en: "A meaning-only hit must be similar enough (unrelated knowledge is not handed to the AI), so it can still say there is no information when the knowledge base does not cover a question. Without a model, or when the call fails, search falls back to keywords" },
+      { type: "added", th: "ใช้โมเดล embedding บน Ollama ในเครื่อง (ฟรี) เช่น bge-m3 ที่รองรับภาษาไทย ตั้งด้วย OLLAMA_EMBED_MODEL ใน .env ระบบสร้าง vector ให้ความรู้ใหม่/ที่แก้ไขทุก 30 วินาที และสร้างใหม่ทั้งหมดเมื่อเปลี่ยนโมเดล (vector ไม่เข้า audit log)", en: "Uses an embedding model on the local Ollama (free), e.g. bge-m3, which handles Thai; set OLLAMA_EMBED_MODEL in .env. New or edited knowledge is embedded every 30 seconds, and everything again when the model changes (vectors never reach the audit log)" },
+    ],
+  },
+  {
     version: "0.29.0",
     date: "2026-10-23",
     title: { th: "ต้นทุนดำเนินงาน (ค่าไฟ แพ็กเกจ AI server)", en: "Operating costs (electricity, AI plans, servers)" },

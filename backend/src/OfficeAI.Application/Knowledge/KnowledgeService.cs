@@ -13,7 +13,7 @@ public record DocumentDto(Guid Id, Guid ProjectId, DocumentKind Kind, string Tit
     bool IsSimulated, DateTimeOffset CreatedAt, string? Content);
 
 /// <summary>Knowledge base and project documents. Knowledge is trusted only after a person validates it.</summary>
-public class KnowledgeService(IAppDbContext db, ICurrentUser current, TimeProvider clock)
+public class KnowledgeService(IAppDbContext db, ICurrentUser current, TimeProvider clock, KnowledgeSearch search)
 {
     /// <summary>
     /// Case-insensitive match on title, body and tags, limited to company-wide entries and the given project.
@@ -43,11 +43,9 @@ public class KnowledgeService(IAppDbContext db, ICurrentUser current, TimeProvid
 
     public async Task<List<KnowledgeDto>> ListAsync(string? query, KnowledgeStatus? status, Guid? projectId, CancellationToken ct)
     {
-        var q = string.IsNullOrWhiteSpace(query)
-            ? db.KnowledgeEntries.AsNoTracking().Where(k => projectId == null || k.ProjectId == null || k.ProjectId == projectId).OrderByDescending(k => k.CreatedAt)
-            : SearchQuery(db, query.Trim(), projectId);
-        if (status is { } s) q = q.Where(k => k.Status == s);
-        var rows = await q.Take(200).ToListAsync(ct);
+        if (!string.IsNullOrWhiteSpace(query)) return await ToDtosAsync(await search.SearchAsync(query.Trim(), projectId, status, 200, ct), ct);
+        var q = db.KnowledgeEntries.AsNoTracking().Where(k => projectId == null || k.ProjectId == null || k.ProjectId == projectId).OrderByDescending(k => k.CreatedAt);
+        var rows = await (status is { } s ? q.Where(k => k.Status == s) : q).Take(200).ToListAsync(ct);
         return await ToDtosAsync(rows, ct);
     }
 
