@@ -283,22 +283,6 @@ public class ChatAiReplyTests(ApiFixture fx)
     }
 
     [Fact]
-    public async Task Terminal_runs_commands_for_the_CEO_only_and_audits_them()
-    {
-        var ceo = await fx.CeoAsync();
-        var result = await ceo.PostAsync<TerminalResultDto>("/api/assistant/terminal", new { command = "git status" });
-        Assert.Equal("ran: git status", result.Output);
-        Assert.Equal(0, result.ExitCode);
-        Assert.Equal("git status", fx.Claude.Commands.Last());
-        var audit = await ceo.GetAsync<List<AuditLogDto>>("/api/audit?entityType=Terminal&take=5");
-        Assert.Contains(audit, a => a.Action == "TerminalCommand" && (a.NewValues ?? "").Contains("git status"));
-
-        var manager = await fx.UserWithRolesAsync(SystemRoles.Manager, SystemRoles.Member);
-        Assert.Equal(System.Net.HttpStatusCode.Forbidden, (await manager.PostAsJsonAsync("/api/assistant/terminal", new { command = "dir" })).StatusCode);
-        Assert.Equal("git status", fx.Claude.Commands.Last());
-    }
-
-    [Fact]
     public async Task Claude_hands_work_to_an_AI_employee_which_runs_it_and_reports_in_the_assistant_channel()
     {
         var ceo = await fx.CeoAsync();

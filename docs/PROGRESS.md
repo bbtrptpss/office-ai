@@ -328,3 +328,14 @@ Open: fine-tuned Qwen3-8B (training in `D:\FreeAi\train`) → GGUF → Ollama �
 | AI settings: “Fallback models” card (add, reorder, remove, “provider not ready” warning) | done (typecheck/lint clean; browser walkthrough not done) |
 
 237 tests.
+
+## Phase 23 — Two-factor sign-in and the terminal step-up ✅ (2026-10-23)
+
+| Item | Status |
+| --- | --- |
+| §14 security: TOTP two-factor sign-in (ASP.NET Identity `AuthenticatorTokenProvider`; key and recovery codes in `UserTokens`, no migration). `GET /auth/2fa`, `POST /auth/2fa/setup` (new key each time until confirmed; refused while on), `/enable {code}` (10 recovery codes, shown once), `/disable {password, code or recovery code}` (resets the key), `/recovery-codes {code}` | done |
+| Login: a right password with 2FA on answers `200 {requiresTwoFactor:true}` and signs nothing in; `POST /auth/login/2fa {code | recoveryCode}` finishes it (rate-limited, failures count towards lockout, audited) | done |
+| Terminal step-up: `/assistant/terminal` needs the CEO role, 2FA on (`terminal.2fa_required`) and an open terminal (`terminal.locked`, 403). `POST /assistant/terminal/unlock {code}` opens it for 15 idle minutes (`TerminalGate`, in memory, bound to the security stamp); `/lock`, `/status`; sign-out locks it | done |
+| UI: login code step (authenticator or recovery code), “Two-factor sign-in” card on My settings (QR via `qrcode`, key to type, recovery codes, turn off), terminal asks for the code inline and then runs the waiting command | done (typecheck/lint clean) |
+
+The authenticator accepts codes from the neighbouring 30-second steps; a code is not blocked from being reused inside that window. 239 tests.

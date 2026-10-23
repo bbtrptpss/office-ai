@@ -88,6 +88,7 @@ public static class DependencyInjection
         services.AddSingleton<IAiProvider, ClaudeCodeProvider>(); // uses the ClaudeBridge options configured below
         services.AddSingleton<AiProviderRegistry>();
         services.AddSingleton<AiFallback>(); // remembers failed models across runs
+        services.AddSingleton<OfficeAI.Application.Communication.TerminalGate>(); // open terminals, in memory
 
         services.AddSingleton<IAgentTool, TaskContextTool>();
         services.AddSingleton<IAgentTool, ProjectTasksTool>();

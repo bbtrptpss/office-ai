@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.28.0",
+    date: "2026-10-23",
+    title: { th: "การยืนยันสองขั้น และ Terminal ที่ต้องใส่รหัส", en: "Two-factor sign-in and a terminal behind a code" },
+    changes: [
+      { type: "security", th: "การยืนยันสองขั้น (2FA) ด้วยแอป Authenticator: เปิดได้ที่ “การตั้งค่าของฉัน” (สแกน QR แล้วยืนยันด้วยรหัส 6 หลัก) ได้รหัสกู้คืน 10 รหัสที่แสดงครั้งเดียว เมื่อเปิดแล้วการเข้าสู่ระบบต้องใส่รหัสจากแอป (หรือรหัสกู้คืน) หลังรหัสผ่าน รหัสผิดนับรวมกับการล็อกบัญชี 5 ครั้ง ปิดได้ด้วยรหัสผ่าน + รหัสจากแอป", en: "Two-factor sign-in (2FA) with an authenticator app: turn it on in “My settings” (scan the QR code, confirm with a 6-digit code) and get 10 recovery codes shown once. Once on, signing in needs a code from the app (or a recovery code) after the password; wrong codes count towards the 5-attempt lockout. Turning it off needs the password and a code" },
+      { type: "security", th: "Terminal บนหน้าภาพรวมใช้ได้เฉพาะ CEO ที่เปิด 2FA แล้ว และต้องพิมพ์รหัส 6 หลักจากแอปเพื่อเปิด เปิดค้างได้ 15 นาทีนับจากคำสั่งล่าสุด และล็อกทันทีเมื่อออกจากระบบ เปลี่ยนรหัสผ่าน ปิด 2FA หรือรีสตาร์ตระบบ — คำสั่งที่พิมพ์ไว้ตอนล็อกจะรันต่อเองหลังใส่รหัสถูก", en: "The overview Terminal is for a CEO with 2FA on, and opens only with a 6-digit code from the app. It stays open 15 minutes after the last command and locks at once on sign-out, a password change, turning 2FA off or a restart — the command typed while locked runs once the code is accepted" },
+      { type: "added", th: "บันทึกการตรวจสอบมีรายการเปิด/ปิด 2FA สร้างรหัสกู้คืนใหม่ เปิด Terminal และใส่รหัส Terminal ผิด (ไม่เคยบันทึกกุญแจหรือรหัสกู้คืน)", en: "The audit log records 2FA on/off, new recovery codes, terminal unlocks and wrong terminal codes (never the key or the recovery codes)" },
+    ],
+  },
+  {
     version: "0.27.0",
     date: "2026-10-23",
     title: { th: "โมเดลสำรองเมื่อ AI ตอบไม่ได้", en: "Fallback models when an AI cannot answer" },

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { AgentRun, api, Assistant, ChatMessage, ClaudeReply, Dashboard, Meeting, RecentTask, TerminalResult, usd } from "@/lib/api";
+import { AgentRun, api, ApiError, Assistant, ChatMessage, ClaudeReply, Dashboard, Meeting, RecentTask, TerminalResult, usd } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -226,6 +226,8 @@ function Stage() {
   const isCeo = !!me?.roles.includes("CEO");
   const [chatMode, setChatMode] = useState(false);
   const terminal = isCeo && !chatMode;
+  // The terminal needs a fresh authenticator code: the command waiting for it runs once the code opens the terminal.
+  const [unlockFor, setUnlockFor] = useState<string | null>(null);
   const members = [
     ...(claudeOn ? [{ employeeId: CLAUDE_ID, displayName: terminal ? "Terminal" : "Claude", jobTitle: terminal ? t.dashTerminalTitle : t.dashClaudeTitle, status: "Available" as const, openTasks: 0, currentTask: null }] : []),
     ...(assistant?.members ?? []),
@@ -274,18 +276,34 @@ function Stage() {
     setNote(null);
     const at = key;
     const isTerminal = isClaude && terminal;
-    update(at, (list) => [...list, { question: isTerminal ? `PS> ${question}` : question, typing: true }]);
+    const unlocking = isTerminal && unlockFor !== null && /^\d{6}$/.test(question.replace(/\s/g, ""));
+    update(at, (list) => [...list, { question: unlocking ? "🔐 ••••••" : isTerminal ? `PS> ${question}` : question, typing: true }]);
     const failed = (err: unknown, from?: string) => settle(at, { answer: err instanceof Error ? err.message : String(err), from });
     if (isTerminal) {
       setPending(true);
+      let command = question;
       try {
-        const res = await api.post<TerminalResult>("/api/assistant/terminal", { command: question });
+        if (unlocking) {
+          await api.post("/api/assistant/terminal/unlock", { code: question.replace(/\s/g, "") });
+          command = unlockFor!;
+          setUnlockFor(null);
+          settle(at, { answer: t.dashTerminalUnlocked, from: "Terminal" });
+          update(at, (list) => [...list, { question: `PS> ${command}`, typing: true }]);
+        }
+        const res = await api.post<TerminalResult>("/api/assistant/terminal", { command });
         const footer = res.timedOut ? t.dashTerminalTimedOut : `exit ${res.exitCode} · ${(res.ms / 1000).toFixed(1)}s`;
         settle(at, { answer: `${res.output || t.dashTerminalNoOutput}
 
 ${footer}`, from: "Terminal", mono: true });
       } catch (err) {
-        failed(err, "Terminal");
+        const code = err instanceof ApiError ? err.code : undefined;
+        if (code === "terminal.locked") {
+          setUnlockFor(command);
+          settle(at, { answer: t.dashTerminalLocked, from: "Terminal" });
+        } else if (code === "terminal.2fa_required") {
+          setUnlockFor(null);
+          settle(at, { answer: t.dashTerminal2faRequired, from: "Terminal" });
+        } else failed(err, "Terminal");
       } finally {
         setPending(false);
       }
@@ -373,7 +391,7 @@ ${footer}`, from: "Terminal", mono: true });
       <div className={s.composer}>
         <form className={s.ask} onSubmit={ask}>
           <input value={input} onChange={(e) => setInput(e.target.value)} disabled={!canAsk} autoComplete="off" maxLength={3000}
-            placeholder={isClaude && terminal ? t.dashTerminalPlaceholder : current ? t.dashAskPlaceholder.replace("{name}", current.displayName) : t.dashNoAssistant} />
+            placeholder={isClaude && terminal ? (unlockFor !== null ? t.dashTerminalCodePlaceholder : t.dashTerminalPlaceholder) : current ? t.dashAskPlaceholder.replace("{name}", current.displayName) : t.dashNoAssistant} />
           <button type="submit" className={s.send} title={t.send} disabled={!canAsk || !input.trim() || pending}><Arrow /></button>
         </form>
         <div className={s.chips}>

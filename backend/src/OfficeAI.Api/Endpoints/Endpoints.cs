@@ -66,6 +66,8 @@ public static class Endpoints
                 await audit.WriteAsync(AuditActions.LoginSucceeded, "User", user.Id.ToString(), user.Id, user.DisplayName, null, ct);
                 return Results.NoContent();
             }
+            // Password right, two-factor on: not signed in yet; the code goes to /auth/login/2fa.
+            if (result.RequiresTwoFactor) return Results.Ok(new LoginResultDto(true));
             if (result.IsLockedOut)
             {
                 await audit.WriteAsync(AuditActions.LockedOut, "User", user.Id.ToString(), user.Id, user.DisplayName, null, ct);
@@ -88,8 +90,11 @@ public static class Endpoints
             return Results.NoContent();
         }).RequireAuthorization();
 
-        auth.MapPost("/logout", async (SignInManager<AppUser> signIn) =>
+        TwoFactorEndpoints.Map(auth);
+
+        auth.MapPost("/logout", async (SignInManager<AppUser> signIn, ICurrentUser me, TerminalGate gate) =>
         {
+            if (me.UserId is { } id) gate.Lock(id);
             await signIn.SignOutAsync();
             return Results.NoContent();
         }).RequireAuthorization();
@@ -135,14 +140,7 @@ public static class Endpoints
         // It hands work to AI employees only when the person may also create and assign tasks and run AI.
         api.MapPost("/assistant/claude", async (ClaudeAskRequest r, ClaudeChatService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
             await s.AskAsync(r, (await ChatAccessAsync(perms, me, ct)).CanCommandAi, ct)).RequirePermission(Permissions.AgentManage);
-        // The dashboard terminal: any PowerShell command in the project folder on the host, for the CEO role only (never an AI identity).
-        api.MapPost("/assistant/terminal", async (TerminalRequest r, TerminalService s, ICurrentUser me, UserManager<AppUser> users, CancellationToken ct) =>
-        {
-            var user = me.UserId is { } id ? await users.FindByIdAsync(id.ToString()) : null;
-            if (user is null || user.IsAgent || !await users.IsInRoleAsync(user, SystemRoles.Ceo))
-                throw new OfficeAI.Domain.Common.ForbiddenException("The terminal is for the CEO only.");
-            return await s.RunAsync(r, ct);
-        }).RequirePermission(Permissions.AgentManage);
+        TwoFactorEndpoints.MapTerminal(api); // the dashboard terminal: CEO only, behind two-factor sign-in
 
         api.MapGet("/projects", (WorkService s, CancellationToken ct) => s.ListProjectsAsync(ct)).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/projects/{id:guid}", (Guid id, WorkService s, CancellationToken ct) => s.GetProjectAsync(id, ct)).RequirePermission(Permissions.ProjectRead);
