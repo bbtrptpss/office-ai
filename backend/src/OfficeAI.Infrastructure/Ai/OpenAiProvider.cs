@@ -183,7 +183,8 @@ internal static class HttpAi
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
                 throw new AiProviderException($"{providerLabel} rate limit reached: {detail}", retryable: true, rateLimited: true, retryAfter: RetryAfter(response, text));
             if (status >= 500) throw new AiProviderException($"{providerLabel} service error ({status}).", retryable: true);
-            throw new AiProviderException($"{providerLabel} rejected the request ({status}): {detail}", retryable: false);
+            // 401/402/403: the key, credit or plan is the problem, not this request.
+            throw new AiProviderException($"{providerLabel} rejected the request ({status}): {detail}", retryable: false, accountProblem: status is 401 or 402 or 403);
         }
     }
 

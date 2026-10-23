@@ -87,6 +87,7 @@ public static class DependencyInjection
         services.AddHttpClient(ClaudeCodeProvider.HttpClientName, c => c.Timeout = Timeout.InfiniteTimeSpan);
         services.AddSingleton<IAiProvider, ClaudeCodeProvider>(); // uses the ClaudeBridge options configured below
         services.AddSingleton<AiProviderRegistry>();
+        services.AddSingleton<AiFallback>(); // remembers failed models across runs
 
         services.AddSingleton<IAgentTool, TaskContextTool>();
         services.AddSingleton<IAgentTool, ProjectTasksTool>();

@@ -21,6 +21,9 @@ public class AiModel : Entity, IAuditable
     public decimal CacheReadUsdPerMTok { get; set; }
     public decimal CacheWriteUsdPerMTok { get; set; }
     public bool IsEnabled { get; set; } = true;
+
+    /// <summary>Place in the company-wide fallback order (1 = tried first) when a run's own model cannot answer; null = not a fallback.</summary>
+    public int? FallbackRank { get; set; }
 }
 
 /// <summary>An AI provider key entered on the AI settings page. Only the encrypted value and its last 4 characters are stored.</summary>

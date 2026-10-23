@@ -314,3 +314,17 @@ Browser check 2026-10-20 (CEO, real data): Defects, Release, Customer delivery a
 Open: fine-tuned Qwen3-8B (training in `D:\FreeAi\train`) → GGUF → Ollama → evaluate → add in AI settings. Not yet checked in the browser.
 
 231 tests.
+
+## Phase 22 — Fallback models ✅ (2026-10-23)
+
+| Item | Status |
+| --- | --- |
+| §15 “Graceful handling of provider failures”: `AiModel.FallbackRank` (company-wide order, max 10); `PUT /api/ai/fallback {modelIds}` (agent.manage, people only; enabled real models only, no duplicates); disabling a model removes it from the order | done |
+| `AiFallback.ShouldSwitch`: retryable errors once retries are used up, rate limits (a daily quota switches at once), and account problems (`AiProviderException.AccountProblem`: not configured, 401/402/403, no credit). Rejected requests (400 etc.) never switch | done |
+| `AgentExecutor`: a failing call moves the run to the next usable fallback (same provider kind: never simulated ↔ real), continuing the saved conversation; a Notice step records from/to/reason; each turn's usage and cost use the model that answered. A run whose provider is not configured, or whose model is cooling down, starts on the fallback | done |
+| Cooldown (in memory, per model): 1 h after a daily quota or account problem, 2 min (or the provider's Retry-After) after an outage. Cooling models go last in the order | done |
+| `AgentRunService.CreateRunAsync` and `AgentSelector`: an employee whose provider is not set up runs on the first fallback; `ChatReplyService` falls back the same way | done |
+| Gemini: tool calls made by another model are sent with the documented placeholder thought signature | done (not yet exercised against the real API) |
+| AI settings: “Fallback models” card (add, reorder, remove, “provider not ready” warning) | done (typecheck/lint clean; browser walkthrough not done) |
+
+237 tests.

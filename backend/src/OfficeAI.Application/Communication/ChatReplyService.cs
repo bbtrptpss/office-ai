@@ -13,7 +13,7 @@ namespace OfficeAI.Application.Communication;
 /// Writes an AI employee's answer to a person who @mentioned it in chat. One model call with no tools: the AI can talk,
 /// not act. Every call is priced and recorded as an actual cost, and all the usual budgets apply.
 /// </summary>
-public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, ReportsService reports, IRealtimeNotifier notifier,
+public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, AiFallback fallback, ReportsService reports, IRealtimeNotifier notifier,
     TimeProvider clock, ILogger<ChatReplyService> log)
 {
     public const int ContextMessages = 20;
@@ -32,6 +32,23 @@ public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, Re
         var provider = config is null ? null : providers.Find(config.Provider);
         var price = config is null ? null : await db.AiModels.AsNoTracking()
             .FirstOrDefaultAsync(m => m.Provider == config.Provider && m.ModelId == config.ModelId && m.IsEnabled, CancellationToken.None);
+        var tried = new HashSet<string>();
+        if (config is { IsEnabled: true } && price is not null)
+        {
+            tried.Add(AiFallback.Tried(price.Provider, price.ModelId));
+            // Own provider not set up, or its model failed moments ago: answer on the company fallback model instead.
+            var unavailable = provider is not { IsAvailable: true };
+            if (unavailable || fallback.IsCoolingDown(price.Provider, price.ModelId))
+            {
+                var next = (await fallback.CandidatesAsync(db, provider?.IsSimulated ?? false, tried, ct))
+                    .FirstOrDefault(c => unavailable || !fallback.IsCoolingDown(c.Model.Provider, c.Model.ModelId));
+                if (next.Provider is not null)
+                {
+                    (provider, price) = (next.Provider, next.Model);
+                    tried.Add(AiFallback.Tried(price.Provider, price.ModelId));
+                }
+            }
+        }
         var problem = config is null || !config.IsEnabled ? "ยังไม่ได้เปิดใช้งาน AI ของฉัน"
             : provider is null || !provider.IsAvailable ? "ยังไม่ได้ตั้งค่าการเชื่อมต่อ AI (API key)"
             : price is null ? "โมเดลของฉันยังไม่มีราคาในระบบ"
@@ -44,18 +61,37 @@ public class ChatReplyService(IAppDbContext db, AiProviderRegistry providers, Re
 
         reply.Status = ChatReplyStatus.Running;
         reply.Provider = provider!.Name;
-        reply.ModelId = config!.ModelId;
+        reply.ModelId = price!.ModelId;
         reply.IsSimulated = provider.IsSimulated;
         await db.SaveChangesAsync(CancellationToken.None);
         await notifier.ChatAiTypingAsync(channel.Id, employee.DisplayName, true, CancellationToken.None);
 
         try
         {
-            var request = new AiRequest(config.ModelId, SystemPrompt(employee, channel) + await CompanyFactsAsync(ct) + await KnowledgeAsync(reply, channel, ct),
+            var request = new AiRequest(price.ModelId, SystemPrompt(employee, channel) + await CompanyFactsAsync(ct) + await KnowledgeAsync(reply, channel, ct),
                 [new AiMessage(AiRole.User, [new AiText(await TranscriptAsync(reply, employee, ct))])], [],
-                Math.Min(MaxReplyTokens, config.MaxTokensPerCall), Effort.Low);
-            var response = await CallAsync(provider, request, ct);
-            await RecordCostAsync(reply, employee, channel, price!, response.Usage);
+                Math.Min(MaxReplyTokens, config!.MaxTokensPerCall), Effort.Low);
+            AiResponse response;
+            while (true)
+            {
+                try
+                {
+                    response = await CallAsync(provider, request with { ModelId = price.ModelId }, ct);
+                    break;
+                }
+                catch (AiProviderException ex) when (AiFallback.ShouldSwitch(ex))
+                {
+                    fallback.MarkFailed(price.Provider, price.ModelId, ex);
+                    var next = (await fallback.CandidatesAsync(db, provider.IsSimulated, tried, ct)).FirstOrDefault();
+                    if (next.Provider is null) throw;
+                    log.LogWarning("Chat reply {ReplyId} switched from {From} to {To}: {Error}", reply.Id, $"{price.Provider}/{price.ModelId}",
+                        $"{next.Model.Provider}/{next.Model.ModelId}", ex.Message);
+                    (provider, price) = (next.Provider, next.Model);
+                    tried.Add(AiFallback.Tried(price.Provider, price.ModelId));
+                    (reply.Provider, reply.ModelId, reply.IsSimulated) = (provider.Name, price.ModelId, provider.IsSimulated);
+                }
+            }
+            await RecordCostAsync(reply, employee, channel, price, response.Usage);
 
             var text = string.Join("\n\n", response.Content.OfType<AiText>().Select(t => t.Text.Trim()).Where(t => t.Length > 0));
             if (response.StopReason == AiStopReason.Refusal || text.Length == 0)

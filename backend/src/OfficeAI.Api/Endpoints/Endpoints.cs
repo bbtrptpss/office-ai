@@ -177,6 +177,7 @@ public static class Endpoints
         api.MapGet("/ai/models", (AgentAdminService s, CancellationToken ct) => s.ListModelsAsync(ct)).RequirePermission(Permissions.AgentRead);
         api.MapPost("/ai/models", (CreateAiModelRequest r, AgentAdminService s, CancellationToken ct) => s.CreateModelAsync(r, ct)).RequirePermission(Permissions.AgentManage);
         api.MapPut("/ai/models/{id:guid}", (Guid id, UpdateAiModelRequest r, AgentAdminService s, CancellationToken ct) => s.UpdateModelAsync(id, r, ct)).RequirePermission(Permissions.AgentManage);
+        api.MapPut("/ai/fallback", (SetFallbackOrderRequest r, AgentAdminService s, CancellationToken ct) => s.SetFallbackOrderAsync(r, ct)).RequirePermission(Permissions.AgentManage);
         api.MapGet("/ai/tools", (AgentAdminService s) => s.ListTools()).RequirePermission(Permissions.AgentRead);
         api.MapGet("/agents/{employeeId:guid}/config", (Guid employeeId, AgentAdminService s, CancellationToken ct) => s.GetConfigAsync(employeeId, ct)).RequirePermission(Permissions.AgentRead);
         api.MapPut("/agents/{employeeId:guid}/config", (Guid employeeId, UpdateAgentConfigRequest r, AgentAdminService s, CancellationToken ct) => s.UpdateConfigAsync(employeeId, r, ct)).RequirePermission(Permissions.AgentManage);

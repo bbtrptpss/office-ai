@@ -101,7 +101,8 @@ public sealed class AnthropicProvider(IOptions<AnthropicOptions> options, IAiCre
         }
         catch (AnthropicApiException ex)
         {
-            throw new AiProviderException($"Anthropic rejected the request: {ex.Message}", retryable: false, ex);
+            throw new AiProviderException($"Anthropic rejected the request: {ex.Message}", retryable: false, ex,
+                accountProblem: ex.Message.Contains("authentication", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase));
         }
 
         var content = new List<AiContent>();

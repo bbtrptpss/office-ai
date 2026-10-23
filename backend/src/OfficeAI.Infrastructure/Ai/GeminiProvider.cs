@@ -94,7 +94,8 @@ public sealed class GeminiProvider(IHttpClientFactory http, IOptions<GeminiOptio
                         break;
                     case AiToolCall call:
                         var part = new JsonObject { ["functionCall"] = new JsonObject { ["name"] = call.Name, ["args"] = JsonNode.Parse(call.Input.GetRawText()) } };
-                        if (signatures.TryGetValue(call.Id, out var sig)) part["thoughtSignature"] = sig;
+                        // A call made by another model (after a fallback switch) has no signature; Gemini accepts this documented placeholder for it.
+                        part["thoughtSignature"] = signatures.TryGetValue(call.Id, out var sig) ? sig : "skip_thought_signature_validator";
                         parts.Add(part);
                         break;
                     case AiToolResult r:

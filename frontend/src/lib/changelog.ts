@@ -31,6 +31,17 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.27.0",
+    date: "2026-10-23",
+    title: { th: "โมเดลสำรองเมื่อ AI ตอบไม่ได้", en: "Fallback models when an AI cannot answer" },
+    changes: [
+      { type: "added", th: "หน้าตั้งค่า AI มี “ลำดับโมเดลสำรอง” (สูงสุด 10 ตัว เลื่อนขึ้น/ลง/เอาออกได้): ถ้าโมเดลของพนักงาน AI ตอบไม่ได้ เพราะผู้ให้บริการล่มหลังลองซ้ำแล้ว โควตาหมด (เช่น Gemini free tier 20 ครั้ง/วัน) หรือ key/เครดิตใช้ไม่ได้ งานจะไปต่อกับโมเดลถัดไปในบทสนทนาเดิม ไม่เริ่มใหม่ และบันทึกในประวัติการทำงานว่าสลับจากตัวไหนไปตัวไหนเพราะอะไร", en: "AI settings has “Fallback models” (up to 10, reorder or remove): when an AI employee's model cannot answer — provider down after retries, quota used up (e.g. Gemini's 20 free requests a day), or key/credit unusable — the run carries on with the next model in the same conversation instead of starting over, and the transcript notes which model it switched from and to, and why" },
+      { type: "added", th: "แชทกับ AI ใช้ลำดับโมเดลสำรองเดียวกัน และพนักงานที่ยังไม่ได้ตั้งผู้ให้บริการของตัวเองก็รับงานผ่านโมเดลสำรองได้ (ระบบมอบหมายงานนับว่าพร้อมทำงาน)", en: "Chat answers use the same fallback order, and an employee whose own provider is not set up can still take work on a fallback model (the workflow engine counts it as available)" },
+      { type: "changed", th: "โมเดลที่เพิ่งล้มจะถูกข้ามไปชั่วคราว (โควตารายวันหรือปัญหา key 1 ชั่วโมง ล่มชั่วคราว 2 นาที) งานถัดไปเริ่มที่โมเดลสำรองทันทีโดยไม่เสียเวลาลองตัวเดิม ค่าใช้จ่ายแต่ละรอบคิดตามราคาโมเดลที่ตอบจริง ส่วนคำขอที่ผิดเอง (เช่นยาวเกิน) ไม่สลับโมเดล", en: "A model that just failed is skipped for a while (1 hour for a daily quota or key problem, 2 minutes for an outage), so the next run starts on the fallback right away; each turn is priced on the model that answered it. Faulty requests (e.g. too long) do not switch models" },
+      { type: "fixed", th: "Gemini รับบทสนทนาที่โมเดลอื่นเคยเรียกเครื่องมือไว้แล้วได้ (ใส่ thought signature แทนให้) จึงรับช่วงงานกลางทางได้", en: "Gemini accepts a conversation in which another model already called tools (a placeholder thought signature is sent), so it can take over a run midway" },
+    ],
+  },
+  {
     version: "0.26.2",
     date: "2026-10-23",
     title: { th: "อัปเดตแพ็กเกจที่มีช่องโหว่", en: "Patched a vulnerable package" },

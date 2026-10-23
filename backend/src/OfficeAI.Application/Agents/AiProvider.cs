@@ -1,4 +1,7 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using OfficeAI.Application.Abstractions;
 using OfficeAI.Domain.Agents;
 
 namespace OfficeAI.Application.Agents;
@@ -79,10 +82,16 @@ public interface IAiCredentials
 }
 
 /// <summary>Thrown by adapters for provider failures; <see cref="Retryable"/> marks rate limits, 5xx and network errors.</summary>
-public sealed class AiProviderException(string message, bool retryable, Exception? inner = null, bool rateLimited = false, TimeSpan? retryAfter = null)
+public sealed class AiProviderException(string message, bool retryable, Exception? inner = null, bool rateLimited = false, TimeSpan? retryAfter = null,
+    bool accountProblem = false)
     : Exception(message, inner)
 {
     public bool Retryable { get; } = retryable;
+
+    /// <summary>The key, credit or plan cannot be used (not configured, rejected, out of credit): this provider will not answer until a person fixes it.</summary>
+    public bool AccountProblem { get; } = accountProblem
+        || message.Contains("credit balance", StringComparison.OrdinalIgnoreCase)
+        || message.Contains("not configured", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The provider's quota was exceeded; waiting usually fixes it.</summary>
     public bool RateLimited { get; } = rateLimited;
@@ -116,6 +125,53 @@ public static class AiRetry
         }
         return attempt < MaxTransientRetries ? TimeSpan.FromSeconds(2 * (attempt + 1)) : null;
     }
+}
+
+/// <summary>
+/// The company-wide fallback order: when a run's or chat reply's model cannot answer (provider down after retries, quota used up,
+/// key or credit unusable), the next enabled model in the order whose provider is configured takes over. Never mixes the
+/// simulated provider with real ones. Models that just failed sit out a cooldown so the next run starts on a working one.
+/// </summary>
+public sealed class AiFallback(AiProviderRegistry providers, TimeProvider clock)
+{
+    public const int MaxModels = 10;
+    public static readonly TimeSpan QuotaCooldown = TimeSpan.FromHours(1);
+    public static readonly TimeSpan OutageCooldown = TimeSpan.FromMinutes(2);
+
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _coolingUntil = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Worth switching to another model: retries are used up (or pointless) and the problem is the provider, not the request.</summary>
+    public static bool ShouldSwitch(AiProviderException ex) => ex.Retryable || ex.RateLimited || ex.AccountProblem;
+
+    private static string Key(string provider, string modelId) => $"{provider}/{modelId}";
+
+    public bool IsCoolingDown(string provider, string modelId) =>
+        _coolingUntil.TryGetValue(Key(provider, modelId), out var until) && until > clock.GetUtcNow();
+
+    /// <summary>Remembers that a model just failed, so it is skipped for a while (a daily quota or an account problem longer than an outage).</summary>
+    public void MarkFailed(string provider, string modelId, AiProviderException ex)
+    {
+        var wait = ex.AccountProblem || AiRetry.IsLongTermQuota(ex) ? QuotaCooldown
+            : ex.RetryAfter is { } after && after > OutageCooldown ? after
+            : OutageCooldown;
+        _coolingUntil[Key(provider, modelId)] = clock.GetUtcNow() + wait;
+    }
+
+    /// <summary>Usable fallback models in order, excluding the ones already tried; cooling-down models go last instead of being dropped.</summary>
+    public async Task<List<(IAiProvider Provider, AiModel Model)>> CandidatesAsync(IAppDbContext db, bool simulated,
+        IReadOnlyCollection<string> tried, CancellationToken ct)
+    {
+        var models = await db.AiModels.AsNoTracking().Where(m => m.IsEnabled && m.FallbackRank != null).OrderBy(m => m.FallbackRank).ToListAsync(ct);
+        return models
+            .Where(m => !tried.Contains(Key(m.Provider, m.ModelId)))
+            .Select(m => (Provider: providers.Find(m.Provider), Model: m))
+            .Where(x => x.Provider is { IsAvailable: true } p && p.IsSimulated == simulated)
+            .OrderBy(x => IsCoolingDown(x.Model.Provider, x.Model.ModelId))
+            .Select(x => (x.Provider!, x.Model))
+            .ToList();
+    }
+
+    public static string Tried(string provider, string modelId) => Key(provider, modelId);
 }
 
 public sealed class AiProviderRegistry(IEnumerable<IAiProvider> providers)

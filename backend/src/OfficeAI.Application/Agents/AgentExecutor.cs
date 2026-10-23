@@ -18,6 +18,7 @@ namespace OfficeAI.Application.Agents;
 public sealed class AgentExecutor(
     IAppDbContext db,
     AiProviderRegistry providers,
+    AiFallback fallback,
     ToolRegistry tools,
     IRealtimeNotifier notifier,
     TimeProvider clock,
@@ -53,12 +54,26 @@ public sealed class AgentExecutor(
 
         var problem = config is null ? "No agent configuration."
             : price is null ? $"No price configured for {run.Provider}/{run.ModelId}."
-            : provider is null || !provider.IsAvailable ? $"Provider '{run.Provider}' is not configured."
             : null;
         if (problem is not null)
         {
             await FinishAsync(run, employee, AgentRunStatus.Failed, "precondition", problem);
             return;
+        }
+        var active = new ActiveModel(provider, price!);
+        if (provider is not { IsAvailable: true })
+        {
+            var unavailable = $"Provider '{run.Provider}' is not configured.";
+            if (!await SwitchAsync(run, active, unavailable, onlyReady: false, CancellationToken.None))
+            {
+                await FinishAsync(run, employee, AgentRunStatus.Failed, "precondition", unavailable);
+                return;
+            }
+        }
+        else if (fallback.IsCoolingDown(run.Provider, run.ModelId))
+        {
+            // It failed moments ago (e.g. its daily quota is used up): start on a working fallback instead of failing again.
+            await SwitchAsync(run, active, $"{run.Provider}/{run.ModelId} failed a few minutes ago.", onlyReady: true, CancellationToken.None);
         }
 
         var resuming = run.ConversationJson is not null;
@@ -87,7 +102,7 @@ public sealed class AgentExecutor(
 
         try
         {
-            var (status, reason, error) = await LoopAsync(run, employee, task, config, price!, provider!, linked.Token);
+            var (status, reason, error) = await LoopAsync(run, employee, task, config, active, linked.Token);
             await FinishAsync(run, employee, status, reason, error);
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancel.IsCancellationRequested)
@@ -107,7 +122,7 @@ public sealed class AgentExecutor(
     }
 
     private async Task<(AgentRunStatus, string, string?)> LoopAsync(
-        AgentRun run, EmployeeProfile employee, WorkTask task, AgentConfiguration config, AiModel price, IAiProvider provider, CancellationToken ct)
+        AgentRun run, EmployeeProfile employee, WorkTask task, AgentConfiguration config, ActiveModel active, CancellationToken ct)
     {
         var granted = await db.AgentToolPermissions.AsNoTracking().Where(p => p.EmployeeId == employee.Id).Select(p => p.ToolId).ToListAsync(ct);
         var available = granted.Select(tools.Find).OfType<IAgentTool>().Where(t => t.Descriptor.AllowedFor(run.Purpose)).ToList();
@@ -158,9 +173,8 @@ public sealed class AgentExecutor(
             if (run.InputTokens + run.OutputTokens >= config.MaxTokensPerRun)
                 return (AgentRunStatus.LimitReached, "tokens", $"Run token limit of {config.MaxTokensPerRun} reached.");
 
-            var request = new AiRequest(run.ModelId, system, messages, toolDefs, config.MaxTokensPerCall, config.Effort);
-            var response = await CallWithRetryAsync(provider, request, ct);
-            await RecordUsageAsync(run, employee, price, provider, response.Usage);
+            var response = await CallAsync(run, active, modelId => new AiRequest(modelId, system, messages, toolDefs, config.MaxTokensPerCall, config.Effort), ct);
+            await RecordUsageAsync(run, employee, active.Price, active.Provider!, response.Usage);
             run.Turns = turn;
 
             messages.Add(new AiMessage(AiRole.Assistant, response.Content));
@@ -310,6 +324,47 @@ public sealed class AgentExecutor(
         Telemetry.ToolExecutions.Add(1, new("tool", exec.ToolId), new("status", exec.Status.ToString()));
         if (queuedApproval is not null) await notifier.ApprovalsChangedAsync(CancellationToken.None);
         return (content, isError, limit);
+    }
+
+    /// <summary>The model a run is using right now; a fallback switch replaces it, mid-run included.</summary>
+    private sealed class ActiveModel(IAiProvider? provider, AiModel price)
+    {
+        public IAiProvider? Provider { get; set; } = provider;
+        public AiModel Price { get; set; } = price;
+        public HashSet<string> Tried { get; } = [AiFallback.Tried(price.Provider, price.ModelId)];
+    }
+
+    /// <summary>One model call; when the provider cannot answer after its retries, the next fallback model takes over the same conversation.</summary>
+    private async Task<AiResponse> CallAsync(AgentRun run, ActiveModel active, Func<string, AiRequest> request, CancellationToken ct)
+    {
+        while (true)
+        {
+            try
+            {
+                return await CallWithRetryAsync(active.Provider!, request(active.Price.ModelId), ct);
+            }
+            catch (AiProviderException ex) when (AiFallback.ShouldSwitch(ex))
+            {
+                fallback.MarkFailed(active.Price.Provider, active.Price.ModelId, ex);
+                if (!await SwitchAsync(run, active, ex.Message, onlyReady: false, ct)) throw;
+            }
+        }
+    }
+
+    /// <summary>Moves the run to the next fallback model and notes why in the transcript. False when there is none left to try.</summary>
+    /// <param name="onlyReady">Skip models that are cooling down after a recent failure.</param>
+    private async Task<bool> SwitchAsync(AgentRun run, ActiveModel active, string reason, bool onlyReady, CancellationToken ct)
+    {
+        var next = (await fallback.CandidatesAsync(db, run.IsSimulated, active.Tried, ct))
+            .FirstOrDefault(c => !onlyReady || !fallback.IsCoolingDown(c.Model.Provider, c.Model.ModelId));
+        if (next.Provider is null) return false;
+        var from = $"{run.Provider}/{run.ModelId}";
+        (active.Provider, active.Price) = (next.Provider, next.Model);
+        active.Tried.Add(AiFallback.Tried(next.Model.Provider, next.Model.ModelId));
+        (run.Provider, run.ModelId) = (next.Model.Provider, next.Model.ModelId);
+        log.LogWarning("Run {RunId} switched from {From} to {To}: {Reason}", run.Id, from, $"{run.Provider}/{run.ModelId}", reason);
+        await StepAsync(run, RunStepKind.Notice, $"Switched from {from} to the fallback model {run.Provider}/{run.ModelId}: {reason}");
+        return true;
     }
 
     private async Task<AiResponse> CallWithRetryAsync(IAiProvider provider, AiRequest request, CancellationToken ct)

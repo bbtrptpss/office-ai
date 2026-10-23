@@ -14,7 +14,7 @@ public sealed record AgentChoice(Guid EmployeeId, string DisplayName, string Rea
 /// best skill match, then lightest workload, then name for a stable tie-break. Executives are not assigned work,
 /// except on an objective given to their own department (the executive team's own work).
 /// </summary>
-public sealed class AgentSelector(IAppDbContext db, AiProviderRegistry providers, TimeProvider clock)
+public sealed class AgentSelector(IAppDbContext db, AiProviderRegistry providers, AiFallback fallback, TimeProvider clock)
 {
     private static readonly string[] ReviewSkills = ["code-review", "testing", "quality-gates", "security-review", "test-automation"];
 
@@ -34,8 +34,10 @@ public sealed class AgentSelector(IAppDbContext db, AiProviderRegistry providers
                     db.Tasks.Any(t => t.Id == a.TaskId && t.Status != WorkTaskStatus.Done && t.Status != WorkTaskStatus.Cancelled)),
             })
             .ToListAsync(ct);
+        // An employee whose own provider is not set up can still work on a company fallback model.
+        var hasFallback = (await fallback.CandidatesAsync(db, simulated: false, [], ct)).Count > 0;
         return rows
-            .Where(r => providers.Find(r.Provider) is { IsAvailable: true } && r.Spent < r.MonthlyBudgetUsd)
+            .Where(r => (providers.Find(r.Provider) is { IsAvailable: true } || hasFallback && providers.Find(r.Provider) is not { IsSimulated: true }) && r.Spent < r.MonthlyBudgetUsd)
             .Select(r => new Candidate(r.Id, r.DisplayName, r.Level, r.DepartmentId, r.DeptCode, r.Skills, r.Open))
             .ToList();
     }
