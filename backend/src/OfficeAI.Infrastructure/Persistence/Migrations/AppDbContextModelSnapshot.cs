@@ -2553,6 +2553,84 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OfficeAI.Domain.Finance.OperatingCost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Allocation")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateOnly?>("EndMonth")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsEstimate")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("MonthlyAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateOnly>("StartMonth")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.ToTable("OperatingCosts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OperatingCosts_Amount", "\"MonthlyAmount\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("OfficeAI.Domain.Integrations.EmailDelivery", b =>
                 {
                     b.Property<long>("Id")
@@ -4278,6 +4356,14 @@ namespace OfficeAI.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RoleDefinitionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("OfficeAI.Domain.Finance.OperatingCost", b =>
+                {
+                    b.HasOne("OfficeAI.Domain.Work.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("OfficeAI.Domain.Integrations.EmailDelivery", b =>

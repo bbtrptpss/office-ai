@@ -15,14 +15,20 @@ public record BudgetDto(Guid Id, BudgetScope Scope, Guid? ScopeId, string ScopeN
 public record SetBudgetRequest(BudgetScope Scope, Guid? ScopeId, DateOnly Month, decimal AmountUsd);
 
 public record ProjectFinanceDto(Guid ProjectId, string Code, string Name, int? EstimateRevision, decimal? PlannedTotalCostThb, decimal? PriceThb,
-    decimal? PlannedAiCostThb, decimal ActualAiUsdMonth, decimal ActualAiUsdAllTime, decimal ActualAiThbAllTime, decimal? AiVarianceThb);
+    decimal? PlannedAiCostThb, decimal ActualAiUsdMonth, decimal ActualAiUsdAllTime, decimal ActualAiThbAllTime, decimal? AiVarianceThb,
+    decimal OperatingThbMonth = 0, decimal OperatingThbAllTime = 0);
+/// <summary>One operating cost in the month: what it came to and where it went.</summary>
+public record OperatingMonthDto(Guid Id, string Name, string Category, bool IsEstimate, OperatingCostAllocation Allocation, string? Provider, decimal Thb,
+    List<OperatingSplitDto> Projects, decimal UnallocatedThb);
+public record OperatingSplitDto(Guid ProjectId, string Name, decimal Thb);
 public record SpendRowDto(Guid Id, string Name, decimal CostUsd, long Tokens, int Runs);
 public record FinanceReportDto(DateOnly Month, decimal UsdToThb, decimal TotalUsd, decimal TotalThb, decimal SimulatedUsd,
-    List<ProjectFinanceDto> Projects, List<SpendRowDto> Departments, List<SpendRowDto> Employees, List<BudgetDto> Budgets);
+    List<ProjectFinanceDto> Projects, List<SpendRowDto> Departments, List<SpendRowDto> Employees, List<BudgetDto> Budgets,
+    decimal OperatingThb = 0, decimal OperatingEstimatedThb = 0, decimal TotalWithOperatingThb = 0, List<OperatingMonthDto>? Operating = null);
 
 public record ProfitabilityRowDto(Guid ProjectId, string Code, string Name, int EstimateRevision, decimal PriceThb, decimal PlannedCostThb,
     decimal PlannedMarginThb, decimal PlannedMarginPercent, decimal PlannedAiThb, decimal ActualAiThb, decimal AiOverrunThb,
-    decimal ForecastCostThb, decimal ForecastMarginThb, decimal ForecastMarginPercent, bool AtRisk);
+    decimal ForecastCostThb, decimal ForecastMarginThb, decimal ForecastMarginPercent, bool AtRisk, decimal OperatingThb = 0);
 public record ProfitabilityReportDto(decimal UsdToThb, decimal TotalPriceThb, decimal TotalPlannedMarginThb, decimal TotalForecastMarginThb, List<ProfitabilityRowDto> Projects);
 public record ScenarioRequest(Guid ProjectId, decimal HoursChangePercent = 0m, decimal RateChangePercent = 0m, decimal? AiCostUsd = null,
     decimal? UsdToThb = null, decimal? ContingencyPercent = null, decimal? PriceThb = null, bool RepriceAtTargetMargin = false);
@@ -133,6 +139,8 @@ public class ReportsService(IAppDbContext db, TimeProvider clock)
         var estimates = (await db.Estimates.AsNoTracking().Where(e => e.Status == EstimateStatus.Approved).ToListAsync(ct))
             .GroupBy(e => e.ProjectId).ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.Revision).First());
         var projects = await db.Projects.AsNoTracking().Where(p => p.Status != ProjectStatus.Cancelled).OrderBy(p => p.Code).ToListAsync(ct);
+        var (opCosts, opShares) = await OperatingCostService.AllocateAsync(db, m, m, settings.UsdToThb, ct);
+        var opAllTime = await OperatingCostService.AllTimeByProjectAsync(db, m, settings.UsdToThb, ct);
 
         var projectRows = projects.Select(p =>
         {
@@ -140,8 +148,18 @@ public class ReportsService(IAppDbContext db, TimeProvider clock)
             var allUsd = allTime.GetValueOrDefault(p.Id);
             var allThb = Math.Round(allUsd * settings.UsdToThb, 2);
             return new ProjectFinanceDto(p.Id, p.Code, p.Name, est?.Revision, est?.TotalCost, est?.Price, est?.AiCost,
-                monthCosts.Where(c => c.ProjectId == p.Id).Sum(c => c.AmountUsd), allUsd, allThb, est is null ? null : allThb - est.AiCost);
-        }).Where(r => r.EstimateRevision is not null || r.ActualAiUsdAllTime > 0).ToList();
+                monthCosts.Where(c => c.ProjectId == p.Id).Sum(c => c.AmountUsd), allUsd, allThb, est is null ? null : allThb - est.AiCost,
+                opShares.Where(s => s.ProjectId == p.Id).Sum(s => s.Thb), opAllTime.GetValueOrDefault(p.Id));
+        }).Where(r => r.EstimateRevision is not null || r.ActualAiUsdAllTime > 0 || r.OperatingThbAllTime > 0).ToList();
+        var projectNames = projects.ToDictionary(p => p.Id, p => p.Name);
+        var operating = opCosts.Where(c => c.AppliesTo(m)).Select(c =>
+        {
+            var mine = opShares.Where(s => s.CostId == c.Id).ToList();
+            return new OperatingMonthDto(c.Id, c.Name, c.Category, c.IsEstimate, c.Allocation, c.Provider, mine.Sum(s => s.Thb),
+                mine.Where(s => s.ProjectId != null).Select(s => new OperatingSplitDto(s.ProjectId!.Value, projectNames.GetValueOrDefault(s.ProjectId.Value, "?"), s.Thb)).ToList(),
+                mine.Where(s => s.ProjectId == null).Sum(s => s.Thb));
+        }).OrderByDescending(o => o.Thb).ThenBy(o => o.Name).ToList();
+        var operatingThb = operating.Sum(o => o.Thb);
 
         var usage = await db.UsageRecords.AsNoTracking().Where(u => u.OccurredAt >= from && u.OccurredAt < to)
             .Select(u => new { u.EmployeeId, u.RunId, Tokens = u.InputTokens + u.OutputTokens + u.CacheReadTokens + u.CacheWriteTokens }).ToListAsync(ct);
@@ -157,9 +175,11 @@ public class ReportsService(IAppDbContext db, TimeProvider clock)
             .OrderByDescending(r => r.CostUsd).ToList();
 
         var total = monthCosts.Sum(c => c.AmountUsd);
-        return new FinanceReportDto(m, settings.UsdToThb, total, Math.Round(total * settings.UsdToThb, 2),
+        var totalThb = Math.Round(total * settings.UsdToThb, 2);
+        return new FinanceReportDto(m, settings.UsdToThb, total, totalThb,
             monthCosts.Where(c => c.RunId is { } r && simulatedRuns.Contains(r)).Sum(c => c.AmountUsd),
-            projectRows, byDept, byEmployee.Take(50).ToList(), await ListBudgetsAsync(m, ct));
+            projectRows, byDept, byEmployee.Take(50).ToList(), await ListBudgetsAsync(m, ct),
+            operatingThb, operating.Where(o => o.IsEstimate).Sum(o => o.Thb), totalThb + operatingThb, operating);
     }
 
     // ---------------- profitability & scenarios ----------------
@@ -177,23 +197,27 @@ public class ReportsService(IAppDbContext db, TimeProvider clock)
             .GroupBy(c => c.ProjectId!.Value).Select(g => new { ProjectId = g.Key, Usd = g.Sum(c => c.AmountUsd) }).ToDictionaryAsync(x => x.ProjectId, x => x.Usd, ct);
         var projects = await db.Projects.AsNoTracking().Where(p => p.Status != ProjectStatus.Cancelled && estimates.Keys.Contains(p.Id))
             .OrderBy(p => p.Code).ToListAsync(ct);
+        var operating = await OperatingCostService.AllTimeByProjectAsync(db, CurrentMonth, settings.UsdToThb, ct);
 
-        var rows = projects.Select(p => Forecast(p, estimates[p.Id], actual.GetValueOrDefault(p.Id), settings.UsdToThb)).ToList();
+        var rows = projects.Select(p => Forecast(p, estimates[p.Id], actual.GetValueOrDefault(p.Id), settings.UsdToThb, operating.GetValueOrDefault(p.Id))).ToList();
         return new ProfitabilityReportDto(settings.UsdToThb, rows.Sum(r => r.PriceThb), rows.Sum(r => r.PlannedMarginThb), rows.Sum(r => r.ForecastMarginThb), rows);
     }
 
-    /// <summary>Planned figures from the approved estimate; forecast cost adds any actual AI spend above the planned AI cost.</summary>
-    internal static ProfitabilityRowDto Forecast(Project p, ProjectEstimate e, decimal actualAiUsd, decimal usdToThb)
+    /// <summary>
+    /// Planned figures from the approved estimate; forecast cost adds any actual AI spend above the planned AI cost, and the
+    /// operating costs (electricity, flat-rate AI plans, hosting...) allocated to the project, which the estimate does not cover.
+    /// </summary>
+    internal static ProfitabilityRowDto Forecast(Project p, ProjectEstimate e, decimal actualAiUsd, decimal usdToThb, decimal operatingThb = 0)
     {
         var actualThb = Math.Round(actualAiUsd * usdToThb, 2, MidpointRounding.AwayFromZero);
         var overrun = Math.Max(0m, actualThb - e.AiCost);
-        var forecastCost = e.TotalCost + overrun;
+        var forecastCost = e.TotalCost + overrun + operatingThb;
         var forecastMargin = e.Price - forecastCost;
         var forecastPct = e.Price == 0 ? 0 : Math.Round(forecastMargin / e.Price * 100m, 2, MidpointRounding.AwayFromZero);
         // At risk once the forecast margin has lost more than half of the planned margin, or turned negative.
         var atRisk = forecastMargin < 0 || forecastMargin < e.GrossMargin / 2;
         return new ProfitabilityRowDto(p.Id, p.Code, p.Name, e.Revision, e.Price, e.TotalCost, e.GrossMargin, e.GrossMarginPercent,
-            e.AiCost, actualThb, overrun, forecastCost, forecastMargin, forecastPct, atRisk);
+            e.AiCost, actualThb, overrun, forecastCost, forecastMargin, forecastPct, atRisk, operatingThb);
     }
 
     /// <summary>What-if planning on the latest approved estimate. Read-only: nothing is stored or changed.</summary>

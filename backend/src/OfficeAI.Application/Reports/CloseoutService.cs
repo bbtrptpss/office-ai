@@ -58,7 +58,8 @@ public class CloseoutService(IAppDbContext db, TimeProvider clock)
             .OrderByDescending(e => e.Revision).FirstOrDefaultAsync(ct);
         var actualUsd = await db.CostRecords.Where(c => c.Kind == CostKind.Actual && c.ProjectId == projectId).SumAsync(c => (decimal?)c.AmountUsd, ct) ?? 0m;
         var settings = await DeliveryService.SettingsAsync(db, ct);
-        var money = estimate is null ? null : ReportsService.Forecast(p, estimate, actualUsd, settings.UsdToThb);
+        var operatingThb = (await OperatingCostService.AllTimeByProjectAsync(db, Domain.Finance.BudgetMath.MonthOf(now), settings.UsdToThb, ct)).GetValueOrDefault(projectId);
+        var money = estimate is null ? null : ReportsService.Forecast(p, estimate, actualUsd, settings.UsdToThb, operatingThb);
         var effort = new CloseoutEffortDto(estimate?.TotalHours, runs.Count, runs.Count(r => r.Status == AgentRunStatus.Succeeded),
             runs.Count(r => r.Status is AgentRunStatus.Failed or AgentRunStatus.LimitReached), runs.Count(r => r.IsSimulated),
             Math.Round(runHours, 2, MidpointRounding.AwayFromZero), runs.Sum(r => r.Tokens));
@@ -146,12 +147,14 @@ public static class CompletionReport
             sb.AppendLine("| --- | ---: | ---: |");
             sb.AppendLine($"| {T("ชั่วโมงทำงาน", "Hours")} | {N(c.Effort.PlannedHours ?? 0)} | {T("ไม่ได้บันทึกในระบบ", "not recorded")} |");
             sb.AppendLine($"| {T("ค่า AI (THB)", "AI cost (THB)")} | {N(m2.PlannedAiThb)} | {N(m2.ActualAiThb)} |");
+            if (m2.OperatingThb > 0)
+                sb.AppendLine($"| {T("ต้นทุนดำเนินงานที่ปันส่วนมา (THB)", "Allocated operating costs (THB)")} | — | {N(m2.OperatingThb)} |");
             sb.AppendLine($"| {T("ต้นทุนรวม (THB)", "Total cost (THB)")} | {N(m2.PlannedCostThb)} | {N(m2.ForecastCostThb)} |");
             sb.AppendLine($"| {T("ราคา (THB)", "Price (THB)")} | {N(m2.PriceThb)} | {N(m2.PriceThb)} |");
             sb.AppendLine($"| {T("กำไรขั้นต้น (THB)", "Gross margin (THB)")} | {N(m2.PlannedMarginThb)} ({N(m2.PlannedMarginPercent)}%) | {N(m2.ForecastMarginThb)} ({N(m2.ForecastMarginPercent)}%) |");
             sb.AppendLine();
-            sb.AppendLine(T("ต้นทุนรวมฝั่งจริงคือต้นทุนตามแผนบวกค่า AI จริงส่วนที่เกินแผน ค่าแรงคนยังใช้ตัวเลขตามแผนเพราะระบบไม่ได้บันทึกชั่วโมงจริง",
-                "Actual total cost is the planned cost plus actual AI spend above plan; labour stays at plan because actual hours are not recorded."));
+            sb.AppendLine(T("ต้นทุนรวมฝั่งจริงคือต้นทุนตามแผนบวกค่า AI จริงส่วนที่เกินแผน และต้นทุนดำเนินงานที่ปันส่วนมา (เช่นค่าไฟ แพ็กเกจ AI) ค่าแรงคนยังใช้ตัวเลขตามแผนเพราะระบบไม่ได้บันทึกชั่วโมงจริง",
+                "Actual total cost is the planned cost plus actual AI spend above plan and the operating costs allocated to the project (e.g. electricity, AI plans); labour stays at plan because actual hours are not recorded."));
         }
         else
         {

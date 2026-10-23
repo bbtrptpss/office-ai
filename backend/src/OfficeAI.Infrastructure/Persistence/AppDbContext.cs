@@ -62,6 +62,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<TestRun> TestRuns => Set<TestRun>();
     public DbSet<MergeRequest> MergeRequests => Set<MergeRequest>();
     public DbSet<BudgetAllocation> BudgetAllocations => Set<BudgetAllocation>();
+    public DbSet<OperatingCost> OperatingCosts => Set<OperatingCost>();
     public DbSet<KnowledgeEntry> KnowledgeEntries => Set<KnowledgeEntry>();
     public DbSet<ProjectDocument> Documents => Set<ProjectDocument>();
     public DbSet<IntegrationConfiguration> Integrations => Set<IntegrationConfiguration>();
