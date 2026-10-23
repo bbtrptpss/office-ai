@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.29.0",
+    date: "2026-10-23",
+    title: { th: "ต้นทุนดำเนินงาน (ค่าไฟ แพ็กเกจ AI server)", en: "Operating costs (electricity, AI plans, servers)" },
+    changes: [
+      { type: "added", th: "หน้าการเงินมี “ต้นทุนดำเนินงาน”: ใส่ค่าใช้จ่ายรายเดือนที่ไม่ใช่ค่า AI ต่อ token (ค่าไฟ แพ็กเกจ AI แบบเหมาจ่าย server ฮาร์ดแวร์ ซอฟต์แวร์) เป็นบาทหรือดอลลาร์ มีเดือนเริ่ม/สิ้นสุด และติดป้าย “ค่าประมาณ” ได้ (เช่นค่าไฟที่คำนวณจากวัตต์) — แก้ปัญหาที่ Ollama / Claude Code ราคา 0 ทำให้รายงานดูถูกเกินจริง", en: "Finance has “Operating costs”: monthly costs that are not per-token AI charges (electricity, flat-rate AI plans, servers, hardware, software), in THB or USD, with first/last month and an “estimate” flag (e.g. electricity worked out from watts) — so zero-priced Ollama / Claude Code no longer make reports look cheaper than they are" },
+      { type: "added", th: "ปันส่วนได้ 3 แบบ: ลงโปรเจกต์เดียว, ตามสัดส่วน token ที่แต่ละโปรเจกต์ใช้ในเดือนนั้น (เลือกเฉพาะผู้ให้บริการได้ เช่นค่าไฟ GPU ตามการใช้ ollama) หรือค่าใช้จ่ายส่วนกลาง ยอดแต่ละเดือนรวมกันได้ตรงทุกสตางค์ เดือนที่ไม่มีการใช้จะแสดงว่ายังไม่ได้ปันส่วน", en: "Three allocations: one project, by the AI tokens each project used that month (optionally one provider, e.g. GPU electricity by ollama use), or company overhead. Each month's shares add up to the satang; months with no use show as unallocated" },
+      { type: "changed", th: "รายงานการเงินแสดงต้นทุนดำเนินงานเดือนนี้ ต้นทุนรวม (AI + ดำเนินงาน) และคอลัมน์ต่อโปรเจกต์ กำไรคาดการณ์และรายงานปิดโปรเจกต์บวกต้นทุนดำเนินงานที่ปันส่วนมาด้วย ส่วนงบ AI ยังนับเฉพาะค่า AI จึงไม่ทำให้งาน AI หยุด", en: "The finance report shows this month's operating costs, the total (AI + operating) and a per-project column; the profitability forecast and the completion report add the allocated operating costs. AI budgets still count AI charges only, so these never stop AI work" },
+    ],
+  },
+  {
     version: "0.28.0",
     date: "2026-10-23",
     title: { th: "การยืนยันสองขั้น และ Terminal ที่ต้องใส่รหัส", en: "Two-factor sign-in and a terminal behind a code" },

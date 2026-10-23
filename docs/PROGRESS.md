@@ -339,3 +339,15 @@ Open: fine-tuned Qwen3-8B (training in `D:\FreeAi\train`) → GGUF → Ollama �
 | UI: login code step (authenticator or recovery code), “Two-factor sign-in” card on My settings (QR via `qrcode`, key to type, recovery codes, turn off), terminal asks for the code inline and then runs the waiting command | done (typecheck/lint clean) |
 
 The authenticator accepts codes from the neighbouring 30-second steps; a code is not blocked from being reused inside that window. 239 tests.
+
+## Phase 24 — Operating costs ✅ (2026-10-23)
+
+| Item | Status |
+| --- | --- |
+| §9 “Planned versus actual AI and infrastructure costs”: `OperatingCost` (name, category, monthly amount THB/USD, estimate flag, first/last month, allocation, project or provider, notes). Kept out of `CostRecords`, so AI budgets (which stop runs) never count it | done |
+| `OperatingCostAllocator` (pure): Project → one project; AiUsage → split by that month's non-simulated tokens per project, optionally of one provider, rounding remainder to the largest user so each month adds up exactly, no usage = unallocated; Overhead → never charged to a project. USD uses the current company rate | done |
+| `GET/POST /operating-costs`, `PUT/DELETE /operating-costs/{id}` (finance.read / finance.manage, people only) | done |
+| Finance report: operating total, estimated part, AI + operating total, per-project month/all-time columns, per-cost split. Profitability forecast cost and closeout (and the completion report) add allocated operating costs | done |
+| Finance page: operating cards, list with splits, manage table and dialog; profitability column | done (typecheck/lint clean; stack rebuild waits for the r2 training run, which needs the RAM) |
+
+242 tests.

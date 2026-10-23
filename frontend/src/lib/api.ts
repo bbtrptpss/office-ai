@@ -608,6 +608,8 @@ export interface ProfitabilityRow {
   forecastMarginThb: number;
   forecastMarginPercent: number;
   atRisk: boolean;
+  /** Operating costs (electricity, AI plans, hosting...) allocated to the project so far; part of the forecast cost. */
+  operatingThb: number;
 }
 
 /** Planned versus recorded figures for one project (delivery stage 8). Warnings are codes the UI translates. */
@@ -667,10 +669,27 @@ export interface FinanceReport {
   projects: {
     projectId: string; code: string; name: string; estimateRevision: number | null; plannedTotalCostThb: number | null; priceThb: number | null;
     plannedAiCostThb: number | null; actualAiUsdMonth: number; actualAiUsdAllTime: number; actualAiThbAllTime: number; aiVarianceThb: number | null;
+    operatingThbMonth: number; operatingThbAllTime: number;
   }[];
   departments: { id: string; name: string; costUsd: number; tokens: number; runs: number }[];
   employees: { id: string; name: string; costUsd: number; tokens: number; runs: number }[];
   budgets: Budget[];
+  operatingThb: number;
+  operatingEstimatedThb: number;
+  totalWithOperatingThb: number;
+  operating: {
+    id: string; name: string; category: string; isEstimate: boolean; allocation: OperatingAllocation; provider: string | null; thb: number;
+    projects: { projectId: string; name: string; thb: number }[]; unallocatedThb: number;
+  }[];
+}
+
+export type OperatingAllocation = "Project" | "AiUsage" | "Overhead";
+
+/** A recurring monthly cost that is not a per-token AI charge. Never counts towards AI budgets. */
+export interface OperatingCost {
+  id: string; name: string; category: string; monthlyAmount: number; currency: "Thb" | "Usd"; monthlyThb: number; isEstimate: boolean;
+  startMonth: string; endMonth: string | null; allocation: OperatingAllocation; projectId: string | null; projectName: string | null;
+  provider: string | null; notes: string | null; version: number;
 }
 
 export interface PerformanceRow {

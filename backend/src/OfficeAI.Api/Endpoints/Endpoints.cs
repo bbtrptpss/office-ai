@@ -297,6 +297,14 @@ public static class Endpoints
             .RequirePermission(Permissions.FinanceRead).RequirePermission(Permissions.KnowledgeManage);
         api.MapGet("/reports/performance",(DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.PerformanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
         api.MapGet("/reports/quality-security", (int? days, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.QualitySecurityAsync(days ?? 30, ct)).RequirePermission(Permissions.AuditRead);
+        api.MapGet("/operating-costs", (OfficeAI.Application.Reports.OperatingCostService s, CancellationToken ct) => s.ListAsync(ct)).RequirePermission(Permissions.FinanceRead);
+        api.MapPost("/operating-costs", (OfficeAI.Application.Reports.SaveOperatingCostRequest r, OfficeAI.Application.Reports.OperatingCostService s, CancellationToken ct) => s.CreateAsync(r, ct)).RequirePermission(Permissions.FinanceManage);
+        api.MapPut("/operating-costs/{id:guid}", (Guid id, OfficeAI.Application.Reports.SaveOperatingCostRequest r, OfficeAI.Application.Reports.OperatingCostService s, CancellationToken ct) => s.UpdateAsync(id, r, ct)).RequirePermission(Permissions.FinanceManage);
+        api.MapDelete("/operating-costs/{id:guid}", async (Guid id, OfficeAI.Application.Reports.OperatingCostService s, CancellationToken ct) =>
+        {
+            await s.DeleteAsync(id, ct);
+            return Results.NoContent();
+        }).RequirePermission(Permissions.FinanceManage);
         api.MapGet("/budgets", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.ListBudgetsAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
         api.MapPut("/budgets", (OfficeAI.Application.Reports.SetBudgetRequest r, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.SetBudgetAsync(r, ct)).RequirePermission(Permissions.FinanceManage);
         api.MapDelete("/budgets/{id:guid}", async (Guid id, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) =>

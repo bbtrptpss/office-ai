@@ -53,6 +53,7 @@ public interface IAppDbContext
     DbSet<TestRun> TestRuns { get; }
     DbSet<MergeRequest> MergeRequests { get; }
     DbSet<BudgetAllocation> BudgetAllocations { get; }
+    DbSet<OperatingCost> OperatingCosts { get; }
     DbSet<KnowledgeEntry> KnowledgeEntries { get; }
     DbSet<ProjectDocument> Documents { get; }
     DbSet<IntegrationConfiguration> Integrations { get; }
