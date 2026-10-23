@@ -22,6 +22,7 @@ export default function KnowledgePage() {
   const [status, setStatus] = useState<KnowledgeEntry["status"]>("Validated");
   const [query, setQuery] = useState("");
   const [applied, setApplied] = useState("");
+  const { data: searchStatus } = useLoad(() => api.get<{ byMeaning: boolean; model: string | null; indexed: number; entries: number }>("/api/knowledge/search-status"));
   const { data, error, reload } = useLoad(
     () => api.get<KnowledgeEntry[]>(`/api/knowledge?status=${status}${applied ? `&q=${encodeURIComponent(applied)}` : ""}`),
     `${status}:${applied}`,
@@ -39,6 +40,9 @@ export default function KnowledgePage() {
   return (
     <>
       <PageHeader title={t.knowledge}
+        subtitle={searchStatus && (searchStatus.byMeaning
+          ? <Chip size="small" color="secondary" variant="outlined" label={`🔎 ${t.searchByMeaning} · ${searchStatus.model} · ${searchStatus.indexed}/${searchStatus.entries}`} />
+          : <Chip size="small" variant="outlined" label={t.searchByKeywords} />)}
         actions={canManage && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm({ kind: "Standard", title: "", body: "", tags: "" })}>{t.newKnowledge}</Button>} />
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2, alignItems: { sm: "center" } }}>
         <Tabs value={status} onChange={(_, v) => setStatus(v)} sx={{ flex: 1 }}>

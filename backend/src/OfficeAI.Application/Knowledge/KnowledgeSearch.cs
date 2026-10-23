@@ -88,10 +88,22 @@ public sealed class KnowledgeSearch(IAppDbContext db, IEmbeddingProvider embeddi
     public static string Hash(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..32];
 }
 
+public record KnowledgeSearchStatusDto(bool ByMeaning, string? Model, int Indexed, int Entries);
+
 /// <summary>Keeps every non-archived entry's vector current: new or edited entries, or a changed model. Run by a background worker.</summary>
 public sealed class KnowledgeEmbeddingIndexer(IAppDbContext db, IEmbeddingProvider embeddings, TimeProvider clock, ILogger<KnowledgeEmbeddingIndexer> log)
 {
     public const int Batch = 16;
+
+    /// <summary>Whether search by meaning is on, and how many non-archived entries already have a vector for the current model.</summary>
+    public async Task<KnowledgeSearchStatusDto> StatusAsync(CancellationToken ct)
+    {
+        var entries = db.KnowledgeEntries.AsNoTracking().Where(k => k.Status != KnowledgeStatus.Archived);
+        var total = await entries.CountAsync(ct);
+        if (!embeddings.IsAvailable) return new KnowledgeSearchStatusDto(false, null, 0, total);
+        var indexed = await entries.CountAsync(k => db.KnowledgeEmbeddings.Any(v => v.KnowledgeId == k.Id && v.Model == embeddings.Model), ct);
+        return new KnowledgeSearchStatusDto(true, embeddings.Model, indexed, total);
+    }
 
     /// <summary>Embeds what is missing or stale; returns how many entries were (re)embedded. Archived entries lose their vector.</summary>
     public async Task<int> IndexPendingAsync(CancellationToken ct)
