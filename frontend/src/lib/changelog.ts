@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.34.1",
+    date: "2026-11-05",
+    title: { th: "เตรียมพร้อมสำหรับการติดตั้งจริง", en: "Getting ready for deployment" },
+    changes: [
+      { type: "fixed", th: "หลัง proxy การจำกัดการล็อกอินแยกตามผู้ใช้จริง และ HSTS ทำงาน ก่อนหน้านี้ทุกคนใช้โควตาการล็อกอินร่วมกัน", en: "Behind the proxy the login limit is per visitor and HSTS works; before, everyone shared one login limit" },
+      { type: "security", th: "การติดตั้งจริงไม่ยอมเริ่มถ้า secret เป็นค่าตัวอย่างหรือสั้นเกินไป", en: "A production install refuses to start on example or very short secrets" },
+    ],
+  },
+  {
     version: "0.34.0",
     date: "2026-11-05",
     title: { th: "จัดการบัญชีผู้ใช้", en: "Managing user accounts" },

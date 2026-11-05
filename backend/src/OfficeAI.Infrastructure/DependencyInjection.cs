@@ -68,7 +68,7 @@ public static class DependencyInjection
         services.AddScoped<RetentionService>();
         services.AddScoped<SecurityAuditWriter>();
 
-        // AI providers: keys come from configuration/environment only, never from the database.
+        // AI providers: keys come from the AI settings page (encrypted in the database, see AiCredentialStore) or from configuration.
         services.Configure<AnthropicOptions>(config.GetSection("AiProviders:Anthropic"));
         services.Configure<SimulatedOptions>(config.GetSection("AiProviders:Simulated"));
         services.AddSingleton<IAiProvider, AnthropicProvider>();

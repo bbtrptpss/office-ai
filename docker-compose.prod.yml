@@ -18,6 +18,8 @@ services:
       Sandbox__RunnerToken: ${SANDBOX_RUNNER_TOKEN:?set SANDBOX_RUNNER_TOKEN}
       Security__SecureCookies: "true"
       Security__Hsts: "true"
+      Security__TrustProxy: "true" # the API port is not published: only the proxy reaches it
+      Security__RequireStrongSecrets: "true"
       Logging__Json: "true"
       Integrations__AppBaseUrl: https://${APP_DOMAIN}
       Integrations__AllowHttp: "false"
@@ -30,6 +32,7 @@ services:
 
   sandbox-runner:
     environment:
+      Security__RequireStrongSecrets: "true"
       Sandbox__RunnerToken: ${SANDBOX_RUNNER_TOKEN:?set SANDBOX_RUNNER_TOKEN}
     restart: unless-stopped
 

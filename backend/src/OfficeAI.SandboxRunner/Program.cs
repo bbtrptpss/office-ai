@@ -10,6 +10,8 @@ builder.Services.Configure<SandboxOptions>(builder.Configuration.GetSection("San
 builder.Services.Configure<RepositoryOptions>(builder.Configuration.GetSection("Repositories"));
 builder.Services.AddSingleton<DockerSandbox>();
 
+OfficeAI.Infrastructure.Security.StrongSecrets.Enforce(builder.Configuration);
+
 var app = builder.Build();
 var token = app.Configuration["Sandbox:RunnerToken"];
 if (string.IsNullOrWhiteSpace(token)) throw new InvalidOperationException("Sandbox:RunnerToken must be configured.");
