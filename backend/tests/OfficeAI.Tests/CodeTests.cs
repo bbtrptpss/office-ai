@@ -105,6 +105,17 @@ public class CodeTests(ApiFixture fx)
         Assert.Contains("app.txt", await ceo.GetAsync<List<string>>($"/api/repositories/{repo.Id}/files"));
         var res = await ceo.GetAsync($"/api/repositories/{repo.Id}/file?path=app.txt");
         Assert.Equal("hello\n", await res.Content.ReadAsStringAsync());
+
+        // A branch must exist: anything else, above all a value git would read as an option, never reaches git.
+        var marker = Path.Combine(Path.GetTempPath(), $"officeai-{Guid.NewGuid():N}");
+        foreach (var branch in new[] { $"--output={marker}", "--help", "no-such-branch" })
+        {
+            var q = Uri.EscapeDataString(branch);
+            Assert.Equal(HttpStatusCode.BadRequest, (await ceo.GetAsync($"/api/repositories/{repo.Id}/file?path=app.txt&branch={q}")).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await ceo.GetAsync($"/api/repositories/{repo.Id}/files?branch={q}")).StatusCode);
+        }
+        Assert.Empty(Directory.GetFiles(Path.GetTempPath(), Path.GetFileName(marker) + "*"));
+        Assert.Equal("hello\n", await (await ceo.GetAsync($"/api/repositories/{repo.Id}/file?path=app.txt&branch=main")).Content.ReadAsStringAsync());
     }
 
     [Fact]
