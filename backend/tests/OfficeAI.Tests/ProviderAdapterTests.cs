@@ -66,6 +66,61 @@ public class ProviderAdapterTests
         Assert.DoesNotContain("<tool_call>", prompt);
     }
 
+    // ---------------- Claude Code replies ----------------
+
+    private static readonly AiToolDefinition[] ReplyTools =
+    [
+        new("review_submit", "Review", JsonSerializer.SerializeToElement(new { type = "object", properties = new { outcome = new { type = "string" }, comments = new { type = "string" } } })),
+        new("chat_read", "Read", JsonSerializer.SerializeToElement(new { type = "object", properties = new { limit = new { type = "integer" }, draft = new { type = "boolean" } } })),
+    ];
+
+    [Fact]
+    public void Claude_Code_tool_calls_in_its_native_form_are_not_lost()
+    {
+        var reply = ClaudeCodeProvider.ParseReply("""
+            All checks pass.
+            <function_calls>
+            <invoke name="review_submit">
+            <parameter name="outcome">approve</parameter>
+            <parameter name="comments">Line one
+            and "two" <b>fine</b></parameter>
+            </invoke>
+            <invoke name="chat_read"><parameter name="limit">30</parameter><parameter name="draft">true</parameter></invoke>
+            </function_calls>
+            """, new AiUsage(1, 1, 0, 0), ReplyTools);
+
+        Assert.Equal(AiStopReason.ToolUse, reply.StopReason);
+        Assert.Equal("All checks pass.", reply.Content.OfType<AiText>().Single().Text);
+        var calls = reply.Content.OfType<AiToolCall>().ToList();
+        Assert.Equal(["review_submit", "chat_read"], calls.Select(c => c.Name));
+        Assert.Equal("approve", calls[0].Input.GetProperty("outcome").GetString());
+        Assert.Contains("\"two\" <b>fine</b>", calls[0].Input.GetProperty("comments").GetString());
+        Assert.Equal(30, calls[1].Input.GetProperty("limit").GetInt32()); // typed by the tool's schema
+        Assert.True(calls[1].Input.GetProperty("draft").GetBoolean());
+    }
+
+    [Fact]
+    public void A_tool_call_that_cannot_be_read_never_passes_as_a_finished_answer()
+    {
+        foreach (var cutOff in new[] { "Done.\n<invoke name=\"review_submit\"><parameter name=\"outcome\">approve", "Done.\n<tool_call>{\"name\":\"x\"" })
+        {
+            var reply = ClaudeCodeProvider.ParseReply(cutOff, new AiUsage(1, 1, 0, 0), ReplyTools);
+            Assert.Equal(AiStopReason.ToolUse, reply.StopReason);
+            Assert.Contains(reply.Content.OfType<AiToolCall>(), c => c.Name == "invalid_tool_call");
+        }
+
+        var plain = ClaudeCodeProvider.ParseReply("Finished, nothing more to do.", new AiUsage(1, 1, 0, 0), ReplyTools);
+        Assert.Equal(AiStopReason.EndTurn, plain.StopReason);
+        Assert.Empty(plain.Content.OfType<AiToolCall>());
+    }
+
+    [Fact]
+    public void Tasks_created_at_the_same_moment_get_their_own_branches()
+    {
+        var at = DateTimeOffset.UtcNow;
+        Assert.NotEqual(OfficeAI.Application.Code.Branches.ForTask(Guid.CreateVersion7(at)), OfficeAI.Application.Code.Branches.ForTask(Guid.CreateVersion7(at)));
+    }
+
     // ---------------- Claude bridge ----------------
 
     [Fact]

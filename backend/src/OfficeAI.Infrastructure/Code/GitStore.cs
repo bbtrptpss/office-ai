@@ -126,6 +126,11 @@ public sealed class GitStore(IOptions<RepositoryOptions> options, ILogger<GitSto
             if (remoteBranch.Ok) await Must(work, ct, null, "checkout", "-B", branch, $"origin/{branch}");
             else await Must(work, ct, null, "checkout", "-B", branch, $"origin/{repo.DefaultBranch}");
         }
+        else if ((await GitAsync(work, ["branch", "--show-current"], ct)).Output.Trim() != branch)
+        {
+            // A workspace from before branch names used the whole task id. Moving keeps its uncommitted work.
+            await Must(work, ct, null, "checkout", "-B", branch);
+        }
         return work;
     }
 

@@ -57,8 +57,8 @@ public interface ISandbox
 
 public static class Branches
 {
-    /// <summary>One branch per task: task/&lt;first 8 of id&gt;.</summary>
-    public static string ForTask(Guid taskId) => $"task/{taskId:N}"[..13];
+    /// <summary>One branch per task. The whole id: ids start with their creation time, so a shortened one is shared by tasks created together.</summary>
+    public static string ForTask(Guid taskId) => $"task/{taskId:N}";
 }
 
 public static class WorkspacePaths
