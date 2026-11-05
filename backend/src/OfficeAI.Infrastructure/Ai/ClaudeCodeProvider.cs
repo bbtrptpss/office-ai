@@ -19,8 +19,8 @@ public sealed partial class ClaudeCodeProvider(IHttpClientFactory http, IOptions
     public const string ProviderName = "claude-code";
     public const string HttpClientName = "ai-claude-code";
 
-    /// <summary>The bridge stops Claude Code after 180 seconds; wait a little longer for its answer.</summary>
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(200);
+    /// <summary>The bridge stops one reply after 10 minutes, and a request may first wait for both of its places to come free.</summary>
+    private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(21);
 
     public string Name => ProviderName;
     public bool IsSimulated => false;
@@ -48,13 +48,14 @@ public sealed partial class ClaudeCodeProvider(IHttpClientFactory http, IOptions
         var json = await HttpAi.SendAsync(http, HttpClientName, message, Timeout, "Claude Code bridge", ct);
         var answer = json.Deserialize<BridgeAnswer>(JsonOptions)
             ?? throw new AiProviderException("The Claude Code bridge returned nothing.", retryable: true);
-        if (answer.Error is { } error) throw new AiProviderException($"Claude Code: {error}", retryable: !error.Contains("invalid", StringComparison.OrdinalIgnoreCase));
+        // Sending the same request again would most likely take just as long, so a reply that ran out of time fails the call at once.
+        if (answer.Error is { } error) throw new AiProviderException($"Claude Code: {error}", retryable: !answer.TimedOut && !error.Contains("invalid", StringComparison.OrdinalIgnoreCase));
         // Claude Code sometimes ends with no text at all, even after using tokens. That is a failed call to retry, not a finished answer.
         if (string.IsNullOrWhiteSpace(answer.Reply)) throw new AiProviderException("Claude Code returned an empty reply.", retryable: true);
         return ParseReply(answer.Reply, new AiUsage(answer.InputTokens, answer.OutputTokens, answer.CacheReadTokens, answer.CacheWriteTokens), request.Tools);
     }
 
-    private sealed record BridgeAnswer(string? Reply, string? Error, long InputTokens, long OutputTokens, long CacheReadTokens, long CacheWriteTokens);
+    private sealed record BridgeAnswer(string? Reply, string? Error, long InputTokens, long OutputTokens, long CacheReadTokens, long CacheWriteTokens, bool TimedOut = false);
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { NumberHandling = JsonNumberHandling.AllowReadingFromString };
 
@@ -73,6 +74,7 @@ public sealed partial class ClaudeCodeProvider(IHttpClientFactory http, IOptions
         sb.AppendLine("</tool_call>");
         sb.AppendLine("A short note may come before the blocks. Then stop: the results come back in the next message. "
                       + "Never write tool results yourself. When you are done and need no more tools, reply with no <tool_call> block.");
+        sb.AppendLine("A reply that runs too long is lost whole. Write at most 5 files or about 500 lines in one reply, then carry on in the next, so finished work is kept.");
         return sb.ToString();
     }
 

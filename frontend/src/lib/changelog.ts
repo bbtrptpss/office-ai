@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.36.1",
+    date: "2026-11-05",
+    title: { th: "พนักงาน AI ทำงานชิ้นใหญ่ได้โดยไม่ถูกตัดกลางคัน", en: "AI employees can do larger work without being cut off" },
+    changes: [
+      { type: "fixed", th: "เพิ่มเวลาต่อหนึ่งคำตอบของ Claude Code จาก 3 นาทีเป็น 10 นาที", en: "One Claude Code reply may now take 10 minutes instead of 3" },
+      { type: "changed", th: "เมื่อคำตอบหมดเวลา ระบบบอกตรงๆ แทน error 502 และไม่ส่งคำขอเดิมซ้ำในรอบเดียวกัน", en: "A reply that runs out of time now says so instead of error 502, and the same request is not sent again in that run" },
+      { type: "changed", th: "บอกพนักงาน AI ให้เขียนไม่เกิน 5 ไฟล์หรือราว 500 บรรทัดต่อคำตอบ เพื่อไม่ให้งานที่ทำแล้วหาย", en: "AI employees are told to write at most 5 files or about 500 lines per reply, so finished work is not lost" },
+    ],
+  },
+  {
     version: "0.36.0",
     date: "2026-11-05",
     title: { th: "พนักงาน AI ทำงานจริงได้เสถียรขึ้น", en: "AI employees work more reliably" },

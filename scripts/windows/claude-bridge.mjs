@@ -20,7 +20,8 @@ const TOKEN = env.CLAUDE_BRIDGE_TOKEN ?? "";
 const PORT = Number(env.CLAUDE_BRIDGE_PORT ?? 8765);
 // The terminal is a full shell on this PC, so it stays off unless .env on this PC says otherwise. The API cannot turn it on.
 const TERMINAL_ENABLED = env.CLAUDE_BRIDGE_TERMINAL === "true";
-const TIMEOUT_MS = 180_000;
+// One reply. Writing several files at once can take minutes, and a reply that is cut off is lost whole, so stop only one that has surely gone wrong.
+const TIMEOUT_MS = 600_000;
 // AI employees resend their whole conversation every turn. Bigger than any run's token limit allows, small enough to refuse nonsense.
 const MAX_ASK_CHARS = 2_000_000;
 const ASK_SLOTS = Math.max(1, Number(env.CLAUDE_BRIDGE_CONCURRENCY) || 2);
@@ -75,7 +76,8 @@ function ask({ prompt, system, sessionId, model }, signal) {
     // claude is an npm shim (.cmd) on Windows, so it needs a shell; every argument here is fixed or validated.
     const child = spawn("claude", args, { cwd: work, shell: true, windowsHide: true });
     let out = "", err = "";
-    const timer = setTimeout(() => killTree(child), TIMEOUT_MS);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; killTree(child); }, TIMEOUT_MS);
     const abandon = () => killTree(child);
     signal?.addEventListener("abort", abandon, { once: true });
     // Decoded as a stream: a Thai character split between two chunks would otherwise be damaged.
@@ -88,6 +90,7 @@ function ask({ prompt, system, sessionId, model }, signal) {
       clearTimeout(timer);
       signal?.removeEventListener("abort", abandon);
       rmSync(systemFile, { force: true });
+      if (timedOut) return resolve({ error: `Claude Code did not finish one reply within ${TIMEOUT_MS / 60_000} minutes and was stopped.`, timedOut: true });
       try {
         const json = JSON.parse(out.trim().split(/\r?\n/).pop());
         if (json.is_error) return reject(new Error(json.result || "Claude returned an error."));

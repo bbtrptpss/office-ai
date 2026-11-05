@@ -123,6 +123,18 @@ public class ProviderAdapterTests
     }
 
     [Fact]
+    public async Task A_Claude_Code_reply_that_ran_out_of_time_says_so_and_is_not_sent_again()
+    {
+        var (provider, _) = ClaudeCodeWith(new FakeHandler(HttpStatusCode.OK, """{"error":"Claude Code did not finish one reply within 10 minutes and was stopped.","timedOut":true}"""));
+        var failed = await Assert.ThrowsAsync<AiProviderException>(() => provider.CompleteAsync(Conversation(), default));
+        Assert.False(failed.Retryable);
+        Assert.Contains("within 10 minutes", failed.Message);
+
+        var (other, _) = ClaudeCodeWith(new FakeHandler(HttpStatusCode.OK, """{"error":"Something else went wrong."}"""));
+        Assert.True((await Assert.ThrowsAsync<AiProviderException>(() => other.CompleteAsync(Conversation(), default))).Retryable);
+    }
+
+    [Fact]
     public void Tasks_created_at_the_same_moment_get_their_own_branches()
     {
         var at = DateTimeOffset.UtcNow;
