@@ -1,5 +1,5 @@
 // Lets the Office AI API (in Docker) ask the Claude Code CLI that is signed in on this Windows machine.
-// Claude Code runs with every tool and MCP server disabled, in an empty folder, one question at a time; the API carries out the <action> blocks
+// Claude Code runs with every tool and MCP server disabled, in an empty folder, a few questions at a time (CLAUDE_BRIDGE_CONCURRENCY); the API carries out the <action> blocks
 // (dashboard chat) or <tool_call> blocks (AI employees on the "claude-code" provider) it writes.
 // POST /run is the dashboard terminal: one PowerShell command in the project folder (the API sends it for the CEO only).
 // It answers 403 unless CLAUDE_BRIDGE_TERMINAL=true is in .env when the bridge starts.
@@ -21,6 +21,9 @@ const PORT = Number(env.CLAUDE_BRIDGE_PORT ?? 8765);
 // The terminal is a full shell on this PC, so it stays off unless .env on this PC says otherwise. The API cannot turn it on.
 const TERMINAL_ENABLED = env.CLAUDE_BRIDGE_TERMINAL === "true";
 const TIMEOUT_MS = 180_000;
+// AI employees resend their whole conversation every turn. Bigger than any run's token limit allows, small enough to refuse nonsense.
+const MAX_ASK_CHARS = 2_000_000;
+const ASK_SLOTS = Math.max(1, Number(env.CLAUDE_BRIDGE_CONCURRENCY) || 2);
 if (TOKEN.length < 24) {
   console.error("CLAUDE_BRIDGE_TOKEN in .env is missing or too short.");
   process.exit(1);
@@ -35,13 +38,34 @@ const sameToken = (given) => {
   return a.length === b.length && timingSafeEqual(a, b);
 };
 
-let queue = Promise.resolve();
-const serialized = (job) => (queue = queue.then(job, job));
+// At most `slots` jobs at once. A job whose caller has gone away before it started never starts.
+function limiter(slots) {
+  let active = 0;
+  const waiting = [];
+  const next = () => {
+    while (active < slots && waiting.length) {
+      const job = waiting.shift();
+      if (job.signal?.aborted) { job.reject(new Error("The caller went away.")); continue; }
+      active++;
+      job.run().then(job.resolve, job.reject).finally(() => { active--; next(); });
+    }
+  };
+  return (run, signal) => new Promise((resolve, reject) => { waiting.push({ run, signal, resolve, reject }); next(); });
+}
+// Apart, so a long terminal command never holds up the AI employees.
+const askQueue = limiter(ASK_SLOTS);
+const runQueue = limiter(1);
+
+// With a shell in between, killing the child alone would leave claude running.
+function killTree(child) {
+  if (process.platform === "win32" && child.pid) spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+  else child.kill();
+}
 
 // Claude Code model aliases or ids the API may ask for (AI employees on the "claude-code" provider); validated before it reaches the shell.
 const MODEL = /^[a-z0-9][a-z0-9.-]{0,60}$/i;
 
-function ask({ prompt, system, sessionId, model }) {
+function ask({ prompt, system, sessionId, model }, signal) {
   return new Promise((resolve, reject) => {
     const systemFile = join(work, `system-${randomUUID()}.txt`);
     writeFileSync(systemFile, system ?? "", "utf8");
@@ -51,12 +75,18 @@ function ask({ prompt, system, sessionId, model }) {
     // claude is an npm shim (.cmd) on Windows, so it needs a shell; every argument here is fixed or validated.
     const child = spawn("claude", args, { cwd: work, shell: true, windowsHide: true });
     let out = "", err = "";
-    const timer = setTimeout(() => child.kill(), TIMEOUT_MS);
+    const timer = setTimeout(() => killTree(child), TIMEOUT_MS);
+    const abandon = () => killTree(child);
+    signal?.addEventListener("abort", abandon, { once: true });
+    // Decoded as a stream: a Thai character split between two chunks would otherwise be damaged.
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (err += d));
     child.on("error", reject);
     child.on("close", (code) => {
       clearTimeout(timer);
+      signal?.removeEventListener("abort", abandon);
       rmSync(systemFile, { force: true });
       try {
         const json = JSON.parse(out.trim().split(/\r?\n/).pop());
@@ -106,7 +136,9 @@ function runClaude(command) {
     let out = "", err = "";
     const started = Date.now();
     let timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; child.kill(); }, RUN_TIMEOUT_MS);
+    const timer = setTimeout(() => { timedOut = true; killTree(child); }, RUN_TIMEOUT_MS);
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (err += d));
     child.on("error", (e) => { clearTimeout(timer); resolve({ output: e.message, exitCode: -1, timedOut: false, ms: Date.now() - started }); });
@@ -145,7 +177,9 @@ function run({ command }) {
     const add = (d) => { if (out.length < MAX_OUTPUT * 2) out += d; };
     const started = Date.now();
     let timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; child.kill(); }, RUN_TIMEOUT_MS);
+    const timer = setTimeout(() => { timedOut = true; killTree(child); }, RUN_TIMEOUT_MS);
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
     child.stdout.on("data", add);
     child.stderr.on("data", add);
     child.on("error", (e) => { clearTimeout(timer); resolve({ output: e.message, exitCode: -1, timedOut: false, ms: Date.now() - started }); });
@@ -159,33 +193,44 @@ function run({ command }) {
 }
 
 const server = createServer((req, res) => {
-  const send = (status, body) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(body)); };
+  const send = (status, body) => { if (res.destroyed || res.writableEnded) return; res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(body)); };
   if (req.method === "GET" && req.url === "/health") return send(200, { ok: true });
   if (req.method === "POST" && req.url === "/run") {
     if (!sameToken(req.headers["x-bridge-token"])) return send(401, { error: "unauthorized" });
     if (!TERMINAL_ENABLED) return send(403, { error: "terminal_disabled" });
     let body = "";
+    req.setEncoding("utf8");
     req.on("data", (d) => { body += d; if (body.length > 50_000) req.destroy(); });
     req.on("end", async () => {
       let input;
       try { input = JSON.parse(body); } catch { return send(400, { error: "invalid json" }); }
       if (typeof input.command !== "string" || !input.command.trim()) return send(400, { error: "command is required" });
-      send(200, await serialized(() => run(input)));
+      send(200, await runQueue(() => run(input)));
     });
     return;
   }
   if (req.method !== "POST" || req.url !== "/ask") return send(404, { error: "not found" });
   if (!sameToken(req.headers["x-bridge-token"])) return send(401, { error: "unauthorized" });
   let body = "";
-  req.on("data", (d) => { body += d; if (body.length > 200_000) req.destroy(); });
+  let tooBig = false;
+  req.setEncoding("utf8");
+  req.on("data", (d) => {
+    if (tooBig) return;
+    body += d;
+    if (body.length > MAX_ASK_CHARS) { tooBig = true; body = ""; send(413, { error: `The conversation is longer than ${MAX_ASK_CHARS} characters.` }); }
+  });
   req.on("end", async () => {
+    if (tooBig) return;
     let input;
     try { input = JSON.parse(body); } catch { return send(400, { error: "invalid json" }); }
     if (typeof input.prompt !== "string" || !input.prompt.trim()) return send(400, { error: "prompt is required" });
     if (input.sessionId && !/^[0-9a-f-]{36}$/i.test(input.sessionId)) return send(400, { error: "invalid sessionId" });
     if (input.model != null && (typeof input.model !== "string" || !MODEL.test(input.model))) return send(400, { error: "invalid model" });
+    // The caller gave up (its own timeout, a cancelled run): stop working for nobody and free the place.
+    const gone = new AbortController();
+    res.on("close", () => { if (!res.writableEnded) gone.abort(); });
     try {
-      send(200, await serialized(() => ask(input)));
+      send(200, await askQueue(() => ask(input, gone.signal), gone.signal));
     } catch (e) {
       send(502, { error: e instanceof Error ? e.message : String(e) });
     }
