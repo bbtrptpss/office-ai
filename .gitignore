@@ -25,3 +25,5 @@ secrets/
 
 # Licensed / personal character artwork stays on this machine (see CHARACTER_PACK in .env)
 frontend/public/characters/*/
+e2e/playwright-report/
+e2e/test-results/

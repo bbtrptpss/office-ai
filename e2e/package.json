@@ -1,0 +1,13 @@
+{
+  "name": "officeai-e2e",
+  "private": true,
+  "description": "Browser smoke test. Runs in CI against a throwaway stack; do not point it at real data.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "^22",
+    "typescript": "^5"
+  }
+}

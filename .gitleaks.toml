@@ -1,0 +1,3 @@
+# Secret scan used by CI. Exceptions name the exact test files whose values are made up for the tests, and are checked by hand.
+[extend]
+useDefault = true
