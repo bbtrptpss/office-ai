@@ -31,7 +31,7 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\install-shortcuts.ps1
 log อยู่ที่ `%LOCALAPPDATA%\OfficeAI\start.log` · ถ้าแก้โค้ดแล้วยังต้อง `docker compose up -d --build` เอง
 
 **Windows: สำรองข้อมูลอัตโนมัติทุกวัน** — `powershell -ExecutionPolicy Bypass -File scripts\windows\install-backup-task.ps1`
-(ทุกวัน 12:00 ถ้าปิดเครื่องอยู่จะทำทันทีที่เปิด เก็บ 14 ชุดล่าสุดใน `backups/` · สำรองเองตอนนี้: `scripts\windowsackup-office-ai.ps1` · กู้คืน: `scripts/restore.sh`)
+(ทุกวัน 12:00 ถ้าปิดเครื่องอยู่จะทำทันทีที่เปิด เก็บ 14 ชุดล่าสุดใน `backups/` · สำรองเองตอนนี้: `scripts\windows\backup-office-ai.ps1` · กู้คืน: `scripts/restore.sh`)
 
 **คุยกับ Claude จากหน้าภาพรวม (Claude Code บนเครื่องนี้):** ต้องมี `claude` ที่ login แล้ว, Node และ `CLAUDE_BRIDGE_TOKEN` ใน `.env`
 ตัวเชื่อม `scripts/windows/claude-bridge.mjs` เปิดเองเมื่อกดไอคอน Office AI (หรือรัน `node scripts/windows/claude-bridge.mjs`) — Claude รันคำสั่ง/อ่านไฟล์ไม่ได้ แต่สั่งงานพนักงาน AI ได้ (สร้างงาน มอบหมาย และเริ่มทำ ด้วยสิทธิ์ของคนที่คุย) ใช้โควตาเดียวกับ Claude Code ของคุณ
@@ -60,6 +60,7 @@ log อยู่ที่ `%LOCALAPPDATA%\OfficeAI\start.log` · ถ้าแก
 
 ```bash
 docker compose up -d db                        # เปิดแค่ฐานข้อมูล
+export ConnectionStrings__Default="Host=localhost;Port=15432;Database=officeai;Username=officeai;Password=<POSTGRES_PASSWORD ใน .env>"
 cd backend && dotnet run --project src/OfficeAI.Api   # API ที่ http://localhost:5000
 cd frontend && npm install && npm run dev      # เว็บที่ http://localhost:3000
 ```
@@ -100,4 +101,3 @@ Animation จะลดลงอัตโนมัติถ้าผู้ใช�
 - AuditLogs แก้ไขหรือลบไม่ได้ เพราะมี trigger ในฐานข้อมูลบล็อกไว้
 - กันการแก้ข้อมูลชนกันด้วย optimistic concurrency (xmin): ถ้าแก้ซ้อนกันจะได้ 409
 
-เรื่องที่ยังต้องทำก่อนขึ้น production (Phase 6): HTTPS, เข้ารหัสกุญแจ DataProtection, จัดการ secret และจำกัดสิทธิ์ระดับโปรเจกต์
