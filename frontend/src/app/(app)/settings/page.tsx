@@ -172,9 +172,12 @@ function TwoFactorCard() {
         )}
 
         {!data.enabled && !setup && (
-          <Button variant="contained" size="small" disabled={busy} onClick={() => act(async () => { setQr(null); setSetup(await api.post("/api/auth/2fa/setup", {})); })}>
-            {t.twoFactorStart}
-          </Button>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <TextField size="small" type="password" label={t.password} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+            <Button variant="contained" size="small" disabled={busy || !password} onClick={() => act(async () => { setQr(null); setSetup(await api.post("/api/auth/2fa/setup", { password })); })}>
+              {t.twoFactorStart}
+            </Button>
+          </Stack>
         )}
         {!data.enabled && setup && (
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "flex-start" } }}>
