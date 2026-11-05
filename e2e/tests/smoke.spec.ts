@@ -207,12 +207,12 @@ test("a repository installs dependencies through the proxy and its tests have no
   expect(installed.output).toContain("DONE");
 
   // Anywhere else is refused, through the proxy and around it.
-  const blocked = await runWith("blocked", "wget -q -T 10 -O /dev/null https://example.com && echo PROXY_ALLOWED_IT", "echo TESTS_RAN");
+  const blocked = await runWith("blocked", "wget -q -T 10 -O /dev/null https://example.com && echo PROXY_""ALLOWED", "echo TESTS_RAN");
   expect(blocked.status, blocked.output).toBe("Failed");
-  expect(blocked.output).not.toContain("PROXY_ALLOWED_IT");
+  expect(blocked.output).not.toContain("PROXY_ALLOWED");
   expect(blocked.output).not.toContain("TESTS_RAN");
 
-  const around = await runWith("around", "unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY; wget -q -T 10 -O /dev/null https://registry.npmjs.org && echo WENT_AROUND", "echo TESTS_RAN");
+  const around = await runWith("around", "unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY; wget -q -T 10 -O /dev/null https://registry.npmjs.org && echo WENT_""AROUND", "echo TESTS_RAN");
   expect(around.status, around.output).toBe("Failed");
   expect(around.output).not.toContain("WENT_AROUND");
   await context.close();
