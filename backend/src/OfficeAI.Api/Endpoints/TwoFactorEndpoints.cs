@@ -15,6 +15,7 @@ public record TwoFactorStatusDto(bool Enabled, int RecoveryCodesLeft);
 /// <param name="OtpauthUri">The same key as an otpauth:// link (what a QR code holds).</param>
 public record TwoFactorSetupDto(string SharedKey, string OtpauthUri);
 public record TwoFactorCodeRequest(string? Code);
+public record TwoFactorSetupRequest(string? Password);
 /// <param name="Code">An authenticator code, or one of the recovery codes.</param>
 public record TwoFactorDisableRequest(string? Password, string? Code);
 public record RecoveryCodesDto(List<string> Codes);
@@ -81,15 +82,27 @@ public static class TwoFactorEndpoints
         });
 
         // A new key each time, until a code from it is confirmed: a half-finished setup never leaves a working key behind.
-        tf.MapPost("/setup", async (ICurrentUser me, UserManager<AppUser> users) =>
+        // Needs the password: the key opens the terminal, so a stolen session alone must not be able to enroll its own authenticator.
+        tf.MapPost("/setup", async (TwoFactorSetupRequest req, ICurrentUser me, UserManager<AppUser> users, SignInManager<AppUser> signIn, SecurityAuditWriter audit, CancellationToken ct) =>
         {
             var user = await MeAsync(me, users);
             if (user.TwoFactorEnabled) throw new DomainException("auth.2fa_enabled", "Two-factor sign-in is already on. Turn it off first to use a new key.");
+            var check = await signIn.CheckPasswordSignInAsync(user, req.Password ?? "", lockoutOnFailure: true);
+            if (check.IsLockedOut)
+            {
+                await audit.WriteAsync(AuditActions.LockedOut, "User", user.Id.ToString(), user.Id, user.DisplayName, null, ct);
+                return Results.Problem(statusCode: 423, title: "Account is locked. Try again later.");
+            }
+            if (!check.Succeeded)
+            {
+                await audit.WriteAsync("TwoFactorSetupFailed", "User", user.Id.ToString(), user.Id, user.DisplayName, new { Reason = "bad_password" }, ct);
+                throw new DomainException("auth.bad_password", "The password is not correct.");
+            }
             await users.ResetAuthenticatorKeyAsync(user);
             var key = (await users.GetAuthenticatorKeyAsync(user))!;
             var label = Uri.EscapeDataString($"{Issuer}:{user.Email}");
-            return new TwoFactorSetupDto(Grouped(key), $"otpauth://totp/{label}?secret={key}&issuer={Uri.EscapeDataString(Issuer)}&digits=6");
-        });
+            return Results.Ok(new TwoFactorSetupDto(Grouped(key), $"otpauth://totp/{label}?secret={key}&issuer={Uri.EscapeDataString(Issuer)}&digits=6"));
+        }).RequireRateLimiting("login");
 
         tf.MapPost("/enable", async (TwoFactorCodeRequest req, ICurrentUser me, UserManager<AppUser> users, SignInManager<AppUser> signIn,
             SecurityAuditWriter audit, CancellationToken ct) =>

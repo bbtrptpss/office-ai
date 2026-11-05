@@ -54,7 +54,7 @@ public class TwoFactorTests(ApiFixture fx)
     /// <summary>Turns two-factor sign-in on; returns the shared key and the recovery codes.</summary>
     private static async Task<(string Key, List<string> RecoveryCodes)> EnableAsync(HttpClient c)
     {
-        var setup = await c.PostAsync<TwoFactorSetupDto>("/api/auth/2fa/setup", new { });
+        var setup = await c.PostAsync<TwoFactorSetupDto>("/api/auth/2fa/setup", new { password = Password });
         Assert.StartsWith("otpauth://totp/Office%20AI%3A", setup.OtpauthUri);
         Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/auth/2fa/enable", new { code = "000000" })).StatusCode);
         var codes = await c.PostAsync<RecoveryCodesDto>("/api/auth/2fa/enable", new { code = Totp(setup.SharedKey, DateTimeOffset.UtcNow.AddSeconds(-30)) });
@@ -73,7 +73,7 @@ public class TwoFactorTests(ApiFixture fx)
         Assert.Equal(TwoFactorEndpoints.RecoveryCodeCount, recovery.Count);
         Assert.Equal(new TwoFactorStatusDto(true, 10), await person.GetAsync<TwoFactorStatusDto>("/api/auth/2fa"));
         Assert.Equal(HttpStatusCode.OK, (await person.GetAsync("/api/auth/me")).StatusCode); // the session that turned it on stays
-        Assert.Equal(HttpStatusCode.BadRequest, (await person.PostAsJsonAsync("/api/auth/2fa/setup", new { })).StatusCode); // no silent key swap
+        Assert.Equal(HttpStatusCode.BadRequest, (await person.PostAsJsonAsync("/api/auth/2fa/setup", new { password = Password })).StatusCode); // no silent key swap
 
         var fresh = fx.Anonymous();
         var step1 = await fresh.PostAsJsonAsync("/api/auth/login", new { email, password = Password });
@@ -112,6 +112,32 @@ public class TwoFactorTests(ApiFixture fx)
         Assert.Equal(HttpStatusCode.BadRequest, (await person.PostAsJsonAsync("/api/auth/2fa/disable", new { password = "wrong-password-1", code = Totp(key, DateTimeOffset.UtcNow.AddSeconds(30)) })).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await person.PostAsJsonAsync("/api/auth/2fa/disable", new { password = Password, code = Totp(key, DateTimeOffset.UtcNow.AddSeconds(30)) })).StatusCode);
         await fx.LoginAsync(email, Password);
+    }
+
+    [Fact]
+    public async Task A_session_without_the_password_cannot_start_two_factor_setup()
+    {
+        var (person, _) = await PersonAsync(SystemRoles.Ceo);
+        foreach (var body in new object[] { new { }, new { password = "wrong-password-1" } })
+        {
+            var refused = await person.PostAsJsonAsync("/api/auth/2fa/setup", body);
+            Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+            Assert.Equal("auth.bad_password", await CodeOf(refused));
+            Assert.DoesNotContain("otpauth", await refused.Content.ReadAsStringAsync());
+        }
+        Assert.Equal(HttpStatusCode.Unauthorized, (await fx.Anonymous().PostAsJsonAsync("/api/auth/2fa/setup", new { password = Password })).StatusCode);
+
+        // Wrong passwords count towards the lockout, so a stolen session cannot guess its way in.
+        var (lockedOut, _) = await PersonAsync(SystemRoles.Member);
+        HttpResponseMessage last = new(HttpStatusCode.OK);
+        for (var i = 0; i < 5; i++) last = await lockedOut.PostAsJsonAsync("/api/auth/2fa/setup", new { password = "wrong-password-1" });
+        Assert.Equal((HttpStatusCode)423, last.StatusCode);
+        Assert.Equal((HttpStatusCode)423, (await lockedOut.PostAsJsonAsync("/api/auth/2fa/setup", new { password = Password })).StatusCode);
+
+        // The owner, with the password, carries on as before.
+        var (key, _) = await EnableAsync(person);
+        Assert.False(string.IsNullOrEmpty(key));
+        Assert.Contains(await (await fx.CeoAsync()).GetAsync<List<AuditLogDto>>("/api/audit?take=100"), a => a.Action == "TwoFactorSetupFailed");
     }
 
     [Fact]

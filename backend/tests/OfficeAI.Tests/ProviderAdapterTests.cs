@@ -43,6 +43,24 @@ public class ProviderAdapterTests
     ],
     [new AiToolDefinition("knowledge_search", "Search knowledge", Schema)], 1000, Effort.Medium);
 
+    // ---------------- Claude bridge ----------------
+
+    [Fact]
+    public async Task A_terminal_turned_off_at_the_bridge_is_reported_as_turned_off()
+    {
+        var options = Options.Create(new ClaudeBridgeOptions { Url = "http://bridge.test:8765", Token = new string('t', 32) });
+        var off = new HttpClaudeBridge(new HttpClient(new FakeHandler(HttpStatusCode.Forbidden, """{"error":"terminal_disabled"}""")), options);
+        var refused = await Assert.ThrowsAsync<OfficeAI.Domain.Common.DomainException>(() => off.RunAsync("dir", default));
+        Assert.Equal("terminal.disabled", refused.Code);
+
+        var on = new HttpClaudeBridge(new HttpClient(new FakeHandler(HttpStatusCode.OK, """{"output":"ok","exitCode":0,"timedOut":false,"ms":1}""")), options);
+        Assert.Equal("ok", (await on.RunAsync("dir", default)).Output);
+
+        // Other failures still mean the bridge is unavailable.
+        var down = new HttpClaudeBridge(new HttpClient(new FakeHandler(HttpStatusCode.Unauthorized, "{}")), options);
+        await Assert.ThrowsAsync<HttpRequestException>(() => down.RunAsync("dir", default));
+    }
+
     // ---------------- OpenAI ----------------
 
     private static (OpenAiProvider, FakeHandler) OpenAi(HttpStatusCode status, string body, string? key = "sk-test")

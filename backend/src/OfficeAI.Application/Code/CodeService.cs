@@ -160,16 +160,24 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
 
     public async Task<IReadOnlyList<string>> BranchesAsync(Guid id, CancellationToken ct) => await store.BranchesAsync(await RepoAsync(id, ct), ct);
 
+    /// <summary>Only a branch that really exists reaches git, so a value such as "--output=..." can never be read as an option.</summary>
+    private async Task<string> ExistingBranchAsync(CodeRepository repo, string? branch, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(branch)) return repo.DefaultBranch;
+        var name = branch.Trim();
+        return (await store.BranchesAsync(repo, ct)).Contains(name) ? name : throw new DomainException("code.not_found", "No such branch.");
+    }
+
     public async Task<IReadOnlyList<string>> FilesAsync(Guid id, string? branch, CancellationToken ct)
     {
         var repo = await RepoAsync(id, ct);
-        return await store.ListFilesAsync(repo, string.IsNullOrWhiteSpace(branch) ? repo.DefaultBranch : branch, ct);
+        return await store.ListFilesAsync(repo, await ExistingBranchAsync(repo, branch, ct), ct);
     }
 
     public async Task<string> FileAsync(Guid id, string? branch, string path, CancellationToken ct)
     {
         var repo = await RepoAsync(id, ct);
-        return await store.ReadFileAsync(repo, string.IsNullOrWhiteSpace(branch) ? repo.DefaultBranch : branch, path, ct)
+        return await store.ReadFileAsync(repo, await ExistingBranchAsync(repo, branch, ct), path, ct)
             ?? throw new DomainException("code.not_found", "File not found on that branch.");
     }
 

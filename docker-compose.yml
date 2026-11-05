@@ -59,7 +59,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "5000:8080"
+      - "127.0.0.1:5000:8080" # this PC only; docker-compose.prod.yml serves it through HTTPS instead
     depends_on:
       db:
         condition: service_healthy
@@ -89,7 +89,7 @@ services:
         NEXT_PUBLIC_STAGE_IMAGE: ${STAGE_IMAGE:-}
         NEXT_PUBLIC_CHARACTER_PACK: ${CHARACTER_PACK:-}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000" # this PC only; docker-compose.prod.yml serves it through HTTPS instead
     depends_on:
       - api
 

@@ -31,6 +31,18 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.32.4",
+    date: "2026-11-05",
+    title: { th: "ปิดความเสี่ยงบนเครื่องนี้", en: "Closing exposure on this PC" },
+    changes: [
+      { type: "security", th: "หน้าเว็บและ API เปิดเฉพาะบนเครื่องนี้ (127.0.0.1) เครื่องอื่นเข้าไม่ได้", en: "The web app and API listen on this PC only (127.0.0.1); other computers cannot reach them" },
+      { type: "security", th: "เริ่มตั้งการยืนยันสองขั้นต้องใส่รหัสผ่าน และรหัสผิดนับรวมการล็อกบัญชี session ที่ถูกขโมยจึงลงทะเบียน authenticator เองไม่ได้", en: "Starting two-factor setup needs the password, and wrong ones count towards the lockout, so a stolen session cannot enroll its own authenticator" },
+      { type: "security", th: "Terminal บนหน้าภาพรวมปิดเป็นค่าเริ่มต้นที่ตัวเชื่อม เปิดได้ด้วย CLAUDE_BRIDGE_TERMINAL=true ใน .env การ์ด Claude เริ่มเป็นแชตเสมอ", en: "The dashboard terminal is off by default at the bridge; CLAUDE_BRIDGE_TERMINAL=true in .env turns it on. The Claude card always starts as the chat" },
+      { type: "security", th: "หน้าเว็บส่ง security headers กันการฝังในเว็บอื่น", en: "The web app sends security headers that stop it being framed" },
+      { type: "security", th: "ชื่อ branch ที่ไม่มีอยู่จริงไปไม่ถึง git เมื่อดูไฟล์ใน repository", en: "A branch that does not exist never reaches git when viewing repository files" },
+    ],
+  },
+  {
     version: "0.32.3",
     date: "2026-11-05",
     title: { th: "สำรองข้อมูลที่ตรวจสอบได้ และสำเนานอกเครื่องแบบเข้ารหัส", en: "Verified backups and encrypted off-site copies" },

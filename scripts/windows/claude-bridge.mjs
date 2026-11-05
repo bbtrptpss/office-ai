@@ -2,6 +2,7 @@
 // Claude Code runs with every tool and MCP server disabled, in an empty folder, one question at a time; the API carries out the <action> blocks
 // (dashboard chat) or <tool_call> blocks (AI employees on the "claude-code" provider) it writes.
 // POST /run is the dashboard terminal: one PowerShell command in the project folder (the API sends it for the CEO only).
+// It answers 403 unless CLAUDE_BRIDGE_TERMINAL=true is in .env when the bridge starts.
 //   node scripts/windows/claude-bridge.mjs        (start-office-ai.ps1 starts it; token from .env CLAUDE_BRIDGE_TOKEN)
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
@@ -17,6 +18,8 @@ const env = Object.fromEntries(
 );
 const TOKEN = env.CLAUDE_BRIDGE_TOKEN ?? "";
 const PORT = Number(env.CLAUDE_BRIDGE_PORT ?? 8765);
+// The terminal is a full shell on this PC, so it stays off unless .env on this PC says otherwise. The API cannot turn it on.
+const TERMINAL_ENABLED = env.CLAUDE_BRIDGE_TERMINAL === "true";
 const TIMEOUT_MS = 180_000;
 if (TOKEN.length < 24) {
   console.error("CLAUDE_BRIDGE_TOKEN in .env is missing or too short.");
@@ -160,6 +163,7 @@ const server = createServer((req, res) => {
   if (req.method === "GET" && req.url === "/health") return send(200, { ok: true });
   if (req.method === "POST" && req.url === "/run") {
     if (!sameToken(req.headers["x-bridge-token"])) return send(401, { error: "unauthorized" });
+    if (!TERMINAL_ENABLED) return send(403, { error: "terminal_disabled" });
     let body = "";
     req.on("data", (d) => { body += d; if (body.length > 50_000) req.destroy(); });
     req.on("end", async () => {
