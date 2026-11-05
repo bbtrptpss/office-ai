@@ -42,7 +42,8 @@ public interface ICodeRepositoryStore
     Task<(string? Sha, string? Error)> PushToRemoteAsync(CodeRepository repo, string url, string? token, string branch, CancellationToken ct);
 }
 
-public sealed record SandboxRequest(string Image, string WorkspacePath, string Command, TimeSpan Timeout, double Cpus, int MemoryMb);
+/// <param name="SetupCommand">Downloads dependencies first, with access to the package registries only. The command itself never has a network.</param>
+public sealed record SandboxRequest(string Image, string WorkspacePath, string Command, TimeSpan Timeout, double Cpus, int MemoryMb, string? SetupCommand = null);
 public sealed record SandboxResult(int? ExitCode, string Output, bool TimedOut, int DurationMs, string? Error);
 
 /// <summary>Runs untrusted code in a throwaway, network-less, resource-limited container.</summary>

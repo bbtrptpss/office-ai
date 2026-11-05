@@ -36,6 +36,9 @@ services:
       Sandbox__RunnerToken: ${SANDBOX_RUNNER_TOKEN:?set SANDBOX_RUNNER_TOKEN}
     restart: unless-stopped
 
+  sandbox-proxy:
+    restart: unless-stopped
+
   web:
     ports: !reset []
     build:

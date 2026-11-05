@@ -49,6 +49,7 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("Repositories:AllowLocalRemotes", "true"); // tests use local bare repositories as "GitHub"
             b.UseSetting("Sandbox:UseLocalDocker", "true");
             b.UseSetting("Sandbox:TestTimeoutSeconds", "8");
+            b.UseSetting("Sandbox:SetupNetwork", "none"); // the two steps are tested here; the proxy in the browser smoke test
             b.UseSetting("Integrations:AutoDispatch", "false");
             b.UseSetting("Organization:ClearStaleFailures", "false"); // tests clear stale failures explicitly
             b.UseSetting("Integrations:AllowHttp", "true");

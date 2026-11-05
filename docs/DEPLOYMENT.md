@@ -96,6 +96,7 @@ migration รันอัตโนมัติตอน API เริ่ม แ�
 ## ข้อควรรู้ด้านความปลอดภัย
 
 - `sandbox-runner` เป็น service เดียวที่ต่อกับ Docker socket ซึ่งมีสิทธิ์เทียบเท่า root ของเครื่อง จึงไม่เปิดพอร์ตออกนอกเครือข่ายภายใน รับเฉพาะคำขอที่มี `SANDBOX_RUNNER_TOKEN` และรันได้เฉพาะ image ที่อยู่ใน allow-list
+- คำสั่งติดตั้ง dependency ของ repository รันในเครือข่าย `officeai-sandbox-egress` ซึ่งออกได้ทาง `sandbox-proxy` เท่านั้น และไปได้เฉพาะ HTTPS ถึง registry ใน `deploy/sandbox-proxy/squid.conf` สคริปต์ของ package ทำงานในขั้นนี้ จึงไม่มีการส่ง secret เข้า container
 - ถ้าต้องการแยกขาดยิ่งขึ้น ให้ย้าย runner ไปเครื่องแยก หรือใช้ rootless Docker / gVisor (`--runtime runsc`)
 - กุญแจเข้ารหัส cookie (DataProtection) ถูกเข้ารหัสด้วย certificate ก่อนเก็บลงฐานข้อมูล การเปลี่ยน certificate: สร้างไฟล์ใหม่ ย้ายไฟล์เดิมไปไว้ข้างกัน แล้วตั้ง `DataProtection__PreviousCertificatePaths__0=<path ไฟล์เดิม>` ให้ service `api` เพื่อให้อ่านกุญแจเก่าได้จนหมดอายุ (90 วัน)
 - เซิร์ฟเวอร์ตัวเดียวรองรับ workflow engine ได้หลาย instance เพราะใช้ PostgreSQL advisory lock แต่คิวงาน AI อยู่ในหน่วยความจำของแต่ละ instance จึงแนะนำให้รัน API instance เดียว

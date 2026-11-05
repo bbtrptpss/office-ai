@@ -52,6 +52,8 @@ log อยู่ที่ `%LOCALAPPDATA%\OfficeAI\start.log` · ถ้าแก
 
 ระบบรัน migration และใส่ข้อมูลตั้งต้นอัตโนมัติ: 6 แผนก, 31 ตำแหน่ง, พนักงาน AI 30 ตัว และ CEO 1 คน
 
+**ให้พนักงาน AI ทำโปรเจกต์ที่มี dependency:** ตั้ง “คำสั่งติดตั้ง dependency” ที่ repository เช่น `npm ci` หรือ `dotnet restore` ขั้นนี้ออกอินเทอร์เน็ตได้เฉพาะ registry ใน `deploy/sandbox-proxy/squid.conf` ส่วนเทสต์และ lint รันต่อใน container ที่ไม่มี network
+
 ## ติดตั้งใช้งานจริง
 
 ดู [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — HTTPS อัตโนมัติ, secrets, สำรอง/กู้คืน, monitoring

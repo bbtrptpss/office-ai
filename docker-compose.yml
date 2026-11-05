@@ -76,9 +76,18 @@ services:
       Sandbox__UseLocalDocker: "true"
       Sandbox__RunnerToken: ${SANDBOX_RUNNER_TOKEN:-dev-runner-token}
       Sandbox__WorkspaceMount: "volume:officeai-repos:"
+      Sandbox__SetupNetwork: officeai-sandbox-egress
+      Sandbox__SetupProxy: http://sandbox-proxy:3128
     volumes:
       - repos:/data/repos:ro
       - /var/run/docker.sock:/var/run/docker.sock
+
+  # The sandbox's only way out while a setup command downloads dependencies: HTTPS to the registries in squid.conf.
+  sandbox-proxy:
+    build: ./deploy/sandbox-proxy
+    networks:
+      - default
+      - sandbox-egress
 
   web:
     build:
@@ -92,6 +101,12 @@ services:
       - "127.0.0.1:3000:3000" # this PC only; docker-compose.prod.yml serves it through HTTPS instead
     depends_on:
       - api
+
+networks:
+  # Containers here have no route out except through sandbox-proxy.
+  sandbox-egress:
+    name: officeai-sandbox-egress
+    internal: true
 
 volumes:
   pgdata:

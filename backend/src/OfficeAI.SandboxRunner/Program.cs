@@ -31,7 +31,7 @@ app.MapPost("/run", async (HttpRequest http, RunnerRequest req, DockerSandbox sa
     if (req.TimeoutSeconds is < 1 or > 3600 || req.Cpus is <= 0 or > 4 || req.MemoryMb is < 64 or > 8192)
         return Results.BadRequest("Limits are out of range.");
 
-    var result = await sandbox.RunAsync(new SandboxRequest(req.Image, workspace, req.Command, TimeSpan.FromSeconds(req.TimeoutSeconds), req.Cpus, req.MemoryMb), ct);
+    var result = await sandbox.RunAsync(new SandboxRequest(req.Image, workspace, req.Command, TimeSpan.FromSeconds(req.TimeoutSeconds), req.Cpus, req.MemoryMb, req.SetupCommand), ct);
     return Results.Ok(result);
 });
 

@@ -31,6 +31,14 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.35.0",
+    date: "2026-11-05",
+    title: { th: "พนักงาน AI ทำโปรเจกต์ที่มี dependency ได้", en: "AI employees can work on projects with dependencies" },
+    changes: [
+      { type: "added", th: "คำสั่งติดตั้ง dependency ต่อ repository: ขั้นติดตั้งออกอินเทอร์เน็ตได้เฉพาะ registry ที่อนุญาต ส่วนเทสต์และ lint ไม่มี network เหมือนเดิม", en: "A dependency install command per repository: that step can reach the allowed package registries only, while tests and lint still have no network" },
+    ],
+  },
+  {
     version: "0.34.1",
     date: "2026-11-05",
     title: { th: "เตรียมพร้อมสำหรับการติดตั้งจริง", en: "Getting ready for deployment" },

@@ -188,6 +188,36 @@ test("a manager can reset a password and turn an account off", async ({ browser 
   await admin.context.close();
 });
 
+test("a repository installs dependencies through the proxy and its tests have no network", async ({ browser }) => {
+  test.setTimeout(300_000);
+  const { context, api } = await ceoPage(browser);
+  const project = await post<{ id: string }>(api, "/api/projects", { code: `DEP-${Date.now()}`, name: "Dependencies project", status: "Active" });
+  type Run = { status: string; output: string };
+
+  const runWith = async (name: string, setupCommand: string, testCommand: string) => {
+    const repo = await post<{ id: string }>(api, `/api/projects/${project.id}/repositories`, { name, sandboxImage: "node:22-alpine", testCommand, setupCommand });
+    return post<Run>(api, `/api/repositories/${repo.id}/test-runs`, {});
+  };
+
+  // A real package from the real registry, used by tests that cannot reach anything.
+  const installed = await runWith("deps",
+    `echo '{"name":"x","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}' > package.json && npm install --no-audit --no-fund`,
+    `node -e "if (require('left-pad')('1', 3, '0') !== '001') process.exit(9)" && if wget -q -T 5 -O /dev/null https://registry.npmjs.org; then echo TESTS_HAVE_NETWORK; exit 1; fi; echo DONE`);
+  expect(installed.status, installed.output).toBe("Passed");
+  expect(installed.output).toContain("DONE");
+
+  // Anywhere else is refused, through the proxy and around it.
+  const blocked = await runWith("blocked", "wget -q -T 10 -O /dev/null https://example.com && echo PROXY_ALLOWED_IT", "echo TESTS_RAN");
+  expect(blocked.status, blocked.output).toBe("Failed");
+  expect(blocked.output).not.toContain("PROXY_ALLOWED_IT");
+  expect(blocked.output).not.toContain("TESTS_RAN");
+
+  const around = await runWith("around", "unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY; wget -q -T 10 -O /dev/null https://registry.npmjs.org && echo WENT_AROUND", "echo TESTS_RAN");
+  expect(around.status, around.output).toBe("Failed");
+  expect(around.output).not.toContain("WENT_AROUND");
+  await context.close();
+});
+
 test("two-factor setup asks for the password first", async ({ browser }) => {
   const admin = await ceoPage(browser);
   const email = `member-${Date.now()}@e2e.test`;

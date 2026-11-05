@@ -544,6 +544,7 @@ export interface Repository {
   sandboxImage: string;
   testCommand: string;
   lintCommand: string | null;
+  setupCommand: string | null;
   isDefault: boolean;
   createdAt: string;
   version: number;

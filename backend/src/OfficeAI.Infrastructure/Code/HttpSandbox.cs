@@ -5,7 +5,7 @@ using OfficeAI.Application.Code;
 namespace OfficeAI.Infrastructure.Code;
 
 /// <summary>Wire format between the API and the sandbox runner. Paths are relative to the shared repositories root.</summary>
-public sealed record RunnerRequest(string Image, string Workspace, string Command, int TimeoutSeconds, double Cpus, int MemoryMb);
+public sealed record RunnerRequest(string Image, string Workspace, string Command, int TimeoutSeconds, double Cpus, int MemoryMb, string? SetupCommand = null);
 
 /// <summary>The API's view of the sandbox when it runs in a container: it asks the runner service, which alone can reach Docker.</summary>
 public sealed class HttpSandbox(HttpClient http, IOptions<SandboxOptions> options, IOptions<RepositoryOptions> repos) : ISandbox
@@ -19,7 +19,7 @@ public sealed class HttpSandbox(HttpClient http, IOptions<SandboxOptions> option
         var relative = Path.GetRelativePath(Path.GetFullPath(repos.Value.Root), Path.GetFullPath(req.WorkspacePath)).Replace('\\', '/');
         using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(new Uri(options.Value.RunnerUrl!), "/run"))
         {
-            Content = JsonContent.Create(new RunnerRequest(req.Image, relative, req.Command, (int)req.Timeout.TotalSeconds, req.Cpus, req.MemoryMb)),
+            Content = JsonContent.Create(new RunnerRequest(req.Image, relative, req.Command, (int)req.Timeout.TotalSeconds, req.Cpus, req.MemoryMb, req.SetupCommand)),
         };
         message.Headers.Add("X-Runner-Token", options.Value.RunnerToken ?? "");
         try

@@ -8,14 +8,15 @@ namespace OfficeAI.Application.Code;
 
 public record RepositoryDto(Guid Id, Guid ProjectId, string Name, string DefaultBranch, string SandboxImage, string TestCommand, bool IsDefault, DateTimeOffset CreatedAt, uint Version,
     string? RemoteUrl = null, string? RemoteTokenEnvVar = null, bool RemoteTokenPresent = false, DateTimeOffset? RemotePushedAt = null, string? RemotePushedSha = null,
-    string? RemoteError = null, string? LintCommand = null);
+    string? RemoteError = null, string? LintCommand = null, string? SetupCommand = null);
 /// <param name="ImportUrl">Start from a copy of this remote (GitHub/GitLab) instead of an empty repository; it also becomes the push remote.</param>
 public record CreateRepositoryRequest(string Name, string SandboxImage, string TestCommand, string DefaultBranch = "main", string? ImportUrl = null,
-    string? RemoteTokenEnvVar = null, string? LintCommand = null);
+    string? RemoteTokenEnvVar = null, string? LintCommand = null, string? SetupCommand = null);
 /// <summary>Null RemoteUrl removes the remote.</summary>
 public record SetRemoteRequest(string? RemoteUrl, string? RemoteTokenEnvVar, uint? Version = null);
 /// <param name="LintCommand">Lint / format check / static analysis; blank removes it.</param>
-public record UpdateRepositoryRequest(string SandboxImage, string TestCommand, uint? Version = null, string? LintCommand = null);
+/// <param name="SetupCommand">Downloads dependencies before tests and lint; blank removes it.</param>
+public record UpdateRepositoryRequest(string SandboxImage, string TestCommand, uint? Version = null, string? LintCommand = null, string? SetupCommand = null);
 public record TestRunDto(Guid Id, Guid RepositoryId, Guid? TaskId, Guid? RunId, string Branch, string? CommitSha, string Image, string Command,
     TestRunStatus Status, int? ExitCode, string? Output, int DurationMs, DateTimeOffset StartedAt, CheckKind Kind = CheckKind.Test);
 public record MergeRequestDto(Guid Id, Guid ProjectId, Guid RepositoryId, Guid? TaskId, int Number, string Title, string? Description, string SourceBranch,
@@ -65,7 +66,7 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
     public async Task<List<RepositoryDto>> ListAsync(Guid projectId, CancellationToken ct) =>
         (await db.CodeRepositories.AsNoTracking().Where(r => r.ProjectId == projectId).OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name).ToListAsync(ct))
             .Select(r => new RepositoryDto(r.Id, r.ProjectId, r.Name, r.DefaultBranch, r.SandboxImage, r.TestCommand, r.IsDefault, r.CreatedAt, r.Version,
-                r.RemoteUrl, r.RemoteTokenEnvVar, !string.IsNullOrEmpty(ReadToken(r.RemoteTokenEnvVar)), r.RemotePushedAt, r.RemotePushedSha, r.RemoteError, r.LintCommand))
+                r.RemoteUrl, r.RemoteTokenEnvVar, !string.IsNullOrEmpty(ReadToken(r.RemoteTokenEnvVar)), r.RemotePushedAt, r.RemotePushedSha, r.RemoteError, r.LintCommand, r.SetupCommand))
             .ToList();
 
     private void ValidateSandbox(string image, string command)
@@ -74,9 +75,9 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
         if (string.IsNullOrWhiteSpace(command) || command.Length > 1000) throw new DomainException("validation", "testCommand is required (max 1000 characters).");
     }
 
-    private static string? CleanLint(string? command)
+    private static string? CleanLint(string? command, string field = "lintCommand")
     {
-        if (command is { Length: > 1000 }) throw new DomainException("validation", "lintCommand must be at most 1000 characters.");
+        if (command is { Length: > 1000 }) throw new DomainException("validation", $"{field} must be at most 1000 characters.");
         return string.IsNullOrWhiteSpace(command) ? null : command.Trim();
     }
 
@@ -92,7 +93,7 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
 
         var repo = new CodeRepository
         {
-            ProjectId = projectId, Name = name, DefaultBranch = req.DefaultBranch, SandboxImage = req.SandboxImage, TestCommand = req.TestCommand.Trim(), LintCommand = CleanLint(req.LintCommand),
+            ProjectId = projectId, Name = name, DefaultBranch = req.DefaultBranch, SandboxImage = req.SandboxImage, TestCommand = req.TestCommand.Trim(), LintCommand = CleanLint(req.LintCommand), SetupCommand = CleanLint(req.SetupCommand, "setupCommand"),
             IsDefault = !await db.CodeRepositories.AnyAsync(r => r.ProjectId == projectId, ct),
         };
         if (string.IsNullOrWhiteSpace(req.ImportUrl))
@@ -127,6 +128,7 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
         repo.SandboxImage = req.SandboxImage;
         repo.TestCommand = req.TestCommand.Trim();
         repo.LintCommand = CleanLint(req.LintCommand);
+        repo.SetupCommand = CleanLint(req.SetupCommand, "setupCommand");
         await db.SaveChangesAsync(ct);
         return (await ListAsync(repo.ProjectId, ct)).First(r => r.Id == id);
     }
@@ -202,7 +204,7 @@ public partial class CodeService(IAppDbContext db, ICodeRepositoryStore store, I
         var path = await store.CheckoutBranchAsync(repo, branch, ct);
         var sha = (await store.GitAsync(path, ["rev-parse", "HEAD"], ct)).Output.Trim();
         var started = clock.GetUtcNow();
-        var result = await sandbox.RunAsync(new SandboxRequest(repo.SandboxImage, path, command, sandbox.TestTimeout, 1.0, 2048), ct);
+        var result = await sandbox.RunAsync(new SandboxRequest(repo.SandboxImage, path, command, sandbox.TestTimeout, 1.0, 2048, repo.SetupCommand), ct);
         var run = new TestRun
         {
             RepositoryId = repo.Id, Kind = kind, Branch = branch, CommitSha = sha, Image = repo.SandboxImage, Command = command,

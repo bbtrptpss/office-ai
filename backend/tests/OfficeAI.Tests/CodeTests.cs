@@ -158,6 +158,44 @@ public class CodeTests(ApiFixture fx)
     }
 
     [Fact]
+    public async Task Setup_prepares_the_workspace_and_the_tests_still_run_without_a_network()
+    {
+        var (ceo, _, _, _, repo) = await SetupAsync("BACKEND", [], testCommand: """
+            test "$(cat deps/lib.txt)" = "installed" || { echo DEPS_MISSING; exit 1; }
+            if wget -q -T 3 -O /dev/null http://1.1.1.1; then echo NETWORK_REACHABLE; exit 1; fi
+            if touch /src/hacked 2>/dev/null; then echo WORKSPACE_WRITABLE; exit 1; fi
+            [ "$(id -u)" != "0" ] || { echo RUNNING_AS_ROOT; exit 1; }
+            echo ISOLATED
+            """);
+        repo = await ceo.PutAsync<RepositoryDto>($"/api/repositories/{repo.Id}", new { sandboxImage = Image, testCommand = repo.TestCommand, setupCommand = "mkdir deps && echo installed > deps/lib.txt" });
+        Assert.StartsWith("mkdir deps", repo.SetupCommand);
+
+        var run = await ceo.PostAsync<TestRunDto>($"/api/repositories/{repo.Id}/test-runs", new { });
+        Assert.True(run.Status == TestRunStatus.Passed, run.Output);
+        Assert.Contains("ISOLATED", run.Output);
+        Assert.Contains("--- setup:", run.Output);
+    }
+
+    [Fact]
+    public async Task A_failed_setup_fails_the_run_without_running_the_tests_and_leaves_nothing_behind()
+    {
+        var (ceo, _, _, _, repo) = await SetupAsync("BACKEND", [], testCommand: "echo TESTS_RAN");
+        await ceo.PutAsync<RepositoryDto>($"/api/repositories/{repo.Id}", new { sandboxImage = Image, testCommand = repo.TestCommand, setupCommand = "echo cannot download; exit 3" });
+
+        var run = await ceo.PostAsync<TestRunDto>($"/api/repositories/{repo.Id}/test-runs", new { });
+        Assert.Equal(TestRunStatus.Failed, run.Status);
+        Assert.Equal(3, run.ExitCode);
+        Assert.Contains("cannot download", run.Output);
+        Assert.Contains("setup failed", run.Output);
+        Assert.DoesNotContain("TESTS_RAN", run.Output);
+
+        using var volumes = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("docker", ["volume", "ls", "-q", "--filter", "name=officeai-sbx-work-"]) { RedirectStandardOutput = true })!;
+        var left = await volumes.StandardOutput.ReadToEndAsync();
+        await volumes.WaitForExitAsync();
+        Assert.Equal("", left.Trim());
+    }
+
+    [Fact]
     public async Task Runaway_tests_are_stopped_at_the_timeout()
     {
         var (ceo, _, task, _, repo) = await SetupAsync("BACKEND", [Test()], testCommand: "sleep 60");
