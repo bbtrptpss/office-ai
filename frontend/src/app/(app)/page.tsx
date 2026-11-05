@@ -222,9 +222,9 @@ function Stage() {
 
   const [newChat, setNewChat] = useState(false);
   const claudeOn = !!assistant?.claudeAvailable && can("agent.manage");
-  // The CEO's Claude card is a terminal (PowerShell in the project folder on this PC) unless they switch back to the Claude chat.
+  // The Claude card is a chat. The CEO can switch it to the terminal (PowerShell in the project folder on this PC), which the bridge keeps off unless it is turned on in .env.
   const isCeo = !!me?.roles.includes("CEO");
-  const [chatMode, setChatMode] = useState(false);
+  const [chatMode, setChatMode] = useState(true);
   const terminal = isCeo && !chatMode;
   // The terminal needs a fresh authenticator code: the command waiting for it runs once the code opens the terminal.
   const [unlockFor, setUnlockFor] = useState<string | null>(null);
@@ -303,6 +303,9 @@ ${footer}`, from: "Terminal", mono: true });
         } else if (code === "terminal.2fa_required") {
           setUnlockFor(null);
           settle(at, { answer: t.dashTerminal2faRequired, from: "Terminal" });
+        } else if (code === "terminal.disabled") {
+          setUnlockFor(null);
+          settle(at, { answer: t.dashTerminalDisabled, from: "Terminal" });
         } else failed(err, "Terminal");
       } finally {
         setPending(false);

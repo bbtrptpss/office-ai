@@ -1,7 +1,9 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using OfficeAI.Application.Communication;
+using OfficeAI.Domain.Common;
 
 namespace OfficeAI.Infrastructure.Ai;
 
@@ -38,6 +40,8 @@ public sealed class HttpClaudeBridge(HttpClient http, IOptions<ClaudeBridgeOptio
         using var req = new HttpRequestMessage(HttpMethod.Post, new Uri(new Uri(options.Value.Url!), "/run")) { Content = JsonContent.Create(new { command }) };
         req.Headers.Add("x-bridge-token", options.Value.Token);
         using var res = await http.SendAsync(req, ct);
+        if (res.StatusCode == HttpStatusCode.Forbidden)
+            throw new DomainException("terminal.disabled", "The terminal is turned off on this PC (CLAUDE_BRIDGE_TERMINAL in .env).");
         if (!res.IsSuccessStatusCode) throw new HttpRequestException($"Claude bridge returned {(int)res.StatusCode}.");
         return await res.Content.ReadFromJsonAsync<TerminalResultDto>(ct) ?? throw new HttpRequestException("Claude bridge returned nothing.");
     }
