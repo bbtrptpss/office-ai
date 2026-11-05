@@ -186,7 +186,12 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
         {
             // "Try again": unblock; the engine counts attempts from this decision onwards.
             if (task.Status == WorkTaskStatus.Blocked) task.Status = WorkTaskStatus.InProgress;
-            if (approval.DecisionNote is { } note) AddHumanReview(task.Id, note);
+            if (approval.DecisionNote is { } note)
+            {
+                AddHumanReview(task.Id, note);
+                // Reviewers judge against the acceptance criteria, so a person's decision has to change them to count.
+                task.AcceptanceCriteria = $"{task.AcceptanceCriteria}\n\nDecision by a person on {now:yyyy-MM-dd}, which overrides anything above it disagrees with: {note}".Trim();
+            }
         }
         else if (TaskStateMachine.CanTransition(task.Status, WorkTaskStatus.Cancelled))
         {

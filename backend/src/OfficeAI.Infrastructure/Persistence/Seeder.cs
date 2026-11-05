@@ -114,6 +114,15 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
         await GrantNewToolsOnceAsync("v0.20.0-release-tool", [PrepareReleaseTool.ToolId], now, ct);
         await GrantNewToolsOnceAsync("v0.23.0-lint-tools", [Application.Code.RunLintTool.ToolId, Application.Code.ScanSecretsTool.ToolId], now, ct);
 
+        // 20 tool calls stopped real coding work: reading a small project and writing its changes used them all. Only the old default moves; limits people set stay.
+        const string toolLimitMarker = "v0.35.1-tool-call-limit";
+        if (!await db.SeedMarkers.AnyAsync(m => m.Key == toolLimitMarker, ct))
+        {
+            await db.AgentConfigurations.Where(c => c.MaxToolCallsPerRun == 20).ExecuteUpdateAsync(s => s.SetProperty(c => c.MaxToolCallsPerRun, 60), ct);
+            db.SeedMarkers.Add(new SeedMarker { Key = toolLimitMarker, AppliedAt = now });
+            await db.SaveChangesAsync(ct);
+        }
+
         if (!await db.ChatChannels.AnyAsync(c => c.Kind == ChannelKind.Company && c.Name == ChatService.GeneralChannel, ct))
         {
             db.ChatChannels.Add(new ChatChannel { Kind = ChannelKind.Company, Name = ChatService.GeneralChannel, Description = "Company-wide conversation" });

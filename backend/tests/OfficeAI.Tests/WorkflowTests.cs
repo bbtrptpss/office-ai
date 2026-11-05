@@ -358,6 +358,30 @@ public class WorkflowTests(ApiFixture fx)
     }
 
     [Fact]
+    public async Task A_blocked_task_says_why_and_the_persons_decision_joins_its_acceptance_criteria()
+    {
+        var ceo = await fx.CeoAsync();
+        var blocked = await ScriptedModelAsync(ScriptedProvider.Sequence(ScriptedProvider.Call("task_report_blocked", new { reason = "The sandbox cannot return the lockfile." })));
+        var worker = await NewAgentAsync(ceo, "BACKEND", ScriptedProvider.ProviderName, blocked);
+        var (_, workflow, project) = await ApprovedOneTaskWorkflowAsync(worker);
+        for (var i = 0; i < 3; i++)
+        {
+            await TickAsync();
+            await WaitForIdleAsync();
+        }
+
+        var escalation = Assert.Single(await PendingAsync(ceo, workflow.Id));
+        Assert.Equal(ApprovalKind.Escalation, escalation.Kind);
+        Assert.Contains("The sandbox cannot return the lockfile.", escalation.Details);
+
+        await ApproveAsync(ceo, escalation, note: "Skip the lockfile.");
+        var task = (await ceo.GetAsync<List<TaskDto>>($"/api/projects/{project.Id}/tasks")).Single(t => t.Title == "Only task");
+        Assert.Contains("Skip the lockfile.", task.AcceptanceCriteria);
+        Assert.Contains("overrides", task.AcceptanceCriteria);
+        await ceo.PostAsync<WorkflowDto>($"/api/workflows/{workflow.Id}/cancel", new { });
+    }
+
+    [Fact]
     public async Task Retrying_the_failed_run_answers_the_escalation_and_the_engine_runs_again()
     {
         var ceo = await fx.CeoAsync();
