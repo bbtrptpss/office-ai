@@ -31,6 +31,18 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.35.1",
+    date: "2026-11-05",
+    title: { th: "แก้สิ่งที่พบจากการทดลองงานจริง", en: "Fixes from the first real trial" },
+    changes: [
+      { type: "fixed", th: "คำสั่งเครื่องมือของพนักงาน AI บน claude-code ไม่หายอีก เมื่อ Claude ตอบในรูปแบบ <invoke> ซึ่งเคยทำให้ผลรีวิวหายและงานจบโดยไม่ได้ทำ", en: "Tool calls of AI employees on claude-code are no longer lost when Claude answers in its <invoke> form, which used to lose reviews and end work without doing it" },
+      { type: "fixed", th: "แต่ละงานมี branch ของตัวเอง ก่อนหน้านี้งานที่สร้างพร้อมกันได้ชื่อ branch เดียวกัน", en: "Each task has its own branch; tasks created together used to share one" },
+      { type: "changed", th: "ขีดจำกัดเรียกเครื่องมือต่อรอบเพิ่มจาก 20 เป็น 60 (เฉพาะค่าเริ่มต้นเดิม ค่าที่ตั้งเองไม่เปลี่ยน)", en: "The tool call limit per run goes from 20 to 60 (the old default only; limits people set stay)" },
+      { type: "changed", th: "คำขอตัดสินใจบอกเหตุผลที่ agent รายงาน และคำตัดสินของคนถูกเพิ่มในเกณฑ์การยอมรับของงาน เพื่อให้ผู้รีวิวยึดตาม", en: "Decision requests show the reason the agent gave, and a person's decision joins the task's acceptance criteria so reviewers follow it" },
+      { type: "added", th: "เลือกแผนกได้ตอนเริ่ม objective", en: "Choose a department when starting an objective" },
+    ],
+  },
+  {
     version: "0.35.0",
     date: "2026-11-05",
     title: { th: "พนักงาน AI ทำโปรเจกต์ที่มี dependency ได้", en: "AI employees can work on projects with dependencies" },

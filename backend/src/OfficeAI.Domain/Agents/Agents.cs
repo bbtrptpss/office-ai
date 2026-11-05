@@ -54,7 +54,7 @@ public class AgentConfiguration : Entity, IAuditable
     public Effort Effort { get; set; } = Effort.Medium;
     public int MaxTokensPerCall { get; set; } = 8_000;
     public int MaxTurnsPerRun { get; set; } = 12;
-    public int MaxToolCallsPerRun { get; set; } = 20;
+    public int MaxToolCallsPerRun { get; set; } = 60;
     public int MaxTokensPerRun { get; set; } = 200_000;
     public int TimeoutSeconds { get; set; } = 600;
     public decimal MonthlyBudgetUsd { get; set; } = 5m;

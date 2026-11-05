@@ -134,7 +134,7 @@ public sealed class WorkflowEngine(
         switch (task.Status)
         {
             case WorkTaskStatus.Blocked:
-                await EscalateOnceAsync(w, task, "The task is blocked.", "Blocked", ct);
+                await EscalateOnceAsync(w, task, await BlockedReasonAsync(task.Id, ct), "Blocked", ct);
                 return;
             case WorkTaskStatus.WaitingApproval:
                 if (!await db.ApprovalRequests.AnyAsync(a => a.TaskId == task.Id && a.Kind == ApprovalKind.TaskCompletion && a.Status == ApprovalStatus.Pending, ct))
@@ -233,7 +233,8 @@ public sealed class WorkflowEngine(
         }
         if (recent.Count >= def.MaxRunsPerTask)
         {
-            await EscalateOnceAsync(w, task, $"{recent.Count} runs without finishing. Retry or cancel?", "TooManyRuns", ct);
+            var ended = string.Join(", ", recent.Take(5).Select(h => h.StopReason ?? h.Status.ToString()));
+            await EscalateOnceAsync(w, task, $"{recent.Count} runs without finishing (latest first: {ended}). Retry or cancel?", "TooManyRuns", ct);
             return;
         }
         if (await ActiveRunsAsync(w.Id, ct) >= w.MaxParallelRuns) return;
@@ -247,6 +248,25 @@ public sealed class WorkflowEngine(
         catch (DomainException ex)
         {
             await EscalateOnceAsync(w, task, ex.Message, ex.Code, ct);
+        }
+    }
+
+    /// <summary>What the agent wrote when it reported the block: the person deciding needs it, not just that it happened.</summary>
+    private async Task<string> BlockedReasonAsync(Guid taskId, CancellationToken ct)
+    {
+        var input = await db.ToolExecutions.AsNoTracking()
+            .Where(x => x.ToolId == Agents.ReportBlockedTool.ToolId && x.Status == ToolExecutionStatus.Succeeded)
+            .Join(db.AgentRuns.Where(r => r.TaskId == taskId), x => x.RunId, r => r.Id, (x, _) => x)
+            .OrderByDescending(x => x.StartedAt).Select(x => x.InputJson).FirstOrDefaultAsync(ct);
+        if (input is null) return "The task is blocked.";
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(input);
+            return doc.RootElement.TryGetProperty("reason", out var reason) && reason.GetString() is { Length: > 0 } text ? $"The task is blocked: {text}" : "The task is blocked.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return "The task is blocked."; // the stored input is cut off at its size limit
         }
     }
 

@@ -8,7 +8,7 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { api, Employee, usd, Workflow, WorkflowEvent } from "@/lib/api";
+import { api, Department, Employee, usd, Workflow, WorkflowEvent } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -31,14 +31,15 @@ export function ObjectivesPanel({ projectId, employees }: { projectId: string; e
   useRealtime("approvalsChanged", () => void reload());
   useRealtime<{ projectId: string }>("agentRunChanged", (e) => e.projectId === projectId && void reload());
 
-  const planners = employees.filter((e) => e.kind === "AI" && e.status !== "Inactive");
-  const [form, setForm] = useState<{ objective: string; plannerEmployeeId: string; budgetUsd: number; maxParallelRuns: number } | null>(null);
+  const { data: departments } = useLoad(() => api.get<Department[]>("/api/departments"));
+  const [form, setForm] = useState<{ objective: string; departmentId: string; plannerEmployeeId: string; budgetUsd: number; maxParallelRuns: number } | null>(null);
+  const planners = employees.filter((e) => e.kind === "AI" && e.status !== "Inactive" && (!form?.departmentId || e.departmentId === form.departmentId));
   const [message, setMessage] = useState<string | null>(null);
 
   async function start() {
     if (!form) return;
     try {
-      await api.post(`/api/projects/${projectId}/objectives`, { ...form, plannerEmployeeId: form.plannerEmployeeId || null });
+      await api.post(`/api/projects/${projectId}/objectives`, { ...form, departmentId: form.departmentId || null, plannerEmployeeId: form.plannerEmployeeId || null });
       setForm(null);
       await reload();
     } catch (e) {
@@ -53,7 +54,7 @@ export function ObjectivesPanel({ projectId, employees }: { projectId: string; e
         <Typography variant="h6" sx={{ flex: 1 }}>🗺️ {t.objectives}</Typography>
         {can("project.manage") && (
           <Button size="small" variant="outlined" startIcon={<AddIcon />}
-            onClick={() => { setMessage(null); setForm({ objective: "", plannerEmployeeId: planners.find((p) => p.jobTitle === "COO")?.id ?? "", budgetUsd: 20, maxParallelRuns: 3 }); }}>
+            onClick={() => { setMessage(null); setForm({ objective: "", departmentId: "", plannerEmployeeId: planners.find((p) => p.jobTitle === "COO")?.id ?? "", budgetUsd: 20, maxParallelRuns: 3 }); }}>
             {t.newObjective}
           </Button>
         )}
@@ -76,6 +77,11 @@ export function ObjectivesPanel({ projectId, employees }: { projectId: string; e
               {message && <Alert severity="error">{message}</Alert>}
               <TextField label={t.objective} value={form.objective} multiline minRows={3} autoFocus
                 onChange={(e) => setForm({ ...form, objective: e.target.value })} />
+              <TextField select label={t.department} value={form.departmentId} helperText={t.objectiveDepartmentHint}
+                onChange={(e) => setForm({ ...form, departmentId: e.target.value, plannerEmployeeId: "" })}>
+                <MenuItem value="">{t.objectiveAnyDepartment}</MenuItem>
+                {(departments ?? []).filter((d) => d.isActive).map((d) => <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>)}
+              </TextField>
               <TextField select label={t.planner} value={form.plannerEmployeeId} onChange={(e) => setForm({ ...form, plannerEmployeeId: e.target.value })}>
                 {planners.map((p) => <MenuItem key={p.id} value={p.id}>🤖 {p.displayName} — {p.jobTitle}</MenuItem>)}
               </TextField>

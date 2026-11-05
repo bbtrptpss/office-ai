@@ -49,7 +49,7 @@ public sealed partial class ClaudeCodeProvider(IHttpClientFactory http, IOptions
         var answer = json.Deserialize<BridgeAnswer>(JsonOptions)
             ?? throw new AiProviderException("The Claude Code bridge returned nothing.", retryable: true);
         if (answer.Error is { } error) throw new AiProviderException($"Claude Code: {error}", retryable: !error.Contains("invalid", StringComparison.OrdinalIgnoreCase));
-        return ParseReply(answer.Reply ?? "", new AiUsage(answer.InputTokens, answer.OutputTokens, answer.CacheReadTokens, answer.CacheWriteTokens));
+        return ParseReply(answer.Reply ?? "", new AiUsage(answer.InputTokens, answer.OutputTokens, answer.CacheReadTokens, answer.CacheWriteTokens), request.Tools);
     }
 
     private sealed record BridgeAnswer(string? Reply, string? Error, long InputTokens, long OutputTokens, long CacheReadTokens, long CacheWriteTokens);
@@ -108,10 +108,25 @@ public sealed partial class ClaudeCodeProvider(IHttpClientFactory http, IOptions
     [GeneratedRegex(@"<tool_call>\s*(.*?)\s*</tool_call>", RegexOptions.Singleline)]
     private static partial Regex ToolCallBlock();
 
-    internal static AiResponse ParseReply(string reply, AiUsage usage)
+    // Claude sometimes answers in its native form despite the instructions: <invoke name="tool"><parameter name="x">value</parameter></invoke>.
+    [GeneratedRegex(@"<(?:\w+:)?invoke\s+name=""([^""]+)""\s*>(.*?)</(?:\w+:)?invoke>", RegexOptions.Singleline)]
+    private static partial Regex InvokeBlock();
+
+    [GeneratedRegex(@"<(?:\w+:)?parameter\s+name=""([^""]+)""[^>]*>(.*?)</(?:\w+:)?parameter>", RegexOptions.Singleline)]
+    private static partial Regex InvokeParameter();
+
+    [GeneratedRegex(@"</?(?:\w+:)?function_calls>")]
+    private static partial Regex InvokeWrapper();
+
+    [GeneratedRegex(@"<(?:\w+:)?invoke\b|<tool_call>")]
+    private static partial Regex UnfinishedCall();
+
+    internal static AiResponse ParseReply(string reply, AiUsage usage, IReadOnlyList<AiToolDefinition>? tools = null)
     {
         var content = new List<AiContent>();
-        var text = ToolCallBlock().Replace(reply, "").Trim();
+        var text = InvokeWrapper().Replace(InvokeBlock().Replace(ToolCallBlock().Replace(reply, ""), ""), "").Trim();
+        // A call that cannot be read must not pass as a finished answer: the model is told, and can send it again.
+        var unfinished = UnfinishedCall().IsMatch(text);
         if (text.Length > 0) content.Add(new AiText(text));
         foreach (Match m in ToolCallBlock().Matches(reply))
         {
@@ -129,7 +144,34 @@ public sealed partial class ClaudeCodeProvider(IHttpClientFactory http, IOptions
             }
             content.Add(new AiToolCall($"cc_{Guid.NewGuid():N}", name ?? "invalid_tool_call", args));
         }
+        foreach (Match m in InvokeBlock().Matches(reply))
+        {
+            var name = m.Groups[1].Value;
+            content.Add(new AiToolCall($"cc_{Guid.NewGuid():N}", name, InvokeArguments(m.Groups[2].Value, tools?.FirstOrDefault(t => t.Name == name))));
+        }
+        if (unfinished) content.Add(new AiToolCall($"cc_{Guid.NewGuid():N}", "invalid_tool_call", JsonSerializer.SerializeToElement(new { })));
         var stop = content.OfType<AiToolCall>().Any() ? AiStopReason.ToolUse : AiStopReason.EndTurn;
         return new AiResponse(content, stop, usage, stop == AiStopReason.ToolUse ? "tool_calls" : "end_turn");
+    }
+
+    /// <summary>Native parameters are all text: anything the tool's schema does not declare as a string is read as JSON when it can be.</summary>
+    private static JsonElement InvokeArguments(string body, AiToolDefinition? tool)
+    {
+        var args = new JsonObject();
+        foreach (Match p in InvokeParameter().Matches(body))
+        {
+            var name = p.Groups[1].Value;
+            var value = p.Groups[2].Value;
+            var type = tool is not null && tool.InputSchema.TryGetProperty("properties", out var props) && props.TryGetProperty(name, out var prop)
+                && prop.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : "string";
+            JsonNode? node = JsonValue.Create(value);
+            if (type != "string")
+            {
+                try { node = JsonNode.Parse(value.Trim()); }
+                catch (JsonException) { /* left as text: the tool's input check answers the model */ }
+            }
+            args[name] = node;
+        }
+        return JsonSerializer.SerializeToElement(args);
     }
 }
