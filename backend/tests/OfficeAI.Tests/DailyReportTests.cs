@@ -51,5 +51,13 @@ public class DailyReportTests(ApiFixture fx)
 
         var viaApi = await ceo.GetAsync<DailyReportDto>($"/api/reports/daily?date={today:yyyy-MM-dd}");
         Assert.Equal(report.TasksDone, viaApi.TasksDone);
+        Assert.NotNull(viaApi.CostUsd);
+        Assert.Contains("ค่าใช้จ่าย AI", viaApi.Text);
+
+        // Finance data needs finance.read: the Member role may read projects, not costs.
+        var member = await fx.UserWithRolesAsync(Domain.Security.SystemRoles.Member);
+        var limited = await member.GetAsync<DailyReportDto>($"/api/reports/daily?date={today:yyyy-MM-dd}");
+        Assert.Null(limited.CostUsd);
+        Assert.DoesNotContain("ค่าใช้จ่าย AI", limited.Text);
     }
 }

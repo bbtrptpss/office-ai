@@ -31,6 +31,54 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.35.0",
+    date: "2026-11-05",
+    title: { th: "พนักงาน AI ทำโปรเจกต์ที่มี dependency ได้", en: "AI employees can work on projects with dependencies" },
+    changes: [
+      { type: "added", th: "คำสั่งติดตั้ง dependency ต่อ repository: ขั้นติดตั้งออกอินเทอร์เน็ตได้เฉพาะ registry ที่อนุญาต ส่วนเทสต์และ lint ไม่มี network เหมือนเดิม", en: "A dependency install command per repository: that step can reach the allowed package registries only, while tests and lint still have no network" },
+    ],
+  },
+  {
+    version: "0.34.1",
+    date: "2026-11-05",
+    title: { th: "เตรียมพร้อมสำหรับการติดตั้งจริง", en: "Getting ready for deployment" },
+    changes: [
+      { type: "fixed", th: "หลัง proxy การจำกัดการล็อกอินแยกตามผู้ใช้จริง และ HSTS ทำงาน ก่อนหน้านี้ทุกคนใช้โควตาการล็อกอินร่วมกัน", en: "Behind the proxy the login limit is per visitor and HSTS works; before, everyone shared one login limit" },
+      { type: "security", th: "การติดตั้งจริงไม่ยอมเริ่มถ้า secret เป็นค่าตัวอย่างหรือสั้นเกินไป", en: "A production install refuses to start on example or very short secrets" },
+    ],
+  },
+  {
+    version: "0.34.0",
+    date: "2026-11-05",
+    title: { th: "จัดการบัญชีผู้ใช้", en: "Managing user accounts" },
+    changes: [
+      { type: "added", th: "หน้าความปลอดภัยตั้งรหัสผ่านใหม่ให้คนที่ลืมรหัส และเปิด/ปิดบัญชีได้ ปิดบัญชีตัวเองไม่ได้ และมีเพียง CEO ที่แก้บัญชี CEO ได้ จึงมี CEO เหลืออยู่เสมอ", en: "The security page can set a new password for someone who lost theirs and turn accounts on or off. Nobody can turn off their own account and only a CEO can change a CEO's account, so an active CEO always remains" },
+      { type: "security", th: "รายงานประจำวันผ่าน API ไม่แสดงค่าใช้จ่ายถ้าไม่มีสิทธิ์ finance.read", en: "The daily report API leaves out costs without finance.read" },
+      { type: "added", th: "หน้าแจ้งเมื่อหน้าเว็บมีข้อผิดพลาดหรือไม่พบหน้า", en: "Pages for rendering errors and unknown addresses" },
+    ],
+  },
+  {
+    version: "0.33.0",
+    date: "2026-11-05",
+    title: { th: "งานจาก Claude ต้องยืนยันก่อน และตัวเชื่อมเสถียรขึ้น", en: "Claude's tasks need confirming, and a steadier bridge" },
+    changes: [
+      { type: "security", th: "Claude บนหน้าภาพรวมเสนองานเท่านั้น งานจะเริ่มเมื่อคุณกดยืนยันทีละงาน ข้อความที่แทรกไว้ในชื่องานจึงสั่งงานแทนคุณไม่ได้", en: "Claude on the dashboard only proposes tasks; each starts when you confirm it, so text planted in a task title cannot start work on your behalf" },
+      { type: "security", th: "ข้อความจากงานและผลของเครื่องมือปลอมเป็นโครงสร้าง prompt หรือคำพูดของฝ่ายอื่นไม่ได้", en: "Task text and tool results can no longer pose as prompt structure or as another speaker" },
+      { type: "fixed", th: "ตัวเชื่อม Claude ไม่ทำให้ภาษาไทยในข้อความยาวเสียหายอีก และบทสนทนายาวของพนักงาน AI ไม่ถูกตัดการเชื่อมต่อ", en: "The Claude bridge no longer damages Thai in long messages, and long AI employee conversations are no longer cut off" },
+      { type: "changed", th: "ตัวเชื่อมตอบได้หลายคำถามพร้อมกัน (CLAUDE_BRIDGE_CONCURRENCY) Terminal แยกคิว และหยุดงานเมื่อผู้เรียกเลิกรอ", en: "The bridge answers several questions at once (CLAUDE_BRIDGE_CONCURRENCY), the terminal has its own queue, and work stops when its caller gives up" },
+    ],
+  },
+  {
+    version: "0.32.5",
+    date: "2026-11-05",
+    title: { th: "ตรวจอัตโนมัติทุกครั้งที่ส่งโค้ด", en: "Automatic checks on every push" },
+    changes: [
+      { type: "added", th: "GitHub Actions รันเทสต์ backend, ตรวจ frontend และสแกน secret ทุกครั้งที่ push", en: "GitHub Actions runs the backend tests, the frontend checks and a secret scan on every push" },
+      { type: "added", th: "Smoke test ในเบราว์เซอร์เปิดครบทุกหน้า และเดินงานตั้งแต่แผนถึงอนุมัติด้วย AI จำลอง รันบน GitHub เมื่อเข้า master หรือเมื่อสั่ง", en: "A browser smoke test opens every page and takes an objective from plan to approval with the simulated AI; it runs on GitHub for master or on request" },
+      { type: "changed", th: "การตั้งค่าสำหรับ dev ไม่เก็บรหัสฐานข้อมูลแล้ว ตั้งผ่าน ConnectionStrings__Default ตาม README", en: "The development config no longer holds a database password; set ConnectionStrings__Default as the README shows" },
+    ],
+  },
+  {
     version: "0.32.4",
     date: "2026-11-05",
     title: { th: "ปิดความเสี่ยงบนเครื่องนี้", en: "Closing exposure on this PC" },

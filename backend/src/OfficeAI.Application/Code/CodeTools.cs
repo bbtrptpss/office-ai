@@ -237,7 +237,7 @@ internal static class SandboxCheck
         var sha = (await code.Store.GitAsync(ws.Path, ["rev-parse", "HEAD"], ct)).Output.Trim();
 
         var started = ctx.Clock.GetUtcNow();
-        var result = await sandbox.RunAsync(new SandboxRequest(ws.Repo.SandboxImage, ws.Path, command, sandbox.TestTimeout, 1.0, 2048), ct);
+        var result = await sandbox.RunAsync(new SandboxRequest(ws.Repo.SandboxImage, ws.Path, command, sandbox.TestTimeout, 1.0, 2048, ws.Repo.SetupCommand), ct);
         var status = result.Error is not null ? TestRunStatus.Error
             : result.TimedOut ? TestRunStatus.TimedOut
             : result.ExitCode == 0 ? TestRunStatus.Passed : TestRunStatus.Failed;

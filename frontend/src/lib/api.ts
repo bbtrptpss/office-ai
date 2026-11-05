@@ -291,8 +291,21 @@ export interface ClaudeReply {
   reply: string;
   continued: boolean;
   equivalentCostUsd: number;
-  /** Tasks Claude handed to AI employees in this reply. */
-  tasksStarted: number;
+  /** Tasks Claude wants to hand over; nothing starts until the person confirms each one. */
+  proposed: ProposedTask[] | null;
+}
+
+export interface ProposedTask {
+  id: string;
+  project: string;
+  employee: string;
+  title: string;
+  details: string | null;
+}
+
+export interface ClaudeConfirmResult {
+  reply: string;
+  started: boolean;
 }
 
 /** One dashboard terminal command (CEO only): PowerShell in the project folder on the host. */
@@ -531,6 +544,7 @@ export interface Repository {
   sandboxImage: string;
   testCommand: string;
   lintCommand: string | null;
+  setupCommand: string | null;
   isDefault: boolean;
   createdAt: string;
   version: number;

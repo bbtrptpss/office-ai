@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+# No job holds a secret or writes to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: backend/global.json
+      # Sandbox tests allow a few seconds per run, which a first-time image download would use up.
+      - name: Download the sandbox test image
+        run: docker pull alpine:3.20
+      - name: Build and test
+        working-directory: backend
+        run: dotnet test OfficeAI.slnx --logger "console;verbosity=minimal" --logger "trx;LogFileName=results.trx"
+      - name: Keep test results
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-test-results
+          path: backend/tests/OfficeAI.Tests/TestResults/
+          retention-days: 7
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22 # same as frontend/Dockerfile
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
+      - name: Known vulnerabilities (high and above)
+        run: npm audit --audit-level=high
+
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the whole history, not just the latest commit
+      - name: Install gitleaks 8.30.1
+        run: |
+          curl -sSfL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+      - name: Scan the history
+        run: ./gitleaks git --config .gitleaks.toml --redact --no-banner --verbose .
+
+  # Builds the whole stack, so it runs for master, on request, or for a commit whose message contains [e2e].
+  # Only here, never on a PC running the real system: docker-compose.yml names the repositories volume, so it would be shared.
+  smoke:
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[e2e]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      E2E_CEO_EMAIL: ceo@e2e.test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - name: Settings for this run only
+        run: |
+          ceo="Aa1-$(openssl rand -hex 24)"
+          echo "::add-mask::$ceo"
+          echo "E2E_CEO_PASSWORD=$ceo" >> "$GITHUB_ENV"
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 32)"
+            echo "SANDBOX_RUNNER_TOKEN=$(openssl rand -hex 32)"
+            echo "CEO_EMAIL=$E2E_CEO_EMAIL"
+            echo "CEO_PASSWORD=$ceo"
+            echo "SIMULATED_AI=true"
+          } > .env
+      - name: Start the stack
+        run: docker compose up -d --build
+      - name: Wait until it is ready
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:5000/health/ready && curl -fsS -o /dev/null http://localhost:3000/login; then exit 0; fi
+            sleep 5
+          done
+          echo "The stack did not become ready."
+          exit 1
+      - name: Install the test browser
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Smoke test
+        working-directory: e2e
+        run: npx playwright test
+      - name: Server logs
+        if: failure()
+        run: docker compose logs --no-color --tail 200 api web sandbox-runner
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: smoke-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 7

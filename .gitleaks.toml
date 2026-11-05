@@ -1,0 +1,3 @@
+# Secret scan used by CI. Known false alarms are listed one by one in .gitleaksignore, never by file or by rule.
+[extend]
+useDefault = true

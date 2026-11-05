@@ -1,0 +1,6 @@
+# Checked by hand 2026-11-05. Made-up values inside tests of the secret scanner and the key handling.
+2e8cad03f7206ca5b3c0590612491855ad767bb4:backend/tests/OfficeAI.Tests/CodeTests.cs:aws-access-token:396
+2e8cad03f7206ca5b3c0590612491855ad767bb4:backend/tests/OfficeAI.Tests/CodeTests.cs:aws-access-token:400
+d247a8c619f4795befd0d4dc43651fba4a79afc7:backend/tests/OfficeAI.Tests/ProviderKeyTests.cs:generic-api-key:15
+# An empty ANTHROPIC_API_KEY= line: the scanner read the next line as its value.
+dae29b161cb990d20aae4a0ba0585629eae98722:.env.example:generic-api-key:8

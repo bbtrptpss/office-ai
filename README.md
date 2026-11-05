@@ -31,10 +31,10 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\install-shortcuts.ps1
 log อยู่ที่ `%LOCALAPPDATA%\OfficeAI\start.log` · ถ้าแก้โค้ดแล้วยังต้อง `docker compose up -d --build` เอง
 
 **Windows: สำรองข้อมูลอัตโนมัติทุกวัน** — `powershell -ExecutionPolicy Bypass -File scripts\windows\install-backup-task.ps1`
-(ทุกวัน 12:00 ถ้าปิดเครื่องอยู่จะทำทันทีที่เปิด เก็บ 14 ชุดล่าสุดใน `backups/` · สำรองเองตอนนี้: `scripts\windowsackup-office-ai.ps1` · กู้คืน: `scripts/restore.sh`)
+(ทุกวัน 12:00 ถ้าปิดเครื่องอยู่จะทำทันทีที่เปิด เก็บ 14 ชุดล่าสุดใน `backups/` · สำรองเองตอนนี้: `scripts\windows\backup-office-ai.ps1` · กู้คืน: `scripts/restore.sh`)
 
 **คุยกับ Claude จากหน้าภาพรวม (Claude Code บนเครื่องนี้):** ต้องมี `claude` ที่ login แล้ว, Node และ `CLAUDE_BRIDGE_TOKEN` ใน `.env`
-ตัวเชื่อม `scripts/windows/claude-bridge.mjs` เปิดเองเมื่อกดไอคอน Office AI (หรือรัน `node scripts/windows/claude-bridge.mjs`) — Claude รันคำสั่ง/อ่านไฟล์ไม่ได้ แต่สั่งงานพนักงาน AI ได้ (สร้างงาน มอบหมาย และเริ่มทำ ด้วยสิทธิ์ของคนที่คุย) ใช้โควตาเดียวกับ Claude Code ของคุณ
+ตัวเชื่อม `scripts/windows/claude-bridge.mjs` เปิดเองเมื่อกดไอคอน Office AI (หรือรัน `node scripts/windows/claude-bridge.mjs`) — Claude รันคำสั่ง/อ่านไฟล์ไม่ได้ แต่เสนองานให้พนักงาน AI ได้ (สร้างงาน มอบหมาย และเริ่มทำ เมื่อคนที่คุยกดยืนยันแต่ละงาน ด้วยสิทธิ์ของคนนั้น) ใช้โควตาเดียวกับ Claude Code ของคุณ
 
 **Terminal บนหน้าภาพรวม (เฉพาะ CEO ที่เปิดการยืนยันสองขั้นที่ “การตั้งค่าของฉัน”):** ปิดเป็นค่าเริ่มต้น เปิดได้โดยใส่ `CLAUDE_BRIDGE_TERMINAL=true` ใน `.env` แล้วเปิดตัวเชื่อมใหม่ · ต้องพิมพ์รหัส 6 หลักจากแอป Authenticator เพื่อเปิด (เปิดค้าง 15 นาทีนับจากคำสั่งล่าสุด) การ์ด Claude ของ CEO สลับเป็น Terminal ได้ — พิมพ์คำสั่ง PowerShell แล้วรันในโฟลเดอร์โปรเจกต์บนเครื่องนี้ผ่านตัวเชื่อมตัวเดียวกัน (ไม่จำกัดคำสั่ง ครั้งละ 1 คำสั่ง ไม่เกิน 10 นาที ทุกคำสั่งอยู่ใน audit log) กด “คุยกับ Claude” เพื่อกลับไปแชทแบบเดิม · พิมพ์ `claude <ข้อความ>` เพื่อถาม Claude Code ในโฟลเดอร์โปรเจกต์ (คุยต่อเนื่อง, `claude /new` เริ่มใหม่, แก้ไฟล์ได้เองโดยไม่ต้องอนุมัติ) — แบบโต้ตอบเต็มจอใช้ในหน้าเว็บไม่ได้
 
@@ -52,6 +52,8 @@ log อยู่ที่ `%LOCALAPPDATA%\OfficeAI\start.log` · ถ้าแก
 
 ระบบรัน migration และใส่ข้อมูลตั้งต้นอัตโนมัติ: 6 แผนก, 31 ตำแหน่ง, พนักงาน AI 30 ตัว และ CEO 1 คน
 
+**ให้พนักงาน AI ทำโปรเจกต์ที่มี dependency:** ตั้ง “คำสั่งติดตั้ง dependency” ที่ repository เช่น `npm ci` หรือ `dotnet restore` ขั้นนี้ออกอินเทอร์เน็ตได้เฉพาะ registry ใน `deploy/sandbox-proxy/squid.conf` ส่วนเทสต์และ lint รันต่อใน container ที่ไม่มี network
+
 ## ติดตั้งใช้งานจริง
 
 ดู [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — HTTPS อัตโนมัติ, secrets, สำรอง/กู้คืน, monitoring
@@ -60,6 +62,7 @@ log อยู่ที่ `%LOCALAPPDATA%\OfficeAI\start.log` · ถ้าแก
 
 ```bash
 docker compose up -d db                        # เปิดแค่ฐานข้อมูล
+export ConnectionStrings__Default="Host=localhost;Port=15432;Database=officeai;Username=officeai;Password=<POSTGRES_PASSWORD ใน .env>"
 cd backend && dotnet run --project src/OfficeAI.Api   # API ที่ http://localhost:5000
 cd frontend && npm install && npm run dev      # เว็บที่ http://localhost:3000
 ```
@@ -100,4 +103,3 @@ Animation จะลดลงอัตโนมัติถ้าผู้ใช�
 - AuditLogs แก้ไขหรือลบไม่ได้ เพราะมี trigger ในฐานข้อมูลบล็อกไว้
 - กันการแก้ข้อมูลชนกันด้วย optimistic concurrency (xmin): ถ้าแก้ซ้อนกันจะได้ 409
 
-เรื่องที่ยังต้องทำก่อนขึ้น production (Phase 6): HTTPS, เข้ารหัสกุญแจ DataProtection, จัดการ secret และจำกัดสิทธิ์ระดับโปรเจกต์

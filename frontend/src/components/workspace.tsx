@@ -231,8 +231,8 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
   }, projectId);
   useRealtime("approvalsChanged", () => void reload());
   useRealtime("agentRunChanged", () => void reload());
-  const [form, setForm] = useState<{ name: string; sandboxImage: string; testCommand: string; lintCommand: string; importUrl: string; remoteTokenEnvVar: string } | null>(null);
-  const [checks, setChecks] = useState<{ sandboxImage: string; testCommand: string; lintCommand: string; version: number } | null>(null);
+  const [form, setForm] = useState<{ name: string; sandboxImage: string; testCommand: string; lintCommand: string; setupCommand: string; importUrl: string; remoteTokenEnvVar: string } | null>(null);
+  const [checks, setChecks] = useState<{ sandboxImage: string; testCommand: string; lintCommand: string; setupCommand: string; version: number } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [remoteForm, setRemoteForm] = useState<{ remoteUrl: string; remoteTokenEnvVar: string } | null>(null);
   const [pushing, setPushing] = useState(false);
@@ -249,7 +249,7 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
           <Typography color="text.secondary">{t.noRepository}</Typography>
           {can("project.manage") && (
             <Button variant="contained" startIcon={<AddIcon />}
-              onClick={() => setForm({ name: "app", sandboxImage: data.sandbox.allowedImages[0] ?? "", testCommand: "dotnet test", lintCommand: "", importUrl: "", remoteTokenEnvVar: "" })}>
+              onClick={() => setForm({ name: "app", sandboxImage: data.sandbox.allowedImages[0] ?? "", testCommand: "dotnet test", lintCommand: "", setupCommand: "", importUrl: "", remoteTokenEnvVar: "" })}>
               {t.newRepository}
             </Button>
           )}
@@ -261,10 +261,11 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
               <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
                 <Typography variant="h6" sx={{ flex: 1 }}>📦 {repo.name}</Typography>
                 <Chip size="small" label={`${t.image}: ${repo.sandboxImage}`} />
+                {repo.setupCommand && <Chip size="small" label={`${t.setupCommand}: ${repo.setupCommand}`} sx={{ fontFamily: "monospace" }} />}
                 <Chip size="small" label={`${t.testCommand}: ${repo.testCommand}`} sx={{ fontFamily: "monospace" }} />
                 <Chip size="small" variant={repo.lintCommand ? "filled" : "outlined"} label={`${t.lintCommand}: ${repo.lintCommand ?? t.lintNone}`} sx={{ fontFamily: "monospace" }} />
                 {can("project.manage") && (
-                  <Button size="small" onClick={() => setChecks({ sandboxImage: repo.sandboxImage, testCommand: repo.testCommand, lintCommand: repo.lintCommand ?? "", version: repo.version })}>{t.editChecks}</Button>
+                  <Button size="small" onClick={() => setChecks({ sandboxImage: repo.sandboxImage, testCommand: repo.testCommand, lintCommand: repo.lintCommand ?? "", setupCommand: repo.setupCommand ?? "", version: repo.version })}>{t.editChecks}</Button>
                 )}
               </Stack>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5, alignItems: { sm: "center" } }}>
@@ -310,6 +311,8 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
               <TextField select label={t.image} value={checks.sandboxImage} onChange={(e) => setChecks({ ...checks, sandboxImage: e.target.value })}>
                 {data.sandbox.allowedImages.map((i) => <MenuItem key={i} value={i}>{i}</MenuItem>)}
               </TextField>
+              <TextField label={t.setupCommand} value={checks.setupCommand} onChange={(e) => setChecks({ ...checks, setupCommand: e.target.value })} helperText={t.setupCommandHint}
+                slotProps={{ htmlInput: { style: { fontFamily: "monospace" } } }} />
               <TextField label={t.testCommand} value={checks.testCommand} onChange={(e) => setChecks({ ...checks, testCommand: e.target.value })}
                 slotProps={{ htmlInput: { style: { fontFamily: "monospace" } } }} />
               <TextField label={t.lintCommand} value={checks.lintCommand} onChange={(e) => setChecks({ ...checks, lintCommand: e.target.value })} helperText={t.lintHint}
@@ -321,7 +324,7 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
           <Button onClick={() => setChecks(null)}>{t.cancel}</Button>
           <Button variant="contained" disabled={!checks?.testCommand.trim()} onClick={async () => {
             try {
-              await api.put(`/api/repositories/${repo!.id}`, { ...checks, lintCommand: checks!.lintCommand || null });
+              await api.put(`/api/repositories/${repo!.id}`, { ...checks, lintCommand: checks!.lintCommand || null, setupCommand: checks!.setupCommand || null });
               setChecks(null);
             } catch (e) { setMessage(errorMessage(e)); }
             await reload();
@@ -337,6 +340,8 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
               <TextField select label={t.image} value={form.sandboxImage} onChange={(e) => setForm({ ...form, sandboxImage: e.target.value })}>
                 {data.sandbox.allowedImages.map((i) => <MenuItem key={i} value={i}>{i}</MenuItem>)}
               </TextField>
+              <TextField label={t.setupCommand} value={form.setupCommand} onChange={(e) => setForm({ ...form, setupCommand: e.target.value })} helperText={t.setupCommandHint}
+                slotProps={{ htmlInput: { style: { fontFamily: "monospace" } } }} />
               <TextField label={t.testCommand} value={form.testCommand} onChange={(e) => setForm({ ...form, testCommand: e.target.value })}
                 slotProps={{ htmlInput: { style: { fontFamily: "monospace" } } }} />
               <TextField label={t.lintCommand} value={form.lintCommand} onChange={(e) => setForm({ ...form, lintCommand: e.target.value })} helperText={t.lintHint}
@@ -359,7 +364,7 @@ export function RepositoryPanel({ projectId }: { projectId: string }) {
           <Button variant="contained" onClick={async () => {
             const { importUrl, remoteTokenEnvVar, ...rest } = form!;
             try {
-              await api.post(`/api/projects/${projectId}/repositories`, { ...rest, lintCommand: rest.lintCommand || null, importUrl: importUrl || null, remoteTokenEnvVar: importUrl && remoteTokenEnvVar ? remoteTokenEnvVar : null });
+              await api.post(`/api/projects/${projectId}/repositories`, { ...rest, lintCommand: rest.lintCommand || null, setupCommand: rest.setupCommand || null, importUrl: importUrl || null, remoteTokenEnvVar: importUrl && remoteTokenEnvVar ? remoteTokenEnvVar : null });
               setForm(null);
             } catch (e) { setMessage(errorMessage(e)); }
             await reload();

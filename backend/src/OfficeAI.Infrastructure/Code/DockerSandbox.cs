@@ -19,6 +19,12 @@ public class SandboxOptions
     public int MaxOutputChars { get; set; } = 64_000;
     public int TestTimeoutSeconds { get; set; } = 600;
 
+    /// <summary>The Docker network of a repository's setup step. Empty: setup commands are refused.</summary>
+    public string? SetupNetwork { get; set; }
+
+    /// <summary>The allow-list proxy on that network, handed to the setup step as HTTP(S)_PROXY.</summary>
+    public string? SetupProxy { get; set; }
+
     /// <summary>How the workspace reaches the container: "bind" (host path) or "volume:&lt;name&gt;:&lt;root inside volume&gt;".</summary>
     public string WorkspaceMount { get; set; } = "bind";
 }
@@ -28,9 +34,14 @@ public class SandboxOptions
 /// no privilege escalation, non-root user, CPU/memory/process limits and a hard timeout.
 /// The workspace is mounted read-only and copied into a size-limited tmpfs before the command runs,
 /// so tests can build without being able to modify the real workspace.
+///
+/// A repository with a setup command runs in two containers sharing a throwaway tmpfs volume. The setup container can only reach
+/// the allow-list proxy (see deploy/sandbox-proxy), to download dependencies. The command then runs in a second one with no network at all.
 /// </summary>
 public sealed class DockerSandbox(IOptions<SandboxOptions> options, IOptions<RepositoryOptions> repoOptions, ILogger<DockerSandbox> log) : ISandbox
 {
+    private const string WorkVolumeSize = "4g";
+
     public bool IsAvailable => options.Value.UseLocalDocker;
     public IReadOnlyCollection<string> AllowedImages => options.Value.AllowedImages;
     public TimeSpan TestTimeout => TimeSpan.FromSeconds(Math.Clamp(options.Value.TestTimeoutSeconds, 5, 600));
@@ -39,37 +50,103 @@ public sealed class DockerSandbox(IOptions<SandboxOptions> options, IOptions<Rep
     {
         if (!IsAvailable) return new SandboxResult(null, "", false, 0, "The sandbox is not enabled on this server.");
         if (!AllowedImages.Contains(req.Image)) return new SandboxResult(null, "", false, 0, $"Image '{req.Image}' is not on the sandbox allow-list.");
+        return string.IsNullOrWhiteSpace(req.SetupCommand) ? await RunOneStepAsync(req, ct) : await RunWithSetupAsync(req, ct);
+    }
 
+    private async Task<SandboxResult> RunOneStepAsync(SandboxRequest req, CancellationToken ct)
+    {
+        string[] args =
+        [
+            .. Hardening(req), "--network", "none", "--tmpfs", "/tmp:rw,exec,size=1g",
+            "-e", "HOME=/tmp", "-e", "DOTNET_CLI_HOME=/tmp", "-e", "NUGET_PACKAGES=/tmp/nuget", "-e", "DOTNET_NOLOGO=1", "-e", "npm_config_cache=/tmp/npm",
+            .. Mount(req.WorkspacePath),
+            "-w", "/tmp", req.Image, "sh", "-c", $"cp -r /src /tmp/work && cd /tmp/work && {req.Command}",
+        ];
+        var step = await RunContainerAsync(args, req.Timeout, ct);
+        if (ct.IsCancellationRequested) return new SandboxResult(null, step.Output, false, step.Ms, "Cancelled.");
+        return new SandboxResult(step.TimedOut ? null : step.ExitCode, step.Output, step.TimedOut, step.Ms, null);
+    }
+
+    private async Task<SandboxResult> RunWithSetupAsync(SandboxRequest req, CancellationToken ct)
+    {
+        var network = options.Value.SetupNetwork;
+        if (string.IsNullOrWhiteSpace(network)) return new SandboxResult(null, "", false, 0, "This server has no network for setup commands (Sandbox:SetupNetwork).");
+
+        var volume = $"officeai-sbx-work-{Guid.NewGuid():N}";
+        var sw = Stopwatch.StartNew();
+        var created = await DockerAsync("volume", "create", "--driver", "local", "--opt", "type=tmpfs", "--opt", "device=tmpfs",
+            "--opt", $"o=size={WorkVolumeSize},uid=1000,gid=1000", volume);
+        if (!created) return new SandboxResult(null, "", false, 0, "Could not create the sandbox work volume.");
+        // A tmpfs volume is emptied when its last container stops, which would lose the dependencies between the two steps: this idle container holds it.
+        var holder = $"officeai-sbx-hold-{Guid.NewGuid():N}";
+        try
+        {
+            var holding = await DockerAsync(["run", "-d", "--rm", "--name", holder, .. Hardening(req), "--network", "none", "--mount", $"type=volume,src={volume},dst=/work,volume-nocopy",
+                req.Image, "sleep", ((int)req.Timeout.TotalSeconds + 60).ToString(System.Globalization.CultureInfo.InvariantCulture)]);
+            if (!holding) return new SandboxResult(null, "", false, 0, "Could not start the sandbox work volume.");
+
+            string[] workEnv = ["-e", "HOME=/work/.home", "-e", "DOTNET_CLI_HOME=/work/.home", "-e", "NUGET_PACKAGES=/work/.nuget", "-e", "DOTNET_NOLOGO=1", "-e", "npm_config_cache=/work/.npm"];
+            string[] workMount = ["--tmpfs", "/tmp:rw,exec,size=1g", "--mount", $"type=volume,src={volume},dst=/work,volume-nocopy", "-w", "/work"];
+
+            List<string> proxy = [];
+            if (options.Value.SetupProxy is { Length: > 0 } url)
+                foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "npm_config_proxy", "npm_config_https_proxy" })
+                    proxy.AddRange(["-e", $"{name}={url}"]);
+            // An unreachable DNS server: names outside the network do not resolve here, so DNS is no way out either. The proxy resolves for itself.
+            string[] dns = network == "none" ? [] : ["--dns", "127.0.0.1"];
+
+            string[] setupArgs =
+            [
+                .. Hardening(req), "--network", network, .. dns, .. workEnv, .. proxy, .. workMount, .. Mount(req.WorkspacePath),
+                req.Image, "sh", "-c", $"mkdir -p /work/.home && cp -r /src/. /work/ && {req.SetupCommand}",
+            ];
+            var setup = await RunContainerAsync(setupArgs, req.Timeout, ct);
+            if (ct.IsCancellationRequested) return new SandboxResult(null, setup.Output, false, (int)sw.ElapsedMilliseconds, "Cancelled.");
+            var setupOutput = $"--- setup: {req.SetupCommand}\n{setup.Output}";
+            if (setup.TimedOut) return new SandboxResult(null, setupOutput, true, (int)sw.ElapsedMilliseconds, null);
+            if (setup.ExitCode != 0) return new SandboxResult(setup.ExitCode, setupOutput + "\n--- setup failed: the command did not run", false, (int)sw.ElapsedMilliseconds, null);
+
+            var left = req.Timeout - sw.Elapsed;
+            if (left <= TimeSpan.Zero) return new SandboxResult(null, setupOutput, true, (int)sw.ElapsedMilliseconds, null);
+            string[] runArgs = [.. Hardening(req), "--network", "none", .. workEnv, .. workMount, req.Image, "sh", "-c", req.Command];
+            var run = await RunContainerAsync(runArgs, left, ct);
+            var output = $"{setupOutput}\n--- run: {req.Command}\n{run.Output}";
+            if (ct.IsCancellationRequested) return new SandboxResult(null, output, false, (int)sw.ElapsedMilliseconds, "Cancelled.");
+            return new SandboxResult(run.TimedOut ? null : run.ExitCode, output, run.TimedOut, (int)sw.ElapsedMilliseconds, null);
+        }
+        finally
+        {
+            await DockerAsync("rm", "-f", holder);
+            await DockerAsync("volume", "rm", "-f", volume);
+        }
+    }
+
+    private static string[] Hardening(SandboxRequest req) =>
+    [
+        "--read-only",
+        "--cap-drop", "ALL",
+        "--security-opt", "no-new-privileges",
+        "--user", "1000:1000",
+        "--cpus", req.Cpus.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        "--memory", $"{req.MemoryMb}m", "--memory-swap", $"{req.MemoryMb}m",
+        "--pids-limit", "256",
+    ];
+
+    private sealed record StepResult(int? ExitCode, string Output, bool TimedOut, int Ms);
+
+    private async Task<StepResult> RunContainerAsync(IReadOnlyList<string> containerArgs, TimeSpan limit, CancellationToken ct)
+    {
         var name = $"officeai-sbx-{Guid.NewGuid():N}";
         var psi = new ProcessStartInfo("docker")
         {
             RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false,
             StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8,
         };
-        string[] args =
-        [
-            "run", "--rm", "--name", name,
-            "--network", "none",
-            "--read-only",
-            "--tmpfs", "/tmp:rw,exec,size=1g",
-            "--cap-drop", "ALL",
-            "--security-opt", "no-new-privileges",
-            "--user", "1000:1000",
-            "--cpus", req.Cpus.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--memory", $"{req.MemoryMb}m", "--memory-swap", $"{req.MemoryMb}m",
-            "--pids-limit", "256",
-            "-e", "HOME=/tmp", "-e", "DOTNET_CLI_HOME=/tmp", "-e", "NUGET_PACKAGES=/tmp/nuget", "-e", "DOTNET_NOLOGO=1",
-            "-e", "npm_config_cache=/tmp/npm",
-            .. Mount(req.WorkspacePath),
-            "-w", "/tmp",
-            req.Image,
-            "sh", "-c", $"cp -r /src /tmp/work && cd /tmp/work && {req.Command}",
-        ];
-        foreach (var a in args) psi.ArgumentList.Add(a);
+        foreach (var a in new[] { "run", "--rm", "--name", name }.Concat(containerArgs)) psi.ArgumentList.Add(a);
 
         var sw = Stopwatch.StartNew();
         using var process = Process.Start(psi);
-        if (process is null) return new SandboxResult(null, "", false, 0, "Could not start docker.");
+        if (process is null) return new StepResult(null, "Could not start docker.", false, 0);
         var stdout = new StringBuilder();
         var max = options.Value.MaxOutputChars;
         void Append(string? line)
@@ -83,7 +160,7 @@ public sealed class DockerSandbox(IOptions<SandboxOptions> options, IOptions<Rep
         process.BeginErrorReadLine();
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(req.Timeout);
+        timeout.CancelAfter(limit);
         var timedOut = false;
         try
         {
@@ -97,8 +174,28 @@ public sealed class DockerSandbox(IOptions<SandboxOptions> options, IOptions<Rep
         }
         var output = stdout.ToString();
         if (output.Length >= max) output += "\n…[output truncated]";
-        if (ct.IsCancellationRequested) return new SandboxResult(null, output, false, (int)sw.ElapsedMilliseconds, "Cancelled.");
-        return new SandboxResult(timedOut ? null : process.ExitCode, output, timedOut, (int)sw.ElapsedMilliseconds, null);
+        return new StepResult(timedOut || ct.IsCancellationRequested ? null : process.ExitCode, output, timedOut, (int)sw.ElapsedMilliseconds);
+    }
+
+    private async Task<bool> DockerAsync(params string[] args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("docker") { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true };
+            foreach (var a in args) psi.ArgumentList.Add(a);
+            using var process = Process.Start(psi);
+            if (process is null) return false;
+            var drainOut = process.StandardOutput.ReadToEndAsync();
+            var drainErr = process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            await Task.WhenAll(drainOut, drainErr);
+            return process.ExitCode == 0;
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "docker {Command} failed", args[0]);
+            return false;
+        }
     }
 
     private IEnumerable<string> Mount(string workspace)

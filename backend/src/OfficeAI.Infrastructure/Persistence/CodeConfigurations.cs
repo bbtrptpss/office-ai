@@ -20,6 +20,7 @@ internal class CodeRepositoryConfig : IEntityTypeConfiguration<CodeRepository>
         b.Property(r => r.SandboxImage).HasMaxLength(200);
         b.Property(r => r.TestCommand).HasMaxLength(1000);
         b.Property(r => r.LintCommand).HasMaxLength(1000);
+        b.Property(r => r.SetupCommand).HasMaxLength(1000);
         b.HasIndex(r => new { r.ProjectId, r.Name }).IsUnique();
         b.HasOne<Project>().WithMany().HasForeignKey(r => r.ProjectId).OnDelete(DeleteBehavior.Cascade);
     }

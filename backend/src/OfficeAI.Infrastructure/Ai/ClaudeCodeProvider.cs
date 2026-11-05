@@ -85,7 +85,7 @@ public sealed partial class ClaudeCodeProvider(IHttpClientFactory http, IOptions
                 switch (c)
                 {
                     case AiText text when m.Role == AiRole.User:
-                        sb.AppendLine("[user]").AppendLine(text.Text).AppendLine();
+                        sb.AppendLine("[user]").AppendLine(PromptSafety.TranscriptData(text.Text)).AppendLine();
                         break;
                     case AiText text:
                         sb.AppendLine("[assistant]").AppendLine(text.Text).AppendLine();
@@ -96,7 +96,7 @@ public sealed partial class ClaudeCodeProvider(IHttpClientFactory http, IOptions
                             .AppendLine("</tool_call>").AppendLine();
                         break;
                     case AiToolResult result:
-                        sb.AppendLine($"[tool result {result.ToolCallId}{(result.IsError ? " ERROR" : "")}]").AppendLine(result.Content).AppendLine();
+                        sb.AppendLine($"[tool result {result.ToolCallId}{(result.IsError ? " ERROR" : "")}]").AppendLine(PromptSafety.TranscriptData(result.Content)).AppendLine();
                         break;
                 }
             }

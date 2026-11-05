@@ -35,7 +35,9 @@ scripts/new-dataprotection-cert.sh        # เขียนไฟล์ secrets/
 
 เก็บไฟล์ `.pfx` และรหัสผ่านไว้กับชุดสำรองข้อมูลด้วย ถ้าหาย กุญแจที่เข้ารหัสไว้จะอ่านไม่ได้ (ทุกคนถูก sign out แต่ข้อมูลอื่นไม่เสียหาย)
 
-> secret ทุกตัวอยู่ใน `.env` หรือ secret manager ของเครื่องเท่านั้น ไม่เก็บในฐานข้อมูล ตั้งสิทธิ์ไฟล์ด้วย `chmod 600 .env`
+> secret อยู่ใน `.env` หรือ secret manager ของเครื่อง ยกเว้น AI key ที่ใส่ผ่านหน้า “ตั้งค่า AI” ซึ่งเข้ารหัสแล้วเก็บในฐานข้อมูล ตั้งสิทธิ์ไฟล์ด้วย `chmod 600 .env`
+>
+> ระบบจะไม่ยอมเริ่มถ้า `POSTGRES_PASSWORD`, `CEO_PASSWORD` หรือ `SANDBOX_RUNNER_TOKEN` เป็นค่าตัวอย่าง หรือสั้นกว่า 16 ตัวอักษร
 
 ## 2. เริ่มระบบ
 
@@ -52,6 +54,7 @@ curl -fsS https://$API_DOMAIN/health/ready   # ต้องได้ Healthy
 - ไม่เปิดพอร์ตฐานข้อมูล, API และเว็บสู่ภายนอก ให้เข้าผ่าน Caddy (HTTPS) อย่างเดียว
 - ปิด provider จำลอง (`AiProviders__Simulated__Enabled=false`)
 - cookie ส่งผ่าน HTTPS เท่านั้น เปิด HSTS และเขียน log เป็น JSON
+- เชื่อ header จาก proxy (`Security__TrustProxy`) เพื่อให้การจำกัดการล็อกอินแยกตามผู้ใช้จริง — ห้ามเปิดถ้ามีทางเข้าถึง API โดยไม่ผ่าน Caddy
 - webhook ต้องเป็น `https://` เท่านั้น
 
 ## 3. หลังติดตั้ง
@@ -93,6 +96,7 @@ migration รันอัตโนมัติตอน API เริ่ม แ�
 ## ข้อควรรู้ด้านความปลอดภัย
 
 - `sandbox-runner` เป็น service เดียวที่ต่อกับ Docker socket ซึ่งมีสิทธิ์เทียบเท่า root ของเครื่อง จึงไม่เปิดพอร์ตออกนอกเครือข่ายภายใน รับเฉพาะคำขอที่มี `SANDBOX_RUNNER_TOKEN` และรันได้เฉพาะ image ที่อยู่ใน allow-list
+- คำสั่งติดตั้ง dependency ของ repository รันในเครือข่าย `officeai-sandbox-egress` ซึ่งออกได้ทาง `sandbox-proxy` เท่านั้น และไปได้เฉพาะ HTTPS ถึง registry ใน `deploy/sandbox-proxy/squid.conf` สคริปต์ของ package ทำงานในขั้นนี้ จึงไม่มีการส่ง secret เข้า container
 - ถ้าต้องการแยกขาดยิ่งขึ้น ให้ย้าย runner ไปเครื่องแยก หรือใช้ rootless Docker / gVisor (`--runtime runsc`)
 - กุญแจเข้ารหัส cookie (DataProtection) ถูกเข้ารหัสด้วย certificate ก่อนเก็บลงฐานข้อมูล การเปลี่ยน certificate: สร้างไฟล์ใหม่ ย้ายไฟล์เดิมไปไว้ข้างกัน แล้วตั้ง `DataProtection__PreviousCertificatePaths__0=<path ไฟล์เดิม>` ให้ service `api` เพื่อให้อ่านกุญแจเก่าได้จนหมดอายุ (90 วัน)
 - เซิร์ฟเวอร์ตัวเดียวรองรับ workflow engine ได้หลาย instance เพราะใช้ PostgreSQL advisory lock แต่คิวงาน AI อยู่ในหน่วยความจำของแต่ละ instance จึงแนะนำให้รัน API instance เดียว

@@ -14,6 +14,8 @@ public record CreateUserRequest(string Email, string DisplayName, string? Passwo
 public record RoleDto(Guid Id, string Name, List<string> Permissions);
 public record SetRolePermissionsRequest(List<string> Permissions);
 public record SetUserRolesRequest(List<string> Roles);
+public record SetUserActiveRequest(bool IsActive);
+public record ResetPasswordRequest(string NewPassword);
 public record AuditLogDto(long Id, DateTimeOffset OccurredAt, Guid? ActorUserId, string? ActorName, string Action,
     string EntityType, string? EntityId, string? OldValues, string? NewValues, string? CorrelationId);
 
@@ -79,6 +81,49 @@ public class SecurityAdminService(AppDbContext db, UserManager<AppUser> users, I
         ThrowIfFailed(await users.AddToRolesAsync(user, req.Roles.Except(before)));
         await WriteAuditAsync(AuditActions.Updated, "UserRoles", userId.ToString(), new { Roles = before }, new { req.Roles }, ct);
         return (await ListUsersAsync(ct)).First(u => u.Id == userId);
+    }
+
+    /// <summary>
+    /// Stops or restores someone's access. It takes effect at once for everything behind a permission and at the next sign-in check for the session itself.
+    /// The company can never lock itself out: nobody can turn off their own account, and only a CEO can turn off a CEO, so an active CEO always remains.
+    /// </summary>
+    public async Task<UserDto> SetUserActiveAsync(Guid userId, SetUserActiveRequest req, CancellationToken ct)
+    {
+        var user = await ManagedUserAsync(userId);
+        if (userId == current.UserId) throw new DomainException("security.self", "You cannot turn off your own account.");
+        if (user.IsActive == req.IsActive) return (await ListUsersAsync(ct)).First(u => u.Id == userId);
+        user.IsActive = req.IsActive;
+        ThrowIfFailed(await users.UpdateAsync(user));
+        ThrowIfFailed(await users.UpdateSecurityStampAsync(user)); // existing sessions end
+        await WriteAuditAsync(AuditActions.Updated, "UserActive", userId.ToString(), new { IsActive = !req.IsActive }, new { req.IsActive }, ct);
+        return (await ListUsersAsync(ct)).First(u => u.Id == userId);
+    }
+
+    /// <summary>A manager sets a new password for someone who lost theirs. People change their own with the current one. The password is never audited.</summary>
+    public async Task ResetPasswordAsync(Guid userId, ResetPasswordRequest req, CancellationToken ct)
+    {
+        var user = await ManagedUserAsync(userId);
+        if (userId == current.UserId) throw new DomainException("security.self", "Change your own password with your current one.");
+        if (user.IsAgent) throw new DomainException("security.agent_password", "AI identities do not use passwords.");
+        // Checked first: removing the old password and then failing on the new one would leave the account with none.
+        foreach (var validator in users.PasswordValidators) ThrowIfFailed(await validator.ValidateAsync(users, user, req.NewPassword ?? ""));
+        if (await users.HasPasswordAsync(user)) ThrowIfFailed(await users.RemovePasswordAsync(user));
+        ThrowIfFailed(await users.AddPasswordAsync(user, req.NewPassword!));
+        ThrowIfFailed(await users.ResetAccessFailedCountAsync(user));
+        ThrowIfFailed(await users.SetLockoutEndDateAsync(user, null));
+        await WriteAuditAsync(AuditActions.Updated, "UserPasswordReset", userId.ToString(), null, null, ct);
+    }
+
+    /// <summary>The user to change, if the caller may: only a CEO can act on a CEO, so security.manage alone cannot take over the top account.</summary>
+    private async Task<AppUser> ManagedUserAsync(Guid userId)
+    {
+        var user = await users.FindByIdAsync(userId.ToString()) ?? throw new NotFoundException("User", userId);
+        if (await users.IsInRoleAsync(user, SystemRoles.Ceo))
+        {
+            var me = current.UserId is { } id ? await users.FindByIdAsync(id.ToString()) : null;
+            if (me is null || !await users.IsInRoleAsync(me, SystemRoles.Ceo)) throw new ForbiddenException("Only a CEO can change a CEO's account.");
+        }
+        return user;
     }
 
     public async Task<List<RoleDto>> ListRolesAsync(CancellationToken ct)

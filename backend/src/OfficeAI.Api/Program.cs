@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OfficeAI.Api.Endpoints;
@@ -22,6 +23,21 @@ CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICult
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
+OfficeAI.Infrastructure.Security.StrongSecrets.Enforce(config);
+
+// Behind the HTTPS proxy every request arrives from the proxy over plain HTTP. Only turn this on where nothing else can reach the API:
+// a visitor reaching it directly could then claim any address.
+var trustProxy = config.GetValue("Security:TrustProxy", false);
+if (trustProxy)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(o =>
+    {
+        o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        o.ForwardLimit = 1;
+        o.KnownIPNetworks.Clear();
+        o.KnownProxies.Clear();
+    });
+}
 
 // ---------- Observability ----------
 if (config.GetValue("Logging:Json", false))
@@ -122,6 +138,7 @@ builder.Services.AddExceptionHandler<AppExceptionHandler>();
 
 var app = builder.Build();
 
+if (trustProxy) app.UseForwardedHeaders();
 app.UseMiddleware<CorrelationIdMiddleware>();
 if (!app.Environment.IsDevelopment() && config.GetValue("Security:Hsts", false)) app.UseHsts();
 app.UseExceptionHandler();
