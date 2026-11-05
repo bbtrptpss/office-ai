@@ -300,7 +300,9 @@ public static class Endpoints
     private static void MapReports(RouteGroupBuilder api)
     {
         api.MapGet("/reports/finance", (DateOnly? month, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.FinanceAsync(month, ct)).RequirePermission(Permissions.FinanceRead);
-        api.MapGet("/reports/daily", (DateOnly? date, OfficeAI.Application.Reports.DailyReportService s, CancellationToken ct) => s.BuildAsync(date ?? s.Yesterday, ct)).RequirePermission(Permissions.ProjectRead);
+        // Costs are finance data: without finance.read the report leaves them out.
+        api.MapGet("/reports/daily", async (DateOnly? date, OfficeAI.Application.Reports.DailyReportService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+            await s.BuildAsync(date ?? s.Yesterday, ct, includeCost: await HasAsync(perms, me, Permissions.FinanceRead, ct))).RequirePermission(Permissions.ProjectRead);
         api.MapGet("/reports/profitability", (OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.ProfitabilityAsync(ct)).RequirePermission(Permissions.FinanceRead);
         api.MapPost("/reports/scenario", (OfficeAI.Application.Reports.ScenarioRequest req, OfficeAI.Application.Reports.ReportsService s, CancellationToken ct) => s.ScenarioAsync(req, ct)).RequirePermission(Permissions.FinanceRead);
         api.MapGet("/projects/{id:guid}/closeout", (Guid id, OfficeAI.Application.Reports.CloseoutService s, CancellationToken ct) => s.GetAsync(id, ct)).RequirePermission(Permissions.FinanceRead);
@@ -467,6 +469,12 @@ public static class Endpoints
         sec.MapGet("/users", (SecurityAdminService s, CancellationToken ct) => s.ListUsersAsync(ct)).RequirePermission(Permissions.SecurityManage);
         sec.MapPost("/users", (CreateUserRequest r, SecurityAdminService s, CancellationToken ct) => s.CreateUserAsync(r, ct)).RequirePermission(Permissions.SecurityManage);
         sec.MapPut("/users/{id:guid}/roles", (Guid id, SetUserRolesRequest r, SecurityAdminService s, CancellationToken ct) => s.SetUserRolesAsync(id, r, ct)).RequirePermission(Permissions.SecurityManage);
+        sec.MapPut("/users/{id:guid}/active", (Guid id, SetUserActiveRequest r, SecurityAdminService s, CancellationToken ct) => s.SetUserActiveAsync(id, r, ct)).RequirePermission(Permissions.SecurityManage);
+        sec.MapPost("/users/{id:guid}/password", async (Guid id, ResetPasswordRequest r, SecurityAdminService s, CancellationToken ct) =>
+        {
+            await s.ResetPasswordAsync(id, r, ct);
+            return Results.NoContent();
+        }).RequirePermission(Permissions.SecurityManage).RequireRateLimiting("login");
         sec.MapGet("/retention", (RetentionService s, CancellationToken ct) => s.GetAsync(ct)).RequirePermission(Permissions.SecurityManage);
         sec.MapPut("/retention", (SaveRetentionRequest r, RetentionService s, CancellationToken ct) => s.SaveAsync(r, ct)).RequirePermission(Permissions.SecurityManage);
         sec.MapGet("/retention/preview", (RetentionService s, CancellationToken ct) => s.PreviewAsync(ct)).RequirePermission(Permissions.SecurityManage);

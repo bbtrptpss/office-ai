@@ -20,7 +20,7 @@ public class DailyReportOptions
     public string TimeZone { get; set; } = "Asia/Bangkok";
 }
 
-public record DailyReportDto(DateOnly Day, string Text, int TasksDone, int Deliverables, int Runs, int FailedRuns, int PendingApprovals, decimal CostUsd);
+public record DailyReportDto(DateOnly Day, string Text, int TasksDone, int Deliverables, int Runs, int FailedRuns, int PendingApprovals, decimal? CostUsd);
 
 /// <summary>
 /// What the AI employees did in one day, posted after midnight to the company channel <see cref="Channel"/> with a notification to the people.
@@ -60,7 +60,7 @@ public class DailyReportService(IAppDbContext db, IRealtimeNotifier notifier, Ti
 
     private static string Header(DateOnly day) => $"# รายงานประจำวัน {day:yyyy-MM-dd}";
 
-    public async Task<DailyReportDto> BuildAsync(DateOnly day, CancellationToken ct)
+    public async Task<DailyReportDto> BuildAsync(DateOnly day, CancellationToken ct, bool includeCost = true)
     {
         var (from, to) = Window(day);
         var names = await db.Employees.AsNoTracking().ToDictionaryAsync(e => e.Id, e => e.DisplayName, ct);
@@ -97,7 +97,7 @@ public class DailyReportService(IAppDbContext db, IRealtimeNotifier notifier, Ti
         var sb = new StringBuilder();
         sb.AppendLine($"{Header(day)} (00:00–24:00 น.)");
         sb.AppendLine();
-        sb.AppendLine($"**สรุป:** งานเสร็จ {done.Count} · ส่งมอบ {deliverables.Count} ชิ้น · AI ทำงาน {runs.Count} รอบ (ไม่สำเร็จ {failedRuns.Count}) · รอ CEO อนุมัติ {pending.Count} · ค่าใช้จ่าย AI ${cost:0.##}");
+        sb.AppendLine($"**สรุป:** งานเสร็จ {done.Count} · ส่งมอบ {deliverables.Count} ชิ้น · AI ทำงาน {runs.Count} รอบ (ไม่สำเร็จ {failedRuns.Count}) · รอ CEO อนุมัติ {pending.Count}{(includeCost ? $" · ค่าใช้จ่าย AI ${cost:0.##}" : "")}");
 
         if (done.Count + deliverables.Count + runs.Count + started.Count + finished.Count == 0)
             sb.AppendLine().AppendLine("วันนี้ไม่มีงานเกิดขึ้น");
@@ -135,7 +135,7 @@ public class DailyReportService(IAppDbContext db, IRealtimeNotifier notifier, Ti
 
         var text = sb.ToString().TrimEnd();
         if (text.Length > ChatService.MaxBody) text = text[..(ChatService.MaxBody - 40)] + "\n…(ตัดเพราะยาวเกิน ดูรายละเอียดในระบบ)";
-        return new DailyReportDto(day, text, done.Count, deliverables.Count, runs.Count, failedRuns.Count, pending.Count, cost);
+        return new DailyReportDto(day, text, done.Count, deliverables.Count, runs.Count, failedRuns.Count, pending.Count, includeCost ? cost : null);
     }
 
     /// <summary>Posts the day's report once (a second call for the same day does nothing). Returns whether it posted.</summary>

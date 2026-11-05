@@ -7,12 +7,14 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { api, Role, User } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { Loading, PageHeader, useErrorMessage, useLoad } from "@/components/common";
 import { RetentionPanel } from "@/components/retention";
 
 export default function SecurityPage() {
   const { t } = useI18n();
+  const { me } = useAuth();
   const errorMessage = useErrorMessage();
   const { data, error, reload } = useLoad(async () => {
     const [roles, users, permissions] = await Promise.all([
@@ -24,6 +26,8 @@ export default function SecurityPage() {
   });
   const [message, setMessage] = useState<string | null>(null);
   const [newUser, setNewUser] = useState<{ email: string; displayName: string; password: string; isAgent: boolean; roles: string[] } | null>(null);
+  const [resetFor, setResetFor] = useState<User | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
 
   if (!data) return <Loading error={error} />;
 
@@ -88,6 +92,7 @@ export default function SecurityPage() {
               <TableCell>{t.displayName}</TableCell>
               <TableCell>{t.email}</TableCell>
               <TableCell>{t.roles}</TableCell>
+              <TableCell />
             </TableRow>
           </TableHead>
           <TableBody>
@@ -114,6 +119,18 @@ export default function SecurityPage() {
                     ))}
                   </Stack>
                 </TableCell>
+                <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                  <Chip size="small" variant="outlined" color={u.isActive ? "success" : "default"} label={u.isActive ? t.userActive : t.userInactive} sx={{ mr: 1 }} />
+                  {!u.isAgent && u.id !== me?.userId && (
+                    <>
+                      <Button size="small" onClick={() => { setResetPassword(""); setResetFor(u); }}>{t.resetPassword}</Button>
+                      <Button size="small" color={u.isActive ? "error" : "primary"} onClick={() => {
+                        if (u.isActive && !window.confirm(t.userTurnOffConfirm)) return;
+                        void act(() => api.put(`/api/security/users/${u.id}/active`, { isActive: !u.isActive }));
+                      }}>{u.isActive ? t.userTurnOff : t.userTurnOn}</Button>
+                    </>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -121,6 +138,17 @@ export default function SecurityPage() {
       </TableContainer>
 
       <RetentionPanel />
+
+      <Dialog open={!!resetFor} onClose={() => setResetFor(null)} fullWidth maxWidth="xs">
+        <DialogTitle>{t.resetPassword}: {resetFor?.displayName}</DialogTitle>
+        <DialogContent>
+          <TextField sx={{ mt: 1 }} fullWidth label={t.newPassword} type="password" autoComplete="new-password" helperText="≥ 10 chars, upper, lower, digit" value={resetPassword} onChange={(e) => setResetPassword(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setResetFor(null)}>{t.cancel}</Button>
+          <Button variant="contained" disabled={!resetPassword} onClick={() => act(() => api.post(`/api/security/users/${resetFor!.id}/password`, { newPassword: resetPassword }), () => { setResetFor(null); setResetPassword(""); })}>{t.save}</Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={!!newUser} onClose={() => setNewUser(null)} fullWidth maxWidth="sm">
         <DialogTitle>{t.newUser}</DialogTitle>

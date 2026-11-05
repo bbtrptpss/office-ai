@@ -58,6 +58,13 @@ test("the web app sends its security headers", async ({ request }) => {
   }
 });
 
+test("an unknown address shows the not-found page", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("lang", "en"));
+  const res = await page.goto("/no-such-page");
+  expect(res?.status()).toBe(404);
+  await expect(page.getByText("Page not found")).toBeVisible();
+});
+
 test("a wrong password does not sign in", async ({ page }) => {
   await page.goto("/login");
   await page.locator('input[type="email"]').fill(CEO_EMAIL!);
@@ -151,6 +158,34 @@ test("an objective goes from plan to approved work with the simulated AI", async
   await page.goto(`/projects/${project.id}`);
   await expect(page.getByText("[SIMULATED] Build the first version").first()).toBeVisible({ timeout: 20_000 });
   await context.close();
+});
+
+test("a manager can reset a password and turn an account off", async ({ browser }) => {
+  const admin = await ceoPage(browser);
+  const problems = watch(admin.page);
+  const email = `reset-${Date.now()}@e2e.test`;
+  await post(admin.api, "/api/security/users", { email, displayName: "Reset target", password: MEMBER_PASSWORD, isAgent: false, roles: ["Member"] });
+  admin.page.on("dialog", (d) => void d.accept());
+  await admin.page.goto("/security");
+  const row = admin.page.getByRole("row").filter({ hasText: email });
+
+  const replaced = `Aa1-${crypto.randomUUID()}`;
+  await row.getByRole("button", { name: "Set a new password" }).click();
+  await admin.page.locator('input[autocomplete="new-password"]').fill(replaced);
+  await admin.page.getByRole("button", { name: "Save" }).click();
+  await expect(admin.page.locator('input[autocomplete="new-password"]')).toHaveCount(0);
+
+  const login = async (password: string) => (await fetch(`${API}/api/auth/login`, {
+    method: "POST", headers: { "Content-Type": "application/json", ...write }, body: JSON.stringify({ email, password }),
+  })).status;
+  expect(await login(MEMBER_PASSWORD)).toBe(401);
+  expect(await login(replaced)).toBe(204);
+
+  await row.getByRole("button", { name: "Turn off" }).click();
+  await expect(row.getByText("Turned off")).toBeVisible();
+  expect(await login(replaced)).toBe(401);
+  expect(problems).toEqual([]);
+  await admin.context.close();
 });
 
 test("two-factor setup asks for the password first", async ({ browser }) => {

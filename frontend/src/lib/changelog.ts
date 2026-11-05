@@ -31,6 +31,16 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.34.0",
+    date: "2026-11-05",
+    title: { th: "จัดการบัญชีผู้ใช้", en: "Managing user accounts" },
+    changes: [
+      { type: "added", th: "หน้าความปลอดภัยตั้งรหัสผ่านใหม่ให้คนที่ลืมรหัส และเปิด/ปิดบัญชีได้ ปิดบัญชีตัวเองไม่ได้ และมีเพียง CEO ที่แก้บัญชี CEO ได้ จึงมี CEO เหลืออยู่เสมอ", en: "The security page can set a new password for someone who lost theirs and turn accounts on or off. Nobody can turn off their own account and only a CEO can change a CEO's account, so an active CEO always remains" },
+      { type: "security", th: "รายงานประจำวันผ่าน API ไม่แสดงค่าใช้จ่ายถ้าไม่มีสิทธิ์ finance.read", en: "The daily report API leaves out costs without finance.read" },
+      { type: "added", th: "หน้าแจ้งเมื่อหน้าเว็บมีข้อผิดพลาดหรือไม่พบหน้า", en: "Pages for rendering errors and unknown addresses" },
+    ],
+  },
+  {
     version: "0.33.0",
     date: "2026-11-05",
     title: { th: "งานจาก Claude ต้องยืนยันก่อน และตัวเชื่อมเสถียรขึ้น", en: "Claude's tasks need confirming, and a steadier bridge" },
