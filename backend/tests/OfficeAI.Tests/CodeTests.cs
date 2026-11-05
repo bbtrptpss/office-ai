@@ -98,6 +98,7 @@ public class CodeTests(ApiFixture fx)
 
         var approval = Assert.Single(await ceo.GetAsync<List<ApprovalDto>>($"/api/approvals?status=Pending&taskId={task.Id}"));
         Assert.Equal(ApprovalKind.Merge, approval.Kind);
+        await ceo.PostAsync<TaskDto>($"/api/tasks/{task.Id}/status", new { status = "InReview" });
         (await ceo.PostAsJsonAsync($"/api/approvals/{approval.Id}/decision", new { approve = true, payloadHash = approval.PayloadHash })).EnsureSuccessStatusCode();
 
         mr = (await ceo.GetAsync<MergeRequestDetailDto>($"/api/merge-requests/{mr.Id}")).MergeRequest;
@@ -105,6 +106,8 @@ public class CodeTests(ApiFixture fx)
         Assert.Contains("app.txt", await ceo.GetAsync<List<string>>($"/api/repositories/{repo.Id}/files"));
         var res = await ceo.GetAsync($"/api/repositories/{repo.Id}/file?path=app.txt");
         Assert.Equal("hello\n", await res.Content.ReadAsStringAsync());
+        // Outside a workflow nothing else would end the task: approving its merge does.
+        Assert.Equal(OfficeAI.Domain.Work.WorkTaskStatus.Done, (await ceo.GetAsync<TaskDto>($"/api/tasks/{task.Id}")).Status);
 
         // A branch must exist: anything else, above all a value git would read as an option, never reaches git.
         var marker = Path.Combine(Path.GetTempPath(), $"officeai-{Guid.NewGuid():N}");
@@ -174,6 +177,34 @@ public class CodeTests(ApiFixture fx)
         Assert.True(run.Status == TestRunStatus.Passed, run.Output);
         Assert.Contains("ISOLATED", run.Output);
         Assert.Contains("--- setup:", run.Output);
+    }
+
+    [Fact]
+    public async Task A_lockfile_from_setup_reaches_the_working_copy_for_the_agent_to_commit()
+    {
+        var (ceo, _, task, _, repo) = await SetupAsync("BACKEND",
+        [
+            Test(),
+            ScriptedProvider.Call("repo_read_file", new { path = "package-lock.json" }),
+            Commit("Add the lockfile"),
+            Test(),
+        ], testCommand: "echo RAN");
+        await ceo.PutAsync<RepositoryDto>($"/api/repositories/{repo.Id}", new { sandboxImage = Image, testCommand = repo.TestCommand, setupCommand = "echo '{\"lockfileVersion\":3}' > package-lock.json; echo other > other.lock" });
+
+        var run = await RunAsync(ceo, task.Id);
+        var calls = run.ToolExecutions.OrderBy(x => x.StartedAt).ToList();
+        Assert.Contains("package-lock.json; it is now in your working copy", calls[0].Output);
+        Assert.Contains("lockfileVersion", calls[1].Output);
+        Assert.Equal(ToolExecutionStatus.Succeeded, calls[2].Status);
+        Assert.DoesNotContain("it is now in your working copy", calls[3].Output); // unchanged: no loop of commit and re-run
+
+        var runs = await ceo.GetAsync<List<TestRunDto>>($"/api/repositories/{repo.Id}/test-runs?taskId={task.Id}");
+        Assert.NotNull(runs.OrderBy(r => r.StartedAt).Last().CommitSha); // the committed code is clean evidence
+
+        var branch = Branches.ForTask(task.Id);
+        var files = await ceo.GetAsync<List<string>>($"/api/repositories/{repo.Id}/files?branch={Uri.EscapeDataString(branch)}");
+        Assert.Contains("package-lock.json", files);
+        Assert.DoesNotContain("other.lock", files); // only the known lockfiles come back
     }
 
     [Fact]

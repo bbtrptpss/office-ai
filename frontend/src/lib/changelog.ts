@@ -31,6 +31,18 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.36.0",
+    date: "2026-11-05",
+    title: { th: "พนักงาน AI ทำงานจริงได้เสถียรขึ้น", en: "AI employees work more reliably" },
+    changes: [
+      { type: "fixed", th: "คำตอบว่างจาก Claude Code ถือว่าเรียกไม่สำเร็จและลองใหม่ ไม่ถูกนับเป็นงานสำเร็จอีก", en: "An empty reply from Claude Code counts as a failed call and is retried, no longer as finished work" },
+      { type: "added", th: "lockfile ที่ได้จากคำสั่งติดตั้ง dependency กลับมาที่ working copy ให้ agent commit เวอร์ชัน dependency จึงคงที่", en: "Lockfiles from the dependency install return to the working copy for the agent to commit, so dependency versions stay fixed" },
+      { type: "changed", th: "การลองใหม่ได้รับสรุปว่ารอบก่อนหยุดเพราะอะไรและแก้ไฟล์ไหนไปแล้ว เพื่อไม่ต้องอ่านโค้ดใหม่ทั้งหมด", en: "A retry is told why the last attempt stopped and which files it wrote, so it need not read everything again" },
+      { type: "changed", th: "เมื่อทักษะเท่ากัน งานจะไปที่ผู้เชี่ยวชาญก่อนหัวหน้าแผนก", en: "On equal skills, work goes to a specialist before the head of the department" },
+      { type: "fixed", th: "งานนอก objective ปิดเองเมื่อคนที่มีสิทธิ์อนุมัติ merge ไม่ค้างที่รอรีวิว", en: "A task outside an objective closes when someone allowed to approve tasks approves its merge, instead of staying in review" },
+    ],
+  },
+  {
     version: "0.35.1",
     date: "2026-11-05",
     title: { th: "แก้สิ่งที่พบจากการทดลองงานจริง", en: "Fixes from the first real trial" },

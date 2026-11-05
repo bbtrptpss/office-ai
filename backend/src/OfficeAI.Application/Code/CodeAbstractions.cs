@@ -44,7 +44,8 @@ public interface ICodeRepositoryStore
 
 /// <param name="SetupCommand">Downloads dependencies first, with access to the package registries only. The command itself never has a network.</param>
 public sealed record SandboxRequest(string Image, string WorkspacePath, string Command, TimeSpan Timeout, double Cpus, int MemoryMb, string? SetupCommand = null);
-public sealed record SandboxResult(int? ExitCode, string Output, bool TimedOut, int DurationMs, string? Error);
+/// <param name="GeneratedFiles">Lockfiles the setup step produced (name to content). Everything else in the sandbox is thrown away.</param>
+public sealed record SandboxResult(int? ExitCode, string Output, bool TimedOut, int DurationMs, string? Error, IReadOnlyDictionary<string, string>? GeneratedFiles = null);
 
 /// <summary>Runs untrusted code in a throwaway, network-less, resource-limited container.</summary>
 public interface ISandbox

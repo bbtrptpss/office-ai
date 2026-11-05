@@ -54,7 +54,8 @@ public sealed class AgentSelector(IAppDbContext db, AiProviderRegistry providers
         var best = (await CandidatesAsync(departmentId, ct))
             .Where(c => departmentId != null || c.Level != OrgLevel.Executive)
             .Select(c => new { c, score = SkillScore(c, wanted) })
-            .OrderByDescending(x => x.score).ThenBy(x => x.c.OpenTasks).ThenBy(x => x.c.Name, StringComparer.Ordinal)
+            // On equal skills the work goes to a specialist, not the head of the department, even when the specialist is busier.
+            .OrderByDescending(x => x.score).ThenBy(x => x.c.Level is OrgLevel.Head or OrgLevel.Executive ? 1 : 0).ThenBy(x => x.c.OpenTasks).ThenBy(x => x.c.Name, StringComparer.Ordinal)
             .FirstOrDefault();
         return best is null ? null
             : new AgentChoice(best.c.Id, best.c.Name, $"skills matched {best.score}/{Math.Max(1, wanted.Count)}, {best.c.OpenTasks} open tasks");

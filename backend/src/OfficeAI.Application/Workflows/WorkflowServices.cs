@@ -101,7 +101,7 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
                 await ApplyEstimateDecisionAsync(approval, req.Approve, ct);
                 break;
             case ApprovalKind.Merge:
-                await ApplyMergeDecisionAsync(approval, req.Approve, now, ct);
+                await ApplyMergeDecisionAsync(approval, req.Approve, callerPermissions, now, ct);
                 break;
             case ApprovalKind.ProductionDeployment:
                 await ReleaseService.ApplyDecisionAsync(db, code, approval, req.Approve, now, ct);
@@ -219,6 +219,20 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
         Approvals.Event(db, w.Id, null, "budget_raised", $"Budget raised from {old} to {next} USD.", now);
     }
 
+    /// <summary>
+    /// A task outside a workflow has nothing else to end it: the person approving its merge, if they may approve tasks, has accepted the work.
+    /// Inside a workflow the completion approval does this. Open defects still keep it open.
+    /// </summary>
+    private async Task FinishStandaloneTaskAsync(Guid? taskId, IReadOnlySet<string> callerPermissions, CancellationToken ct)
+    {
+        if (taskId is not { } id || !callerPermissions.Contains(Permissions.TaskApprove)) return;
+        var task = await db.Tasks.FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (task is not { WorkflowExecutionId: null, Status: WorkTaskStatus.InReview }) return;
+        try { await DefectService.EnsureNoOpenDefectsAsync(db, id, ct); }
+        catch (DomainException) { return; }
+        task.Status = WorkTaskStatus.Done;
+    }
+
     private async Task ApplyEstimateDecisionAsync(ApprovalRequest approval, bool approve, CancellationToken ct)
     {
         var estimateId = System.Text.Json.JsonDocument.Parse(approval.PayloadJson).RootElement.GetProperty("estimateId").GetGuid();
@@ -236,7 +250,7 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
     }
 
     /// <summary>Merges exactly the commit that was reviewed; if the branch moved since, the request is refused.</summary>
-    private async Task ApplyMergeDecisionAsync(ApprovalRequest approval, bool approve, DateTimeOffset now, CancellationToken ct)
+    private async Task ApplyMergeDecisionAsync(ApprovalRequest approval, bool approve, IReadOnlySet<string> callerPermissions, DateTimeOffset now, CancellationToken ct)
     {
         var payload = System.Text.Json.JsonDocument.Parse(approval.PayloadJson).RootElement;
         var mr = await db.MergeRequests.FirstAsync(m => m.Id == payload.GetProperty("mergeRequestId").GetGuid(), ct);
@@ -267,6 +281,7 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
                 var tracked = await db.CodeRepositories.FirstAsync(r => r.Id == repo.Id, ct);
                 await Code.CodeService.PushDefaultBranchAsync(code, tracked, clock, ct);
             }
+            await FinishStandaloneTaskAsync(mr.TaskId, callerPermissions, ct);
         }
         else
         {

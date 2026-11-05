@@ -41,6 +41,10 @@ public class SandboxOptions
 public sealed class DockerSandbox(IOptions<SandboxOptions> options, IOptions<RepositoryOptions> repoOptions, ILogger<DockerSandbox> log) : ISandbox
 {
     private const string WorkVolumeSize = "4g";
+    private const int MaxGeneratedFileBytes = 8 * 1024 * 1024;
+
+    /// <summary>Files a setup step may hand back: fixed names at the top of the project, because agents cannot run a package manager themselves.</summary>
+    private static readonly string[] Lockfiles = ["package-lock.json", "packages.lock.json"];
 
     public bool IsAvailable => options.Value.UseLocalDocker;
     public IReadOnlyCollection<string> AllowedImages => options.Value.AllowedImages;
@@ -106,13 +110,17 @@ public sealed class DockerSandbox(IOptions<SandboxOptions> options, IOptions<Rep
             if (setup.TimedOut) return new SandboxResult(null, setupOutput, true, (int)sw.ElapsedMilliseconds, null);
             if (setup.ExitCode != 0) return new SandboxResult(setup.ExitCode, setupOutput + "\n--- setup failed: the command did not run", false, (int)sw.ElapsedMilliseconds, null);
 
+            var generated = new Dictionary<string, string>();
+            foreach (var file in Lockfiles)
+                if (await ReadFromContainerAsync(holder, $"/work/{file}") is { } content) generated[file] = content;
+
             var left = req.Timeout - sw.Elapsed;
-            if (left <= TimeSpan.Zero) return new SandboxResult(null, setupOutput, true, (int)sw.ElapsedMilliseconds, null);
+            if (left <= TimeSpan.Zero) return new SandboxResult(null, setupOutput, true, (int)sw.ElapsedMilliseconds, null, generated);
             string[] runArgs = [.. Hardening(req), "--network", "none", .. workEnv, .. workMount, req.Image, "sh", "-c", req.Command];
             var run = await RunContainerAsync(runArgs, left, ct);
             var output = $"{setupOutput}\n--- run: {req.Command}\n{run.Output}";
             if (ct.IsCancellationRequested) return new SandboxResult(null, output, false, (int)sw.ElapsedMilliseconds, "Cancelled.");
-            return new SandboxResult(run.TimedOut ? null : run.ExitCode, output, run.TimedOut, (int)sw.ElapsedMilliseconds, null);
+            return new SandboxResult(run.TimedOut ? null : run.ExitCode, output, run.TimedOut, (int)sw.ElapsedMilliseconds, null, generated);
         }
         finally
         {
@@ -175,6 +183,28 @@ public sealed class DockerSandbox(IOptions<SandboxOptions> options, IOptions<Rep
         var output = stdout.ToString();
         if (output.Length >= max) output += "\n…[output truncated]";
         return new StepResult(timedOut || ct.IsCancellationRequested ? null : process.ExitCode, output, timedOut, (int)sw.ElapsedMilliseconds);
+    }
+
+    /// <summary>A regular file's text, or null when it is missing, not a regular file or too big.</summary>
+    private async Task<string?> ReadFromContainerAsync(string container, string path)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("docker") { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true, StandardOutputEncoding = Encoding.UTF8 };
+            foreach (var a in new[] { "exec", container, "sh", "-c", $"test -f {path} && ! test -L {path} && test $(wc -c < {path}) -le {MaxGeneratedFileBytes} && cat {path}" }) psi.ArgumentList.Add(a);
+            using var process = Process.Start(psi);
+            if (process is null) return null;
+            var output = process.StandardOutput.ReadToEndAsync();
+            var errors = process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            await errors;
+            return process.ExitCode == 0 ? await output : null;
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "Could not read {Path} from the sandbox", path);
+            return null;
+        }
     }
 
     private async Task<bool> DockerAsync(params string[] args)

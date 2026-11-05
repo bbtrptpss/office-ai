@@ -115,6 +115,14 @@ public class ProviderAdapterTests
     }
 
     [Fact]
+    public async Task An_empty_Claude_Code_reply_is_a_failed_call_not_a_finished_answer()
+    {
+        var (provider, _) = ClaudeCodeWith(new FakeHandler(HttpStatusCode.OK, JsonSerializer.Serialize(new { reply = "  ", sessionId = Guid.NewGuid(), costUsd = 0, inputTokens = 5000, outputTokens = 200 })));
+        var failed = await Assert.ThrowsAsync<AiProviderException>(() => provider.CompleteAsync(Conversation(), default));
+        Assert.True(failed.Retryable);
+    }
+
+    [Fact]
     public void Tasks_created_at_the_same_moment_get_their_own_branches()
     {
         var at = DateTimeOffset.UtcNow;

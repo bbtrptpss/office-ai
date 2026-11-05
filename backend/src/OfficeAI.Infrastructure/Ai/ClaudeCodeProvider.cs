@@ -49,7 +49,9 @@ public sealed partial class ClaudeCodeProvider(IHttpClientFactory http, IOptions
         var answer = json.Deserialize<BridgeAnswer>(JsonOptions)
             ?? throw new AiProviderException("The Claude Code bridge returned nothing.", retryable: true);
         if (answer.Error is { } error) throw new AiProviderException($"Claude Code: {error}", retryable: !error.Contains("invalid", StringComparison.OrdinalIgnoreCase));
-        return ParseReply(answer.Reply ?? "", new AiUsage(answer.InputTokens, answer.OutputTokens, answer.CacheReadTokens, answer.CacheWriteTokens), request.Tools);
+        // Claude Code sometimes ends with no text at all, even after using tokens. That is a failed call to retry, not a finished answer.
+        if (string.IsNullOrWhiteSpace(answer.Reply)) throw new AiProviderException("Claude Code returned an empty reply.", retryable: true);
+        return ParseReply(answer.Reply, new AiUsage(answer.InputTokens, answer.OutputTokens, answer.CacheReadTokens, answer.CacheWriteTokens), request.Tools);
     }
 
     private sealed record BridgeAnswer(string? Reply, string? Error, long InputTokens, long OutputTokens, long CacheReadTokens, long CacheWriteTokens);

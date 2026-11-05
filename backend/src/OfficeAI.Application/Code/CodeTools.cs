@@ -238,6 +238,7 @@ internal static class SandboxCheck
 
         var started = ctx.Clock.GetUtcNow();
         var result = await sandbox.RunAsync(new SandboxRequest(ws.Repo.SandboxImage, ws.Path, command, sandbox.TestTimeout, 1.0, 2048, ws.Repo.SetupCommand), ct);
+        var lockfiles = await KeepGeneratedFilesAsync(ws.Path, result, ct);
         var status = result.Error is not null ? TestRunStatus.Error
             : result.TimedOut ? TestRunStatus.TimedOut
             : result.ExitCode == 0 ? TestRunStatus.Passed : TestRunStatus.Failed;
@@ -251,8 +252,23 @@ internal static class SandboxCheck
         await ctx.Db.SaveChangesAsync(ct);
         var tail = run.Output is { Length: > 8000 } o ? "…" + o[^8000..] : run.Output;
         var what = kind == CheckKind.Lint ? "Lint" : "Tests";
+        var lockfileNote = lockfiles.Count == 0 ? "" : $"\nThe dependency install produced {string.Join(", ", lockfiles)}; it is now in your working copy. Commit it, then re-run on the committed code.";
         return new ToolResult(status == TestRunStatus.Passed,
-            $"{what} {status} (exit {run.ExitCode?.ToString() ?? "-"}, {run.DurationMs} ms){(clean ? "" : " — uncommitted changes were included; commit and re-run before opening a merge request")}\n{tail}");
+            $"{what} {status} (exit {run.ExitCode?.ToString() ?? "-"}, {run.DurationMs} ms){(clean ? "" : " — uncommitted changes were included; commit and re-run before opening a merge request")}\n{tail}{lockfileNote}");
+    }
+
+    /// <summary>Lockfiles come back from the setup step into the working copy, where the agent commits them like any other change.</summary>
+    private static async Task<List<string>> KeepGeneratedFilesAsync(string workspace, SandboxResult result, CancellationToken ct)
+    {
+        var changed = new List<string>();
+        foreach (var (name, content) in result.GeneratedFiles ?? new Dictionary<string, string>())
+        {
+            if (WorkspacePaths.Resolve(workspace, name, out _) is not { } path) continue;
+            if (File.Exists(path) && await File.ReadAllTextAsync(path, ct) == content) continue;
+            await File.WriteAllTextAsync(path, content, ct);
+            changed.Add(name);
+        }
+        return changed;
     }
 }
 
