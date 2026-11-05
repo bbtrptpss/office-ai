@@ -31,6 +31,17 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.32.3",
+    date: "2026-11-05",
+    title: { th: "สำรองข้อมูลที่ตรวจสอบได้ และสำเนานอกเครื่องแบบเข้ารหัส", en: "Verified backups and encrypted off-site copies" },
+    changes: [
+      { type: "fixed", th: "การสำรองที่ล้มเหลวไม่ทิ้งโฟลเดอร์ว่างอีกต่อไป และการลบชุดเก่านับเฉพาะชุดที่ตรวจผ่าน ชุดที่ดีจึงไม่ถูกดันออกโดยโฟลเดอร์ว่าง", en: "A failed backup no longer leaves an empty folder, and pruning counts only verified backups, so empty folders can no longer push good backups out" },
+      { type: "changed", th: "สคริปต์สำรองเปิด Docker Desktop และฐานข้อมูลให้เองเมื่อปิดอยู่ (ใส่ -NoStart เพื่อปิดการทำงานนี้) และแจ้งเตือนบนจอเมื่อล้มเหลว", en: "The backup script starts Docker Desktop and the database when they are down (-NoStart turns this off) and shows a notification when it fails" },
+      { type: "security", th: "สำเนานอกเครื่องเข้ารหัสด้วย gpg AES-256 ก่อนคัดลอกไป Google Drive รหัสผ่านตั้งด้วย set-backup-passphrase.ps1 และเก็บด้วย Windows DPAPI", en: "Off-site copies are encrypted with gpg AES-256 before they are copied to Google Drive; the passphrase is set with set-backup-passphrase.ps1 and stored with Windows DPAPI" },
+      { type: "fixed", th: "restore.sh ตรวจว่าอ่านไฟล์สำรองได้ก่อนหยุดบริการหรือลบข้อมูล และกู้จากโฟลเดอร์ Temp บน Windows ได้", en: "restore.sh checks the backup can be read before it stops services or removes data, and can restore from the Windows Temp folder" },
+    ],
+  },
+  {
     version: "0.32.2",
     date: "2026-10-23",
     title: { th: "สถานะการค้นด้วยความหมาย", en: "Search-by-meaning status" },
@@ -753,6 +764,7 @@ export const CHANGELOG: Release[] = [
 ];
 
 export const TODO: Todo[] = [
+  { status: "waitingCeo", area: { th: "โครงสร้าง", en: "Infrastructure" }, th: "เลือก remote แบบ private สำหรับโค้ด เพราะตอนนี้โค้ดอยู่บนเครื่องนี้เครื่องเดียว", en: "Choose a private remote for the code, which currently exists on this computer only" },
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "เลือกแผนแบบเสียเงิน: Gemini free tier ใช้ได้แค่ 20 ครั้ง/วัน ไม่พอทำงานจริง — เติมเครดิต Anthropic หรือเปิด billing ของ Gemini (ทั้งคู่ต้องผูกบัตร)", en: "Choose a paid plan: the Gemini free tier allows only 20 requests/day — add Anthropic credit or enable Gemini billing (both need a card)" },
   { status: "waitingCeo", area: { th: "AI", en: "AI" }, th: "ถ้ามีบัญชี OpenAI / Gemini: ใส่ key และเพิ่มโมเดลพร้อมราคาในหน้าตั้งค่า AI", en: "If OpenAI / Gemini accounts exist: set the keys and add their models with prices in AI settings" },
   { status: "waitingCeo", area: { th: "ความปลอดภัย", en: "Security" }, th: "เปิดการยืนยันสองขั้นที่ “การตั้งค่าของฉัน” — Terminal บนหน้าภาพรวมใช้ไม่ได้จนกว่าจะเปิด", en: "Turn on two-factor sign-in in “My settings” — the overview Terminal stays unavailable until then" },
