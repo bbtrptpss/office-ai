@@ -140,6 +140,8 @@ public static class Endpoints
         // It hands work to AI employees only when the person may also create and assign tasks and run AI.
         api.MapPost("/assistant/claude", async (ClaudeAskRequest r, ClaudeChatService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
             await s.AskAsync(r, (await ChatAccessAsync(perms, me, ct)).CanCommandAi, ct)).RequirePermission(Permissions.AgentManage);
+        api.MapPost("/assistant/claude/confirm", async (ClaudeConfirmRequest r, ClaudeChatService s, PermissionService perms, ICurrentUser me, CancellationToken ct) =>
+            await s.ConfirmAsync(r, (await ChatAccessAsync(perms, me, ct)).CanCommandAi, ct)).RequirePermission(Permissions.AgentManage);
         TwoFactorEndpoints.MapTerminal(api); // the dashboard terminal: CEO only, behind two-factor sign-in
 
         api.MapGet("/projects", (WorkService s, CancellationToken ct) => s.ListProjectsAsync(ct)).RequirePermission(Permissions.ProjectRead);

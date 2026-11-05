@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { AgentRun, api, ApiError, Assistant, ChatMessage, ClaudeReply, Dashboard, Meeting, RecentTask, TerminalResult, usd } from "@/lib/api";
+import { AgentRun, api, ApiError, Assistant, ChatMessage, ClaudeConfirmResult, ClaudeReply, Dashboard, Meeting, ProposedTask, RecentTask, TerminalResult, usd } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useRealtime } from "@/lib/realtime";
@@ -221,6 +221,8 @@ function Stage() {
   const [pending, setPending] = useState(false);
 
   const [newChat, setNewChat] = useState(false);
+  // What Claude proposes to hand over; nothing starts until the person answers.
+  const [proposals, setProposals] = useState<ProposedTask[]>([]);
   const claudeOn = !!assistant?.claudeAvailable && can("agent.manage");
   // The Claude card is a chat. The CEO can switch it to the terminal (PowerShell in the project folder on this PC), which the bridge keeps off unless it is turned on in .env.
   const isCeo = !!me?.roles.includes("CEO");
@@ -318,6 +320,7 @@ ${footer}`, from: "Terminal", mono: true });
         const res = await api.post<ClaudeReply>("/api/assistant/claude", { message: question, newChat });
         setNewChat(false);
         settle(at, { answer: res.reply, from: "Claude" });
+        setProposals((list) => [...list, ...(res.proposed ?? [])]);
       } catch (err) {
         failed(err, "Claude");
       } finally {
@@ -333,6 +336,16 @@ ${footer}`, from: "Terminal", mono: true });
       setPending(true);
     } catch (err) {
       failed(err);
+    }
+  };
+
+  const answerProposal = async (p: ProposedTask, approve: boolean) => {
+    setProposals((list) => list.filter((x) => x.id !== p.id));
+    try {
+      const res = await api.post<ClaudeConfirmResult>("/api/assistant/claude/confirm", { id: p.id, approve });
+      update(CLAUDE_ID, (list) => [...list, { answer: res.reply, from: "Claude" }]);
+    } catch (err) {
+      update(CLAUDE_ID, (list) => [...list, { answer: err instanceof Error ? err.message : String(err), from: "Claude" }]);
     }
   };
 
@@ -371,6 +384,16 @@ ${footer}`, from: "Terminal", mono: true });
                   {b.mono ? <pre className={s.mono}>{b.answer}</pre> : <Rich text={b.answer ?? ""} />}
                 </>
               )}
+            </div>
+          ))}
+          {isClaude && !terminal && proposals.map((p) => (
+            <div key={p.id} className={s.turn}>
+              <b>{p.title}</b> → {p.employee} ({p.project})
+              {p.details && <div>{p.details}</div>}
+              <div className={s.chips}>
+                <button type="button" className={s.chip} onClick={() => void answerProposal(p, true)}>{t.dashProposalConfirm}</button>
+                <button type="button" className={s.chip} onClick={() => void answerProposal(p, false)}>{t.dashProposalDecline}</button>
+              </div>
             </div>
           ))}
         </div>

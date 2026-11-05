@@ -31,6 +31,17 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.33.0",
+    date: "2026-11-05",
+    title: { th: "งานจาก Claude ต้องยืนยันก่อน และตัวเชื่อมเสถียรขึ้น", en: "Claude's tasks need confirming, and a steadier bridge" },
+    changes: [
+      { type: "security", th: "Claude บนหน้าภาพรวมเสนองานเท่านั้น งานจะเริ่มเมื่อคุณกดยืนยันทีละงาน ข้อความที่แทรกไว้ในชื่องานจึงสั่งงานแทนคุณไม่ได้", en: "Claude on the dashboard only proposes tasks; each starts when you confirm it, so text planted in a task title cannot start work on your behalf" },
+      { type: "security", th: "ข้อความจากงานและผลของเครื่องมือปลอมเป็นโครงสร้าง prompt หรือคำพูดของฝ่ายอื่นไม่ได้", en: "Task text and tool results can no longer pose as prompt structure or as another speaker" },
+      { type: "fixed", th: "ตัวเชื่อม Claude ไม่ทำให้ภาษาไทยในข้อความยาวเสียหายอีก และบทสนทนายาวของพนักงาน AI ไม่ถูกตัดการเชื่อมต่อ", en: "The Claude bridge no longer damages Thai in long messages, and long AI employee conversations are no longer cut off" },
+      { type: "changed", th: "ตัวเชื่อมตอบได้หลายคำถามพร้อมกัน (CLAUDE_BRIDGE_CONCURRENCY) Terminal แยกคิว และหยุดงานเมื่อผู้เรียกเลิกรอ", en: "The bridge answers several questions at once (CLAUDE_BRIDGE_CONCURRENCY), the terminal has its own queue, and work stops when its caller gives up" },
+    ],
+  },
+  {
     version: "0.32.5",
     date: "2026-11-05",
     title: { th: "ตรวจอัตโนมัติทุกครั้งที่ส่งโค้ด", en: "Automatic checks on every push" },
