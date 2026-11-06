@@ -107,8 +107,13 @@ public sealed class PlanSubmitTool : IAgentTool
 }
 
 /// <summary>A reviewer records its verdict on the latest deliverable of the task under review.</summary>
-public sealed class ReviewSubmitTool : IAgentTool
+public sealed partial class ReviewSubmitTool : IAgentTool
 {
+    public const int MinCommentLength = 40;
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"\b(see|as|per)\s+(above|below|earlier|previous|before)\b|ดูด้านบน|ตามด้านบน|ดูข้างบน", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex BackReference();
+
     public const string ToolId = "review.submit";
 
     public ToolDescriptor Descriptor { get; } = new(ToolId, "1.0",
@@ -133,6 +138,11 @@ public sealed class ReviewSubmitTool : IAgentTool
         var comments = input.GetProperty("comments").GetString() ?? "";
         if (outcomeText is not ("approve" or "changes_requested")) return ToolResult.Fail("outcome must be 'approve' or 'changes_requested'.");
         if (string.IsNullOrWhiteSpace(comments)) return ToolResult.Fail("comments must not be empty.");
+        // Only these comments reach the colleague and the person approving. A short pointer such as "see above" left a colleague
+        // with nothing to fix, three times in one task, while the real review sat in the reviewer's own notes.
+        if (comments.Trim().Length < MinCommentLength || BackReference().IsMatch(comments) && comments.Trim().Length < 200)
+            return ToolResult.Fail($"Write the whole review in comments (at least {MinCommentLength} characters): what you checked, what is missing and what to change. " +
+                                   "Nobody sees your other messages, so \"see above\" says nothing to them.");
 
         var task = await ctx.Db.Tasks.FirstAsync(t => t.Id == ctx.TaskId, ct);
         if (task.Status != WorkTaskStatus.InReview) return ToolResult.Fail($"The task is {task.Status}, not in review.");

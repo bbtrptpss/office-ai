@@ -126,6 +126,16 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
 
         // On the Claude Code plan every turn resends the whole conversation, so 200,000 tokens ended 8 of 26 runs of a 5-task objective
         // part-way, and each restart read the code again. It costs no money there; limits people set, and paid providers, stay.
+        // One Claude Code reply may take up to 10 minutes, the same as the old run limit, so a slow reply ended a whole run.
+        const string claudeTimeoutMarker = "v0.37.3-claude-code-run-timeout";
+        if (!await db.SeedMarkers.AnyAsync(m => m.Key == claudeTimeoutMarker, ct))
+        {
+            await db.AgentConfigurations.Where(c => c.Provider == "claude-code" && c.TimeoutSeconds == 600)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.TimeoutSeconds, 1_800), ct);
+            db.SeedMarkers.Add(new SeedMarker { Key = claudeTimeoutMarker, AppliedAt = now });
+            await db.SaveChangesAsync(ct);
+        }
+
         const string claudeTokensMarker = "v0.37.1-claude-code-run-tokens";
         if (!await db.SeedMarkers.AnyAsync(m => m.Key == claudeTokensMarker, ct))
         {

@@ -358,6 +358,27 @@ public class WorkflowTests(ApiFixture fx)
     }
 
     [Fact]
+    public async Task A_review_must_carry_its_whole_reasoning_not_a_pointer_to_it()
+    {
+        var (ceo, project) = await ProjectAsync();
+        var task = await ceo.PostAsync<TaskDto>($"/api/projects/{project.Id}/tasks", new { title = "Reviewed" });
+        await using var scope = fx.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var ctx = new ToolContext(Guid.NewGuid(), task.Id, project.Id, Guid.NewGuid(), false, db, TimeProvider.System);
+        Task<ToolResult> Submit(string comments) => new ReviewSubmitTool().ExecuteAsync(ctx, JsonSerializer.SerializeToElement(new { outcome = "approve", comments }), default);
+
+        foreach (var pointer in new[] { "Approved; see above.", "LGTM", "As above, everything in my notes holds and is fine.", "ตามด้านบน" })
+        {
+            var refused = await Submit(pointer);
+            Assert.False(refused.Success);
+            Assert.Contains("Write the whole review", refused.Output);
+        }
+        // A full review passes this check (and then meets the task's state, which is not in review here).
+        var full = await Submit("Checked every criterion: the three frames have exact sizes, ratios and safe areas, and no real artwork is used.");
+        Assert.Contains("not in review", full.Output);
+    }
+
+    [Fact]
     public async Task A_retry_is_told_how_the_earlier_attempt_ended()
     {
         var ceo = await fx.CeoAsync();

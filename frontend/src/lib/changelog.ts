@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.37.3",
+    date: "2026-11-06",
+    title: { th: "คำรีวิวของ AI ต้องบอกเหตุผลครบ และงานยาวไม่ถูกตัดกลางทาง", en: "AI reviews must give their full reasoning, and long runs are not cut short" },
+    changes: [
+      { type: "fixed", th: "ผู้รีวิว AI ส่งคำรีวิวสั้นหรือแค่อ้างถึงที่อื่น เช่น \"see above\" ไม่ได้อีก ต้องเขียนสิ่งที่ตรวจและสิ่งที่ต้องแก้ให้ครบ", en: "An AI reviewer can no longer submit a short review or a pointer such as \"see above\"; it must write what it checked and what to change" },
+      { type: "changed", th: "เวลาสูงสุดต่อ run ของพนักงานบน Claude Code จาก 10 นาทีเป็น 30 นาที (เฉพาะที่ยังเป็นค่าเดิม) เพราะคำตอบเดียวอาจใช้ถึง 10 นาที", en: "Claude Code employees' run time limit goes from 10 to 30 minutes (only where it was the default), since one reply may take up to 10 minutes" },
+    ],
+  },
+  {
     version: "0.37.2",
     date: "2026-11-06",
     title: { th: "พนักงาน AI เขียนเอกสารยาวได้โดยงานไม่ล้ม", en: "AI employees can write long documents without the run failing" },
