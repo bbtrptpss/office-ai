@@ -129,6 +129,7 @@ public static class DependencyInjection
         services.AddSingleton<IAgentTool, DeleteFileTool>();
         services.AddSingleton<IAgentTool, DiffTool>();
         services.AddSingleton<IAgentTool, CommitTool>();
+        services.AddSingleton<IAgentTool, MergeMainTool>();
         services.AddSingleton<IAgentTool, RunTestsTool>();
         services.AddSingleton<IAgentTool, RunLintTool>();
         services.AddSingleton<IAgentTool, ScanSecretsTool>();

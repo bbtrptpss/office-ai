@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,6 +63,80 @@ public class CodeTests(ApiFixture fx)
     private static AiResponse Write(string path, string content) => ScriptedProvider.Call("repo_write_file", new { path, content });
     private static AiResponse Commit(string message) => ScriptedProvider.Call("repo_commit", new { message });
     private static AiResponse Test() => ScriptedProvider.Call("sandbox_run_tests", new { });
+    private static AiResponse MergeMain(bool abort = false) => ScriptedProvider.Call("repo_merge_main", abort ? new { abort } : new { });
+
+    /// <summary>Someone else's work lands on main while the task branch is open.</summary>
+    private async Task PushToMainAsync(Guid repoId, string file, string content)
+    {
+        await using var scope = fx.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var store = scope.ServiceProvider.GetRequiredService<ICodeRepositoryStore>();
+        var repo = await db.CodeRepositories.AsNoTracking().FirstAsync(r => r.Id == repoId);
+        var dir = await store.CheckoutBranchAsync(repo, repo.DefaultBranch, default);
+        await File.WriteAllTextAsync(Path.Combine(dir, file), content);
+        Assert.True((await store.GitAsync(dir, ["add", "-A"], default)).Ok);
+        Assert.True((await store.GitAsync(dir, ["commit", "-m", $"Change {file} on main"], default, ("Someone", "someone@example.test"))).Ok);
+        Assert.True((await store.GitAsync(dir, ["push", "--quiet", "origin", $"HEAD:refs/heads/{repo.DefaultBranch}"], default)).Ok);
+    }
+
+    [Fact]
+    public async Task A_branch_behind_main_merges_main_resolves_the_conflict_and_only_then_opens_a_merge_request()
+    {
+        var (ceo, _, task, _, repo) = await SetupAsync("BACKEND",
+        [
+            Write("app.txt", "mine\n"),
+            Write("test.sh", "grep -q mine app.txt && grep -q theirs other.txt && echo BOTH_OK"),
+            Commit("My change"),
+            ScriptedProvider.Text("Paused."),
+            // main moved meanwhile
+            OpenMr("Refused: behind main"),
+            MergeMain(),
+            Commit("Commit with the markers still in"),
+            Write("app.txt", "mine\n"),
+            Commit("Resolve the conflict"),
+            MergeMain(),
+            Test(),
+            OpenMr("Mine, on top of main"),
+        ]);
+        await RunAsync(ceo, task.Id);
+        await PushToMainAsync(repo.Id, "app.txt", "theirs\n");
+        await PushToMainAsync(repo.Id, "other.txt", "theirs\n");
+
+        var run = await RunAsync(ceo, task.Id);
+        var calls = run.ToolExecutions.OrderBy(x => x.StartedAt).ToList();
+        Assert.Contains("has changed since your branch started", calls[0].Error);
+        Assert.Contains("stopped on conflicts in: app.txt", calls[1].Error);
+        Assert.Contains("still contain conflict markers", calls[2].Error);
+        Assert.Equal(ToolExecutionStatus.Succeeded, calls[4].Status);
+        Assert.Contains("already contains the latest", calls[5].Output);
+        Assert.Contains("BOTH_OK", calls[6].Output); // tests ran on the combined code
+        Assert.Equal(ToolExecutionStatus.Succeeded, calls[7].Status);
+    }
+
+    [Fact]
+    public async Task An_approved_merge_request_is_not_merged_when_main_moved_after_its_tests()
+    {
+        var (ceo, _, task, project, repo) = await SetupAsync("BACKEND",
+        [
+            Write("app.txt", "hello\n"),
+            Write("test.sh", "grep -q hello app.txt && echo OK"),
+            Commit("Add greeting"),
+            Test(),
+            OpenMr("Greeting"),
+        ]);
+        await RunAsync(ceo, task.Id);
+        await PushToMainAsync(repo.Id, "unrelated.txt", "no conflict\n");
+
+        var approval = Assert.Single(await ceo.GetAsync<List<ApprovalDto>>($"/api/approvals?status=Pending&taskId={task.Id}"));
+        (await ceo.PostAsJsonAsync($"/api/approvals/{approval.Id}/decision", new { approve = true, payloadHash = approval.PayloadHash })).EnsureSuccessStatusCode();
+
+        var mr = Assert.Single(await ceo.GetAsync<List<MergeRequestDto>>($"/api/projects/{project.Id}/merge-requests"));
+        Assert.Equal(MergeRequestStatus.Closed, mr.Status);
+        Assert.DoesNotContain("app.txt", await ceo.GetAsync<List<string>>($"/api/repositories/{repo.Id}/files"));
+        var reviews = await ceo.GetAsync<List<ReviewDto>>($"/api/tasks/{task.Id}/reviews");
+        Assert.Contains(reviews, r => r.Comments.Contains("repo.merge_main"));
+    }
+
     private static AiResponse OpenMr(string title) => ScriptedProvider.Call("repo_open_merge_request", new { title, description = "Adds the greeting" });
 
     [Fact]

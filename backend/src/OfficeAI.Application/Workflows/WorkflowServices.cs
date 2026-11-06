@@ -268,6 +268,19 @@ public class ApprovalService(IAppDbContext db, ICurrentUser current, TimeProvide
         var tip = (await code.GitAsync(System.IO.Path.GetFullPath("."), ["--git-dir", layout.OriginPath(repo), "rev-parse", mr.SourceBranch], ct)).Output.Trim();
         if (tip != mr.HeadSha)
             throw new DomainException("approval.changed", "New commits were pushed after this merge request was opened. Ask for a fresh merge request.");
+        // Its tests ran without what was merged since. Merging anyway could break main even without a conflict, so it goes back to the agent.
+        var targetMoved = !(await code.GitAsync(System.IO.Path.GetFullPath("."), ["--git-dir", layout.OriginPath(repo), "merge-base", "--is-ancestor", mr.TargetBranch, mr.HeadSha], ct)).Ok;
+        if (targetMoved)
+        {
+            mr.Status = Domain.Code.MergeRequestStatus.Closed;
+            approval.DecisionNote = (approval.DecisionNote is null ? "" : approval.DecisionNote + "\n") + $"Not merged: {mr.TargetBranch} changed after the tests ran.";
+            if (mr.TaskId is { } moved)
+                AddHumanReview(moved, $"Merge request !{mr.Number} was approved, but {mr.TargetBranch} changed after its tests ran, so it was not merged. " +
+                                      $"Use repo.merge_main, run the tests, and open a new merge request.");
+            if (approval.WorkflowExecutionId is { } w)
+                Approvals.Event(db, w, mr.TaskId, "merge_outdated", $"!{mr.Number} was not merged: {mr.TargetBranch} changed after its tests ran.", now);
+            return;
+        }
 
         var outcome = await code.MergeAsync(repo, mr.SourceBranch, mr.TargetBranch, $"Merge !{mr.Number}: {mr.Title}", (current.Name ?? "CEO", "ceo@officeai.local"), ct);
         if (outcome.Merged)

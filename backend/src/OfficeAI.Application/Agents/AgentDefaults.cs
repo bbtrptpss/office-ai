@@ -79,7 +79,7 @@ public static class AgentDefaults
         [Code.ListFilesTool.ToolId, Code.ReadFileTool.ToolId, Code.SearchCodeTool.ToolId, Code.DiffTool.ToolId, Code.RunTestsTool.ToolId,
             Code.RunLintTool.ToolId, Code.ScanSecretsTool.ToolId];
     public static readonly string[] CodeWriteTools =
-        [Code.WriteFileTool.ToolId, Code.DeleteFileTool.ToolId, Code.CommitTool.ToolId, Code.OpenMergeRequestTool.ToolId];
+        [Code.WriteFileTool.ToolId, Code.DeleteFileTool.ToolId, Code.CommitTool.ToolId, Code.OpenMergeRequestTool.ToolId, Code.MergeMainTool.ToolId];
 
     /// <summary>Starting hourly rates (THB) by level; the CEO edits the real rate card.</summary>
     public static decimal DefaultRateThb(OrgLevel level) => level switch

@@ -190,6 +190,10 @@ public sealed class CommitTool(CodeWorkspace code) : IAgentTool
         if (string.IsNullOrEmpty(message)) return ToolResult.Fail("message must not be empty.");
         var author = await CodeWorkspace.AuthorAsync(ctx, ct);
         await code.Store.GitAsync(ws.Path, ["add", "-A"], ct);
+        // After repo.merge_main stopped on a conflict, committing the files as they are would put the markers into the code.
+        var markers = await MergeMainTool.ConflictMarkersAsync(code, ws.Path, ct);
+        if (markers.Count > 0)
+            return ToolResult.Fail($"These files still contain conflict markers (<<<<<<<, =======, >>>>>>>): {string.Join(", ", markers)}. Edit them to keep the right code, then commit.");
         var commit = await code.Store.GitAsync(ws.Path, ["commit", "-m", $"{message}\n\nRun: {ctx.RunId}"], ct, author);
         if (!commit.Ok)
             return commit.Output.Contains("nothing to commit") ? ToolResult.Fail("Nothing to commit.") : ToolResult.Fail(commit.Error.Trim());
@@ -197,6 +201,72 @@ public sealed class CommitTool(CodeWorkspace code) : IAgentTool
         if (!push.Ok) return ToolResult.Fail("Committed locally but could not push: " + push.Error.Trim());
         var sha = (await code.Store.GitAsync(ws.Path, ["rev-parse", "HEAD"], ct)).Output.Trim();
         return ToolResult.Ok(new { branch = ws.Branch, sha });
+    }
+}
+
+/// <summary>
+/// Brings the latest main branch into the task branch, so the work is tested together with what others merged meanwhile.
+/// On a conflict the merge stays open in the working copy for the agent to resolve and commit.
+/// </summary>
+public sealed class MergeMainTool(CodeWorkspace code) : IAgentTool
+{
+    public const string ToolId = "repo.merge_main";
+
+    public ToolDescriptor Descriptor { get; } = new(ToolId, "1.0",
+        "Merge the latest main branch into your task branch. Use it when a merge request is refused because main has moved on. " +
+        "Without conflicts the merge is committed and pushed; run the tests again afterwards. " +
+        "With conflicts the listed files contain <<<<<<< ======= >>>>>>> markers: edit each file to keep the right code, then repo.commit, then run the tests. " +
+        "Commit your own changes first. Set abort to true to undo a merge that stopped on conflicts.",
+        CodeSchemas.Obj(new { abort = new { type = "boolean" } }), TimeSpan.FromSeconds(60), 4_000, false, true);
+
+    public async Task<ToolResult> ExecuteAsync(ToolContext ctx, JsonElement input, CancellationToken ct)
+    {
+        if (await code.OpenAsync(ctx, ct) is not { } ws) return ToolResult.Fail(CodeWorkspace.NoRepository);
+        var merging = (await code.Store.GitAsync(ws.Path, ["rev-parse", "-q", "--verify", "MERGE_HEAD"], ct)).Ok;
+        if (input.TryGetProperty("abort", out var a) && a.ValueKind == JsonValueKind.True)
+        {
+            if (!merging) return ToolResult.Fail("No merge is in progress.");
+            await code.Store.GitAsync(ws.Path, ["merge", "--abort"], ct);
+            return ToolResult.Ok(new { aborted = true, result = "The merge was undone; your branch is as it was." });
+        }
+        if (merging) return ToolResult.Fail("A merge with main is already in progress. Resolve the conflicts and use repo.commit, or call this tool with abort set to true.");
+        if ((await code.Store.GitAsync(ws.Path, ["status", "--porcelain"], ct)).Output.Length > 0)
+            return ToolResult.Fail("You have uncommitted changes. Commit them first, then merge main.");
+
+        await code.Store.GitAsync(ws.Path, ["fetch", "--quiet", "origin"], ct);
+        var main = $"origin/{ws.Repo.DefaultBranch}";
+        if ((await code.Store.GitAsync(ws.Path, ["merge-base", "--is-ancestor", main, "HEAD"], ct)).Ok)
+            return ToolResult.Ok(new { upToDate = true, result = $"Your branch already contains the latest {ws.Repo.DefaultBranch}." });
+
+        var author = await CodeWorkspace.AuthorAsync(ctx, ct);
+        var merge = await code.Store.GitAsync(ws.Path, ["merge", "--no-ff", "--no-edit", "-m", $"Merge {ws.Repo.DefaultBranch} into {ws.Branch}\n\nRun: {ctx.RunId}", main], ct, author);
+        if (!merge.Ok)
+        {
+            var conflicted = (await code.Store.GitAsync(ws.Path, ["diff", "--name-only", "--diff-filter=U"], ct)).Output
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (conflicted.Length == 0)
+            {
+                await code.Store.GitAsync(ws.Path, ["merge", "--abort"], ct);
+                return ToolResult.Fail("Could not merge main: " + (merge.Error + merge.Output).Trim());
+            }
+            return new ToolResult(false,
+                $"Merging {ws.Repo.DefaultBranch} stopped on conflicts in: {string.Join(", ", conflicted)}. " +
+                "Read each file, replace every <<<<<<< ... ======= ... >>>>>>> block with the code that should stay (often both changes combined), " +
+                "then use repo.commit and run the tests. To give up, call this tool with abort set to true.");
+        }
+        var push = await code.Store.GitAsync(ws.Path, ["push", "--quiet", "origin", $"HEAD:refs/heads/{ws.Branch}"], ct);
+        if (!push.Ok) return ToolResult.Fail("Merged locally but could not push: " + push.Error.Trim());
+        var sha = (await code.Store.GitAsync(ws.Path, ["rev-parse", "HEAD"], ct)).Output.Trim();
+        return ToolResult.Ok(new { merged = true, sha, result = $"The latest {ws.Repo.DefaultBranch} is now in your branch. Run the tests again before opening a merge request." });
+    }
+
+    /// <summary>Staged files that still hold a conflict marker line.</summary>
+    internal static async Task<List<string>> ConflictMarkersAsync(CodeWorkspace code, string path, CancellationToken ct)
+    {
+        var check = await code.Store.GitAsync(path, ["diff", "--cached", "--check"], ct);
+        return check.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Where(l => l.Contains("leftover conflict marker", StringComparison.Ordinal))
+            .Select(l => l[..l.IndexOf(':')]).Distinct().ToList();
     }
 }
 
@@ -330,6 +400,9 @@ public sealed class OpenMergeRequestTool(CodeWorkspace code) : IAgentTool
         if (head != remoteHead) return ToolResult.Fail("Your latest commit is not pushed. Use repo.commit.");
         var ahead = (await code.Store.GitAsync(ws.Path, ["rev-list", "--count", $"origin/{ws.Repo.DefaultBranch}..HEAD"], ct)).Output.Trim();
         if (ahead == "0") return ToolResult.Fail("The branch has no commits to merge.");
+        // The tests must have run on the code as it will be after the merge, so the branch has to contain the latest main.
+        if (!(await code.Store.GitAsync(ws.Path, ["merge-base", "--is-ancestor", $"origin/{ws.Repo.DefaultBranch}", "HEAD"], ct)).Ok)
+            return ToolResult.Fail($"{ws.Repo.DefaultBranch} has changed since your branch started. Use repo.merge_main, run the tests, then open the merge request.");
 
         var test = await ctx.Db.TestRuns.Where(t => t.RepositoryId == ws.Repo.Id && t.Kind == CheckKind.Test && t.Branch == ws.Branch && t.CommitSha == head)
             .OrderByDescending(t => t.StartedAt).FirstOrDefaultAsync(ct);

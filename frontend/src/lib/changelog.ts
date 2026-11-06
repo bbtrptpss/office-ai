@@ -31,6 +31,17 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.37.0",
+    date: "2026-11-06",
+    title: { th: "งานที่ทำพร้อมกันรวมเข้าด้วยกันได้อย่างปลอดภัย", en: "Work done in parallel comes together safely" },
+    changes: [
+      { type: "added", th: "เครื่องมือ repo.merge_main ให้พนักงาน AI ดึง main ล่าสุดเข้า branch ของงาน ถ้าชนกันจะได้ไฟล์ที่มีจุดชนให้แก้", en: "The repo.merge_main tool lets AI employees bring the latest main into their task branch; on a conflict they get the files to resolve" },
+      { type: "changed", th: "เปิด merge request ได้เมื่อ branch มี main ล่าสุดแล้วเท่านั้น test จึงรันบนโค้ดหลังรวมจริง", en: "A merge request can be opened only when the branch contains the latest main, so the tests ran on the combined code" },
+      { type: "changed", th: "ถ้า main เปลี่ยนหลังจาก test รันแล้ว merge request ที่อนุมัติจะไม่ถูก merge และส่งกลับให้พนักงานอัปเดตก่อน", en: "If main changed after the tests ran, an approved merge request is not merged and goes back to be updated first" },
+      { type: "fixed", th: "commit ที่ยังมีเครื่องหมายจุดชน (<<<<<<<) จะถูกปฏิเสธ", en: "A commit that still contains conflict markers (<<<<<<<) is refused" },
+    ],
+  },
+  {
     version: "0.36.1",
     date: "2026-11-05",
     title: { th: "พนักงาน AI ทำงานชิ้นใหญ่ได้โดยไม่ถูกตัดกลางคัน", en: "AI employees can do larger work without being cut off" },
