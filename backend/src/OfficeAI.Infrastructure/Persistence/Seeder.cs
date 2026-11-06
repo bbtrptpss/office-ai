@@ -114,6 +114,7 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
         await GrantNewToolsOnceAsync("v0.20.0-release-tool", [PrepareReleaseTool.ToolId], now, ct);
         await GrantNewToolsOnceAsync("v0.23.0-lint-tools", [Application.Code.RunLintTool.ToolId, Application.Code.ScanSecretsTool.ToolId], now, ct);
         await GrantNewToolsOnceAsync("v0.37.0-merge-main-tool", [Application.Code.MergeMainTool.ToolId], now, ct);
+        await GrantNewToolsOnceAsync("v0.37.4-read-deliverable-tool", [ReadDeliverableTool.ToolId], now, ct);
 
         // 20 tool calls stopped real coding work: reading a small project and writing its changes used them all. Only the old default moves; limits people set stay.
         const string toolLimitMarker = "v0.35.1-tool-call-limit";

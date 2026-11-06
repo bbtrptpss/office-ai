@@ -358,6 +358,44 @@ public class WorkflowTests(ApiFixture fx)
     }
 
     [Fact]
+    public async Task The_newest_deliverable_comes_first_and_long_ones_can_be_read_to_the_end()
+    {
+        var (ceo, project) = await ProjectAsync();
+        var task = await ceo.PostAsync<TaskDto>($"/api/projects/{project.Id}/tasks", new { title = "Long drafts" });
+        var other = await ceo.PostAsync<TaskDto>($"/api/projects/{project.Id}/tasks", new { title = "Someone else's" });
+        await using var scope = fx.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var author = (await ceo.GetAsync<List<EmployeeDto>>("/api/employees")).First().Id;
+        string Draft(string v) => $"{v}-START " + new string('x', 45_000) + $" {v}-END";
+        foreach (var v in new[] { "v1", "v2", "v3" })
+        {
+            db.Deliverables.Add(new Deliverable { TaskId = task.Id, EmployeeId = author, Title = v, Content = Draft(v) });
+            await db.SaveChangesAsync();
+            await Task.Delay(20);
+        }
+        var secret = new Deliverable { TaskId = other.Id, EmployeeId = author, Title = "not yours", Content = "private" };
+        db.Deliverables.Add(secret);
+        await db.SaveChangesAsync();
+
+        var ctx = new ToolContext(Guid.NewGuid(), task.Id, project.Id, author, false, db, TimeProvider.System);
+        var context = await new TaskContextTool().ExecuteAsync(ctx, JsonSerializer.SerializeToElement(new { }), default);
+        Assert.True(context.Output.Length < 60_000);
+        using var doc = JsonDocument.Parse(context.Output);
+        var latest = doc.RootElement.GetProperty("latestDeliverable");
+        Assert.Equal("v3", latest.GetProperty("title").GetString());
+        Assert.StartsWith("v3-START", latest.GetProperty("content").GetString());
+        Assert.Equal(["v2", "v1"], doc.RootElement.GetProperty("earlierDeliverables").EnumerateArray().Select(e => e.GetProperty("title").GetString()));
+        Assert.DoesNotContain("v1-START", context.Output); // earlier versions are listed, not repeated
+
+        var tool = new ReadDeliverableTool();
+        var rest = await tool.ExecuteAsync(ctx, JsonSerializer.SerializeToElement(new { id = latest.GetProperty("id").GetGuid(), offset = 30_000 }), default);
+        Assert.Contains("v3-END", rest.Output);
+        Assert.Contains("[end]", rest.Output);
+        var refused = await tool.ExecuteAsync(ctx, JsonSerializer.SerializeToElement(new { id = secret.Id }), default);
+        Assert.False(refused.Success);
+    }
+
+    [Fact]
     public async Task A_review_must_carry_its_whole_reasoning_not_a_pointer_to_it()
     {
         var (ceo, project) = await ProjectAsync();

@@ -31,6 +31,15 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.37.4",
+    date: "2026-11-06",
+    title: { th: "พนักงาน AI เห็นผลงานล่าสุดครบ แม้งานจะมีหลายฉบับ", en: "AI employees see the latest deliverable in full, even after many drafts" },
+    changes: [
+      { type: "fixed", th: "ข้อมูลงานเคยเรียงผลงานเก่าก่อนแล้วตัดท้าย ฉบับล่าสุดจึงหายไป ตอนนี้แสดงฉบับล่าสุดก่อน และฉบับเก่าแสดงแค่รายชื่อ", en: "Task context used to list deliverables oldest first and cut the end, losing the newest; now the newest comes first and older ones are only listed" },
+      { type: "added", th: "เครื่องมือ task_read_deliverable ให้อ่านผลงานยาวต่อเป็นช่วงๆ ได้จนจบ", en: "The task_read_deliverable tool reads a long deliverable piece by piece to the end" },
+    ],
+  },
+  {
     version: "0.37.3",
     date: "2026-11-06",
     title: { th: "คำรีวิวของ AI ต้องบอกเหตุผลครบ และงานยาวไม่ถูกตัดกลางทาง", en: "AI reviews must give their full reasoning, and long runs are not cut short" },

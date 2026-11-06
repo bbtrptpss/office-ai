@@ -47,7 +47,7 @@ public sealed class ToolRegistry(IEnumerable<IAgentTool> tools)
 
     /// <summary>Default grants for every new AI employee: read their own work context and hand in results.</summary>
     public static readonly string[] DefaultGrants =
-        [TaskContextTool.ToolId, ProjectTasksTool.ToolId, FindEmployeesTool.ToolId, SubmitDeliverableTool.ToolId, RequestReviewTool.ToolId, ReportBlockedTool.ToolId, Workflows.ReviewSubmitTool.ToolId];
+        [TaskContextTool.ToolId, ReadDeliverableTool.ToolId, ProjectTasksTool.ToolId, FindEmployeesTool.ToolId, SubmitDeliverableTool.ToolId, RequestReviewTool.ToolId, ReportBlockedTool.ToolId, Workflows.ReviewSubmitTool.ToolId];
 }
 
 internal static class ToolJson
@@ -104,8 +104,16 @@ public sealed class TaskContextTool : IAgentTool
     public const string ToolId = "task.read_context";
 
     public ToolDescriptor Descriptor { get; } = new(ToolId, "1.0",
-        "Read the task you are assigned: title, description, acceptance criteria, priority, due date, dependencies and earlier deliverables.",
-        ToolJson.NoInput, TimeSpan.FromSeconds(10), 40_000, RequiresApproval: false, HasSideEffects: false, Purposes: [RunPurpose.Work, RunPurpose.Review, RunPurpose.Plan]);
+        "Read the task you are assigned: title, description, acceptance criteria, priority, due date, dependencies, review feedback, " +
+        "the latest deliverable of this task and the latest deliverable of each task it waits for. Long texts are cut; read the rest with task_read_deliverable.",
+        ToolJson.NoInput, TimeSpan.FromSeconds(10), 60_000, RequiresApproval: false, HasSideEffects: false, Purposes: [RunPurpose.Work, RunPurpose.Review, RunPurpose.Plan]);
+
+    /// <summary>
+    /// Everything used to be sent oldest first and cut at the output limit, so on a task with long drafts the newest one, the one that mattered,
+    /// was the part cut off. Now the newest comes first and in full up to a size, older versions are only listed, and the rest is one call away.
+    /// </summary>
+    private const int LatestChars = 30_000;
+    private const int UpstreamChars = 6_000;
 
     public async Task<ToolResult> ExecuteAsync(ToolContext ctx, JsonElement input, CancellationToken ct)
     {
@@ -113,23 +121,57 @@ public sealed class TaskContextTool : IAgentTool
         var project = await ctx.Db.Projects.AsNoTracking().Where(p => p.Id == task.ProjectId).Select(p => new { p.Code, p.Name, p.Description }).FirstAsync(ct);
         var deps = await ctx.Db.TaskDependencies.AsNoTracking().Where(d => d.TaskId == task.Id)
             .Join(ctx.Db.Tasks, d => d.DependsOnTaskId, t => t.Id, (d, t) => new { t.Title, Status = t.Status.ToString() }).ToListAsync(ct);
-        var deliverables = await ctx.Db.Deliverables.AsNoTracking().Where(d => d.TaskId == task.Id)
-            .OrderBy(d => d.CreatedAt).Select(d => new { d.Title, Status = d.Status.ToString(), d.Content }).ToListAsync(ct);
+        var own = await ctx.Db.Deliverables.AsNoTracking().Where(d => d.TaskId == task.Id)
+            .OrderByDescending(d => d.CreatedAt).Select(d => new { d.Id, d.Title, Status = d.Status.ToString(), d.CreatedAt, d.Content }).ToListAsync(ct);
         var reviews = await ctx.Db.Reviews.AsNoTracking().Where(r => r.TaskId == task.Id)
-            .OrderBy(r => r.CreatedAt).Select(r => new { Outcome = r.Outcome.ToString(), r.Comments }).ToListAsync(ct);
-        // Work handed in by the tasks this one waits for (e.g. delegated sub-tasks).
-        var upstream = await ctx.Db.TaskDependencies.AsNoTracking().Where(d => d.TaskId == task.Id)
-            .Join(ctx.Db.Deliverables, d => d.DependsOnTaskId, x => x.TaskId, (d, x) => new { x.TaskId, x.Title, x.Content, x.CreatedAt })
-            .OrderBy(x => x.CreatedAt).Select(x => new { x.Title, x.Content }).ToListAsync(ct);
+            .OrderByDescending(r => r.CreatedAt).Select(r => new { Outcome = r.Outcome.ToString(), r.Comments, r.CreatedAt }).ToListAsync(ct);
+        // Work handed in by the tasks this one waits for (e.g. delegated sub-tasks): the newest from each.
+        var upstreamAll = await ctx.Db.TaskDependencies.AsNoTracking().Where(d => d.TaskId == task.Id)
+            .Join(ctx.Db.Deliverables, d => d.DependsOnTaskId, x => x.TaskId, (d, x) => new { x.Id, x.TaskId, x.Title, x.Content, x.CreatedAt })
+            .ToListAsync(ct);
+        var upstream = upstreamAll.GroupBy(x => x.TaskId).Select(g => g.OrderByDescending(x => x.CreatedAt).First()).OrderBy(x => x.CreatedAt)
+            .Select(x => new { x.Id, x.Title, Content = Clip(x.Content, UpstreamChars, x.Id) }).ToList();
+        var latest = own.FirstOrDefault();
         return ToolResult.Ok(new
         {
             project,
             task = new { task.Title, task.Description, task.AcceptanceCriteria, Priority = task.Priority.ToString(), task.DueDate, Status = task.Status.ToString(), task.RequiredSkills },
             dependsOn = deps,
-            previousDeliverables = deliverables,
-            reviewFeedback = reviews,
+            reviewFeedback = reviews.Select(r => new { r.Outcome, r.Comments }),
+            latestDeliverable = latest is null ? null : new { latest.Id, latest.Title, latest.Status, Content = Clip(latest.Content, LatestChars, latest.Id) },
+            earlierDeliverables = own.Skip(1).Select(d => new { d.Id, d.Title, d.Status, d.CreatedAt }),
             upstreamDeliverables = upstream,
         });
+    }
+
+    private static string Clip(string content, int max, Guid id) => content.Length <= max ? content
+        : content[..max] + $"\n…[{content.Length - max} more characters: task_read_deliverable with id {id} and offset {max}]";
+}
+
+/// <summary>Reads a deliverable of this task, or of a task it waits for, in pieces.</summary>
+public sealed class ReadDeliverableTool : IAgentTool
+{
+    public const string ToolId = "task.read_deliverable";
+    private const int Piece = 30_000;
+
+    public ToolDescriptor Descriptor { get; } = new(ToolId, "1.0",
+        "Read a deliverable of your task, or of a task it waits for, by its id (from task_read_context). Returns up to 30,000 characters from offset; " +
+        "call again with the next offset to read on.",
+        ToolJson.Schema(new { type = "object", properties = new { id = new { type = "string" }, offset = new { type = "integer", minimum = 0 } }, required = new[] { "id" }, additionalProperties = false }),
+        TimeSpan.FromSeconds(10), 32_000, RequiresApproval: false, HasSideEffects: false, Purposes: [RunPurpose.Work, RunPurpose.Review, RunPurpose.Plan]);
+
+    public async Task<ToolResult> ExecuteAsync(ToolContext ctx, JsonElement input, CancellationToken ct)
+    {
+        if (!input.TryGetProperty("id", out var idEl) || !Guid.TryParse(idEl.GetString(), out var id)) return ToolResult.Fail("id must be a deliverable id.");
+        var offset = input.TryGetProperty("offset", out var o) && o.TryGetInt32(out var n) ? Math.Max(0, n) : 0;
+        var allowed = await ctx.Db.TaskDependencies.AsNoTracking().Where(d => d.TaskId == ctx.TaskId).Select(d => d.DependsOnTaskId).ToListAsync(ct);
+        allowed.Add(ctx.TaskId);
+        var d = await ctx.Db.Deliverables.AsNoTracking().Where(x => x.Id == id && allowed.Contains(x.TaskId)).Select(x => new { x.Title, x.Content }).FirstOrDefaultAsync(ct);
+        if (d is null) return ToolResult.Fail("No such deliverable on this task or on a task it waits for.");
+        if (offset >= d.Content.Length) return ToolResult.Fail($"offset is past the end ({d.Content.Length} characters).");
+        var end = Math.Min(d.Content.Length, offset + Piece);
+        var more = end < d.Content.Length ? $"\n…[{d.Content.Length - end} more characters: call again with offset {end}]" : "\n[end]";
+        return new ToolResult(true, $"{d.Title} (characters {offset}-{end} of {d.Content.Length})\n{d.Content[offset..end]}{more}");
     }
 }
 

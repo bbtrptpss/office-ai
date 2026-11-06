@@ -95,6 +95,7 @@ public static class DependencyInjection
         services.AddSingleton<OfficeAI.Application.Communication.TerminalGate>(); // open terminals, in memory
 
         services.AddSingleton<IAgentTool, TaskContextTool>();
+        services.AddSingleton<IAgentTool, ReadDeliverableTool>();
         services.AddSingleton<IAgentTool, ProjectTasksTool>();
         services.AddSingleton<IAgentTool, FindEmployeesTool>();
         services.AddSingleton<IAgentTool, SubmitDeliverableTool>();
