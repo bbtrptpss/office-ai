@@ -31,6 +31,14 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.37.2",
+    date: "2026-11-06",
+    title: { th: "พนักงาน AI เขียนเอกสารยาวได้โดยงานไม่ล้ม", en: "AI employees can write long documents without the run failing" },
+    changes: [
+      { type: "fixed", th: "เมื่อพนักงาน AI เขียนไฟล์ยาวเกิน 20,000 ตัวอักษร ระบบเคยบันทึกข้อมูลที่ถูกตัดจนเป็น JSON ไม่สมบูรณ์และทำให้ run ล้ม ตอนนี้ย่อเฉพาะข้อความยาวและเก็บชื่อไฟล์ไว้ครบ", en: "When an AI employee wrote a file over 20,000 characters, the record was cut into invalid JSON and the run failed; now only long text is shortened and the file name is kept" },
+    ],
+  },
+  {
     version: "0.37.1",
     date: "2026-11-06",
     title: { th: "พนักงาน AI บน Claude Code ทำงานต่อเนื่องและเห็นปัญหาชัดขึ้น", en: "AI employees on Claude Code work longer and show problems more clearly" },

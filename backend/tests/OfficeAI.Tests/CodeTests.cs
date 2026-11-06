@@ -114,6 +114,21 @@ public class CodeTests(ApiFixture fx)
     }
 
     [Fact]
+    public async Task A_very_large_file_write_is_kept_on_record_without_breaking_the_run()
+    {
+        var big = string.Concat(Enumerable.Repeat("| **Skeleton** | black-800 \u2192 black-900 |\n", 1_500)); // about 70,000 characters
+        var (ceo, _, task, _, _) = await SetupAsync("BACKEND", [Write("docs/spec.md", big), ScriptedProvider.Text("Written.")]);
+
+        var run = await RunAsync(ceo, task.Id);
+        Assert.Equal(AgentRunStatus.Succeeded, run.Run.Status);
+        var write = Assert.Single(run.ToolExecutions);
+        Assert.Equal(ToolExecutionStatus.Succeeded, write.Status);
+        using var stored = System.Text.Json.JsonDocument.Parse(write.InputJson); // valid JSON
+        Assert.Equal("docs/spec.md", stored.RootElement.GetProperty("path").GetString());
+        Assert.Contains("more characters not stored", stored.RootElement.GetProperty("content").GetString());
+    }
+
+    [Fact]
     public async Task A_task_whose_work_is_already_merged_is_told_so_when_it_tries_again()
     {
         var (ceo, _, task, _, _) = await SetupAsync("BACKEND",

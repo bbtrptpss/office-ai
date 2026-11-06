@@ -247,7 +247,7 @@ public sealed class AgentExecutor(
 
         var exec = new ToolExecution
         {
-            RunId = run.Id, ToolCallId = call.Id, IdempotencyKey = key, InputJson = Truncate(call.Input.GetRawText(), 20_000),
+            RunId = run.Id, ToolCallId = call.Id, IdempotencyKey = key, InputJson = StoredInput(call.Input),
             ToolId = call.Name, ToolVersion = "-", StartedAt = clock.GetUtcNow(),
         };
 
@@ -455,6 +455,30 @@ public sealed class AgentExecutor(
     public static string WireName(string toolId) => toolId.Replace('.', '_');
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max] + $"\n…[truncated {s.Length - max} characters]";
+
+    private const int MaxStoredInput = 20_000;
+    private const int MaxStoredValue = 2_000;
+
+    /// <summary>
+    /// The tool input as kept on record. The column holds JSON, so a large input (a whole document written to a file) cannot simply be cut off:
+    /// long text values are shortened instead, which keeps short ones such as a file path readable.
+    /// </summary>
+    internal static string StoredInput(JsonElement input)
+    {
+        var raw = input.GetRawText();
+        if (raw.Length <= MaxStoredInput) return raw;
+        if (input.ValueKind == JsonValueKind.Object)
+        {
+            var shortened = new System.Text.Json.Nodes.JsonObject();
+            foreach (var p in input.EnumerateObject())
+                shortened[p.Name] = p.Value.ValueKind == JsonValueKind.String && p.Value.GetString() is { Length: > MaxStoredValue } text
+                    ? System.Text.Json.Nodes.JsonValue.Create($"{text[..MaxStoredValue]}…[{text.Length - MaxStoredValue} more characters not stored]")
+                    : System.Text.Json.Nodes.JsonNode.Parse(p.Value.GetRawText());
+            var json = shortened.ToJsonString();
+            if (json.Length <= MaxStoredInput) return json;
+        }
+        return JsonSerializer.Serialize(new { truncated = true, characters = raw.Length, start = raw[..MaxStoredValue] });
+    }
 
     private static string BuildSystemPrompt(EmployeeProfile employee, IReadOnlyCollection<string> tools, RunPurpose purpose)
     {
