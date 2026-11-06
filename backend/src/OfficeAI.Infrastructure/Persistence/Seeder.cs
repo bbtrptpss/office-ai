@@ -124,6 +124,17 @@ public class Seeder(AppDbContext db, UserManager<AppUser> users, RoleManager<App
             await db.SaveChangesAsync(ct);
         }
 
+        // On the Claude Code plan every turn resends the whole conversation, so 200,000 tokens ended 8 of 26 runs of a 5-task objective
+        // part-way, and each restart read the code again. It costs no money there; limits people set, and paid providers, stay.
+        const string claudeTokensMarker = "v0.37.1-claude-code-run-tokens";
+        if (!await db.SeedMarkers.AnyAsync(m => m.Key == claudeTokensMarker, ct))
+        {
+            await db.AgentConfigurations.Where(c => c.Provider == "claude-code" && c.MaxTokensPerRun == 200_000)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.MaxTokensPerRun, 600_000), ct);
+            db.SeedMarkers.Add(new SeedMarker { Key = claudeTokensMarker, AppliedAt = now });
+            await db.SaveChangesAsync(ct);
+        }
+
         if (!await db.ChatChannels.AnyAsync(c => c.Kind == ChannelKind.Company && c.Name == ChatService.GeneralChannel, ct))
         {
             db.ChatChannels.Add(new ChatChannel { Kind = ChannelKind.Company, Name = ChatService.GeneralChannel, Description = "Company-wide conversation" });

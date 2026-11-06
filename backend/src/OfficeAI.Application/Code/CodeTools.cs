@@ -399,7 +399,15 @@ public sealed class OpenMergeRequestTool(CodeWorkspace code) : IAgentTool
         var remoteHead = (await code.Store.GitAsync(ws.Path, ["rev-parse", $"origin/{ws.Branch}"], ct)).Output.Trim();
         if (head != remoteHead) return ToolResult.Fail("Your latest commit is not pushed. Use repo.commit.");
         var ahead = (await code.Store.GitAsync(ws.Path, ["rev-list", "--count", $"origin/{ws.Repo.DefaultBranch}..HEAD"], ct)).Output.Trim();
-        if (ahead == "0") return ToolResult.Fail("The branch has no commits to merge.");
+        if (ahead == "0")
+        {
+            var merged = await ctx.Db.MergeRequests.AsNoTracking().Where(m => m.TaskId == ctx.TaskId && m.Status == MergeRequestStatus.Merged)
+                .OrderByDescending(m => m.MergedAt).Select(m => new { m.Number, m.MergedSha }).FirstOrDefaultAsync(ct);
+            return merged is null
+                ? ToolResult.Fail("The branch has no commits to merge.")
+                : ToolResult.Fail($"This task's work is already on {ws.Repo.DefaultBranch}: merge request !{merged.Number} was merged ({merged.MergedSha?[..Math.Min(7, merged.MergedSha.Length)]}). " +
+                                  "There is nothing more to merge. Hand in your work for review as it is.");
+        }
         // The tests must have run on the code as it will be after the merge, so the branch has to contain the latest main.
         if (!(await code.Store.GitAsync(ws.Path, ["merge-base", "--is-ancestor", $"origin/{ws.Repo.DefaultBranch}", "HEAD"], ct)).Ok)
             return ToolResult.Fail($"{ws.Repo.DefaultBranch} has changed since your branch started. Use repo.merge_main, run the tests, then open the merge request.");

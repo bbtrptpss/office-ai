@@ -176,6 +176,8 @@ public sealed class AgentExecutor(
             var response = await CallAsync(run, active, modelId => new AiRequest(modelId, system, messages, toolDefs, config.MaxTokensPerCall, config.Effort), ct);
             await RecordUsageAsync(run, employee, active.Price, active.Provider!, response.Usage);
             run.Turns = turn;
+            if (response.Usage.OutputTokens > LongReplyTokens)
+                await StepAsync(run, RunStepKind.Notice, $"Unusually long reply: {response.Usage.OutputTokens:N0} output tokens in one turn. Check that what it says happened did happen.");
 
             messages.Add(new AiMessage(AiRole.Assistant, response.Content));
             await CheckpointAsync(run, messages);
@@ -528,6 +530,9 @@ public sealed class AgentExecutor(
             return null; // the stored input is cut off at its size limit
         }
     }
+
+    /// <summary>A normal turn writes a few thousand tokens; one of 128,000 came with an account of tool calls that never ran.</summary>
+    public const int LongReplyTokens = 40_000;
 
     public static string BuildTaskMessage(WorkTask task, RunPurpose purpose) =>
         $"""

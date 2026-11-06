@@ -114,6 +114,27 @@ public class CodeTests(ApiFixture fx)
     }
 
     [Fact]
+    public async Task A_task_whose_work_is_already_merged_is_told_so_when_it_tries_again()
+    {
+        var (ceo, _, task, _, _) = await SetupAsync("BACKEND",
+        [
+            Write("app.txt", "hello\n"),
+            Write("test.sh", "grep -q hello app.txt && echo OK"),
+            Commit("Add greeting"),
+            Test(),
+            OpenMr("Greeting"),
+            ScriptedProvider.Text("Waiting for the merge."),
+            OpenMr("Again"),
+        ]);
+        await RunAsync(ceo, task.Id);
+        var approval = Assert.Single(await ceo.GetAsync<List<ApprovalDto>>($"/api/approvals?status=Pending&taskId={task.Id}"));
+        (await ceo.PostAsJsonAsync($"/api/approvals/{approval.Id}/decision", new { approve = true, payloadHash = approval.PayloadHash })).EnsureSuccessStatusCode();
+
+        var again = Assert.Single((await RunAsync(ceo, task.Id)).ToolExecutions);
+        Assert.Contains("already on main: merge request !1 was merged", again.Error);
+    }
+
+    [Fact]
     public async Task An_approved_merge_request_is_not_merged_when_main_moved_after_its_tests()
     {
         var (ceo, _, task, project, repo) = await SetupAsync("BACKEND",

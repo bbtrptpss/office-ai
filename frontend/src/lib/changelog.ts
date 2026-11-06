@@ -31,6 +31,17 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.37.1",
+    date: "2026-11-06",
+    title: { th: "พนักงาน AI บน Claude Code ทำงานต่อเนื่องและเห็นปัญหาชัดขึ้น", en: "AI employees on Claude Code work longer and show problems more clearly" },
+    changes: [
+      { type: "changed", th: "เพดาน token ต่อ run ของพนักงานบน Claude Code จาก 200,000 เป็น 600,000 (เฉพาะที่ยังเป็นค่าเดิม และไม่มีค่าใช้จ่ายเพิ่ม)", en: "Claude Code employees' run token limit goes from 200,000 to 600,000 (only where it was the default; it costs nothing extra there)" },
+      { type: "fixed", th: "error จาก Claude Code แสดงข้อความจริงแทน 502 และเมื่อโควตาเต็มจะรอสักครู่แล้วลองใหม่ก่อนยอมแพ้", en: "Claude Code errors show their own message instead of 502, and a usage limit waits a few minutes and retries before giving up" },
+      { type: "fixed", th: "งานที่ merge เข้า main แล้วได้รับแจ้งให้ส่งรีวิว แทนที่จะรายงานว่าติดขัด", en: "A task whose work is already merged is told to hand it in, instead of reporting itself blocked" },
+      { type: "added", th: "บันทึกคำเตือนเมื่อคำตอบยาวผิดปกติ ซึ่งเป็นจุดที่เคยพบการแต่งผลการทำงาน", en: "A note is recorded when a reply is unusually long, which is where invented tool results have appeared" },
+    ],
+  },
+  {
     version: "0.37.0",
     date: "2026-11-06",
     title: { th: "งานที่ทำพร้อมกันรวมเข้าด้วยกันได้อย่างปลอดภัย", en: "Work done in parallel comes together safely" },

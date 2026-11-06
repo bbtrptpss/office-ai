@@ -235,7 +235,8 @@ const server = createServer((req, res) => {
     try {
       send(200, await askQueue(() => ask(input, gone.signal), gone.signal));
     } catch (e) {
-      send(502, { error: e instanceof Error ? e.message : String(e) });
+      // Answered as data, so the API shows Claude Code's own words (a usage limit, a sign-in problem) instead of "502".
+      send(200, { error: (e instanceof Error ? e.message : String(e)) || "Claude Code failed without a message." });
     }
   });
 });

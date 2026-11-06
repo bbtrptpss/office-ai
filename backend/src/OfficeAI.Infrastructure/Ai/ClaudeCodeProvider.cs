@@ -49,7 +49,11 @@ public sealed partial class ClaudeCodeProvider(IHttpClientFactory http, IOptions
         var answer = json.Deserialize<BridgeAnswer>(JsonOptions)
             ?? throw new AiProviderException("The Claude Code bridge returned nothing.", retryable: true);
         // Sending the same request again would most likely take just as long, so a reply that ran out of time fails the call at once.
-        if (answer.Error is { } error) throw new AiProviderException($"Claude Code: {error}", retryable: !answer.TimedOut && !error.Contains("invalid", StringComparison.OrdinalIgnoreCase));
+        if (answer.Error is { } error)
+        {
+            if (UsageLimit().IsMatch(error)) throw new AiProviderException($"Claude Code: {error}", retryable: true, rateLimited: true);
+            throw new AiProviderException($"Claude Code: {error}", retryable: !answer.TimedOut && !error.Contains("invalid", StringComparison.OrdinalIgnoreCase));
+        }
         // Claude Code sometimes ends with no text at all, even after using tokens. That is a failed call to retry, not a finished answer.
         if (string.IsNullOrWhiteSpace(answer.Reply)) throw new AiProviderException("Claude Code returned an empty reply.", retryable: true);
         return ParseReply(answer.Reply, new AiUsage(answer.InputTokens, answer.OutputTokens, answer.CacheReadTokens, answer.CacheWriteTokens), request.Tools);
@@ -108,6 +112,9 @@ public sealed partial class ClaudeCodeProvider(IHttpClientFactory http, IOptions
         sb.Append("Continue as the assistant.");
         return sb.ToString();
     }
+
+    [GeneratedRegex(@"usage limit|rate limit|limit reached|overloaded|too many requests|\b429\b|\b529\b", RegexOptions.IgnoreCase)]
+    private static partial Regex UsageLimit();
 
     [GeneratedRegex(@"<tool_call>\s*(.*?)\s*</tool_call>", RegexOptions.Singleline)]
     private static partial Regex ToolCallBlock();

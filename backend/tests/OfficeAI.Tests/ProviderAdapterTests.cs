@@ -135,6 +135,20 @@ public class ProviderAdapterTests
     }
 
     [Fact]
+    public async Task Claude_Code_errors_keep_their_own_words_and_a_usage_limit_waits_instead_of_failing()
+    {
+        var (limited, _) = ClaudeCodeWith(new FakeHandler(HttpStatusCode.OK, """{"error":"Claude AI usage limit reached|1793950000"}"""));
+        var wait = await Assert.ThrowsAsync<AiProviderException>(() => limited.CompleteAsync(Conversation(), default));
+        Assert.True(wait.RateLimited);
+        Assert.Contains("usage limit reached", wait.Message);
+
+        var (other, _) = ClaudeCodeWith(new FakeHandler(HttpStatusCode.OK, """{"error":"Not logged in. Please run /login"}"""));
+        var failed = await Assert.ThrowsAsync<AiProviderException>(() => other.CompleteAsync(Conversation(), default));
+        Assert.False(failed.RateLimited);
+        Assert.Contains("Not logged in", failed.Message);
+    }
+
+    [Fact]
     public void Tasks_created_at_the_same_moment_get_their_own_branches()
     {
         var at = DateTimeOffset.UtcNow;
