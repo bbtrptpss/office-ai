@@ -1,4 +1,4 @@
-# Starts Office AI on Windows: Docker Desktop, then the compose stack, then opens the web app.
+# Starts Office AI on Windows: Docker Desktop, then the compose stack, the Claude bridge and Ollama, then opens the web app.
 # Used by the desktop icon and the Windows Startup shortcut (see install-shortcuts.ps1).
 param(
     # Start everything but do not open the browser (used at sign-in).
@@ -81,6 +81,24 @@ try {
             Start-Process -FilePath (Get-Command node).Source -ArgumentList "`"$(Join-Path $PSScriptRoot 'claude-bridge.mjs')`"" -WorkingDirectory $Root -WindowStyle Hidden
             Log 'Started the Claude bridge'
         }
+    }
+
+    # Ollama on this PC, for AI employees on the "ollama" provider (off when .env sets OLLAMA_URL to empty).
+    # A problem here is only a warning: the rest of Office AI works without it.
+    if ($envText -notmatch '(?m)^OLLAMA_URL=\s*$') {
+        $ollamaApp = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama app.exe'
+        if (Test-Url 'http://127.0.0.1:11434/api/tags') { Log 'Ollama is already running' }
+        elseif (Test-Path $ollamaApp) {
+            Start-Process -FilePath $ollamaApp
+            if (Wait-Until { Test-Url 'http://127.0.0.1:11434/api/tags' } 60 'Ollama') { Log 'Started Ollama' }
+            else { Log 'WARNING: Ollama did not start; AI employees on Ollama will fail until it runs.' }
+        }
+        else { Log 'WARNING: Ollama is not installed; AI employees on Ollama will fail.' }
+        try {
+            $models = @((Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 5).models)
+            if ($models.Count -eq 0) { Log 'WARNING: Ollama has no models. Check "Model location" in Ollama settings points where the models are.' }
+            else { Log "Ollama models: $(($models | ForEach-Object { $_.name }) -join ', ')" }
+        } catch { }
     }
 
     if (-not (Wait-Until { Test-Url $ApiHealth } 180 'the API')) { throw 'The API did not start. See: docker compose logs api' }

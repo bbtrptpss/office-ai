@@ -31,6 +31,14 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.37.6",
+    date: "2026-11-07",
+    title: { th: "เปิด Office AI แล้ว Ollama เปิดตามด้วย", en: "Starting Office AI also starts Ollama" },
+    changes: [
+      { type: "added", th: "สคริปต์เปิดระบบเปิดแอป Ollama ด้วย และเตือนถ้า Ollama ไม่มีโมเดล", en: "The start script also opens the Ollama app, and warns when Ollama has no models" },
+    ],
+  },
+  {
     version: "0.37.5",
     date: "2026-11-07",
     title: { th: "งานสรุปท้ายสายอ่านผลงานทุกงานในโปรเจกต์ได้", en: "A summary task can read the work of every task in the project" },
