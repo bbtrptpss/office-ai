@@ -31,6 +31,14 @@ export interface Todo extends Text {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.37.5",
+    date: "2026-11-07",
+    title: { th: "งานสรุปท้ายสายอ่านผลงานทุกงานในโปรเจกต์ได้", en: "A summary task can read the work of every task in the project" },
+    changes: [
+      { type: "fixed", th: "งานที่อยู่ท้ายสาย เช่น เอกสารสรุป เคยอ่านได้แค่ผลงานของงานที่รอโดยตรง ตอนนี้เห็นรายชื่อผลงานล่าสุดของทุกงานในโปรเจกต์และเปิดอ่านได้", en: "A task at the end of a chain, such as a summary document, could only read the work of the task it waits for; it now sees and can read the latest work of every task in the project" },
+    ],
+  },
+  {
     version: "0.37.4",
     date: "2026-11-06",
     title: { th: "พนักงาน AI เห็นผลงานล่าสุดครบ แม้งานจะมีหลายฉบับ", en: "AI employees see the latest deliverable in full, even after many drafts" },

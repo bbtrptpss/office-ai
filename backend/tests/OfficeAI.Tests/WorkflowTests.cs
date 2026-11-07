@@ -361,8 +361,10 @@ public class WorkflowTests(ApiFixture fx)
     public async Task The_newest_deliverable_comes_first_and_long_ones_can_be_read_to_the_end()
     {
         var (ceo, project) = await ProjectAsync();
+        var (_, elsewhere) = await ProjectAsync();
         var task = await ceo.PostAsync<TaskDto>($"/api/projects/{project.Id}/tasks", new { title = "Long drafts" });
-        var other = await ceo.PostAsync<TaskDto>($"/api/projects/{project.Id}/tasks", new { title = "Someone else's" });
+        var sibling = await ceo.PostAsync<TaskDto>($"/api/projects/{project.Id}/tasks", new { title = "Earlier step" });
+        var other = await ceo.PostAsync<TaskDto>($"/api/projects/{elsewhere.Id}/tasks", new { title = "Another project's" });
         await using var scope = fx.Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var author = (await ceo.GetAsync<List<EmployeeDto>>("/api/employees")).First().Id;
@@ -374,7 +376,8 @@ public class WorkflowTests(ApiFixture fx)
             await Task.Delay(20);
         }
         var secret = new Deliverable { TaskId = other.Id, EmployeeId = author, Title = "not yours", Content = "private" };
-        db.Deliverables.Add(secret);
+        var earlier = new Deliverable { TaskId = sibling.Id, EmployeeId = author, Title = "Moodboard", Content = "tokens and colours" };
+        db.Deliverables.AddRange(secret, earlier);
         await db.SaveChangesAsync();
 
         var ctx = new ToolContext(Guid.NewGuid(), task.Id, project.Id, author, false, db, TimeProvider.System);
@@ -386,11 +389,17 @@ public class WorkflowTests(ApiFixture fx)
         Assert.StartsWith("v3-START", latest.GetProperty("content").GetString());
         Assert.Equal(["v2", "v1"], doc.RootElement.GetProperty("earlierDeliverables").EnumerateArray().Select(e => e.GetProperty("title").GetString()));
         Assert.DoesNotContain("v1-START", context.Output); // earlier versions are listed, not repeated
+        // Work from the rest of the project is listed by id, and only this project's.
+        var listed = Assert.Single(doc.RootElement.GetProperty("otherProjectDeliverables").EnumerateArray());
+        Assert.Equal("Moodboard", listed.GetProperty("title").GetString());
+        Assert.DoesNotContain("not yours", context.Output);
 
         var tool = new ReadDeliverableTool();
         var rest = await tool.ExecuteAsync(ctx, JsonSerializer.SerializeToElement(new { id = latest.GetProperty("id").GetGuid(), offset = 30_000 }), default);
         Assert.Contains("v3-END", rest.Output);
         Assert.Contains("[end]", rest.Output);
+        var sibl = await tool.ExecuteAsync(ctx, JsonSerializer.SerializeToElement(new { id = earlier.Id }), default);
+        Assert.Contains("tokens and colours", sibl.Output);
         var refused = await tool.ExecuteAsync(ctx, JsonSerializer.SerializeToElement(new { id = secret.Id }), default);
         Assert.False(refused.Success);
     }

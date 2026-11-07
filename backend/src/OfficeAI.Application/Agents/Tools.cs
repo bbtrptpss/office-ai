@@ -105,7 +105,8 @@ public sealed class TaskContextTool : IAgentTool
 
     public ToolDescriptor Descriptor { get; } = new(ToolId, "1.0",
         "Read the task you are assigned: title, description, acceptance criteria, priority, due date, dependencies, review feedback, " +
-        "the latest deliverable of this task and the latest deliverable of each task it waits for. Long texts are cut; read the rest with task_read_deliverable.",
+        "the latest deliverable of this task and of each task it waits for, and a list of the other deliverables in the project. " +
+        "Long texts are cut; read the rest, or any listed deliverable, with task_read_deliverable.",
         ToolJson.NoInput, TimeSpan.FromSeconds(10), 60_000, RequiresApproval: false, HasSideEffects: false, Purposes: [RunPurpose.Work, RunPurpose.Review, RunPurpose.Plan]);
 
     /// <summary>
@@ -131,6 +132,14 @@ public sealed class TaskContextTool : IAgentTool
             .ToListAsync(ct);
         var upstream = upstreamAll.GroupBy(x => x.TaskId).Select(g => g.OrderByDescending(x => x.CreatedAt).First()).OrderBy(x => x.CreatedAt)
             .Select(x => new { x.Id, x.Title, Content = Clip(x.Content, UpstreamChars, x.Id) }).ToList();
+        // A summary at the end of a chain (a spec sheet, a final report) needs the work of every earlier task, not only the one it waits for.
+        var shown = upstream.Select(x => x.Id).Concat(own.Select(x => x.Id)).ToHashSet();
+        var projectAll = await ctx.Db.Deliverables.AsNoTracking()
+            .Join(ctx.Db.Tasks, x => x.TaskId, t => t.Id, (x, t) => new { x.Id, x.TaskId, TaskTitle = t.Title, t.ProjectId, x.Title, x.CreatedAt, Characters = x.Content.Length })
+            .Where(x => x.ProjectId == task.ProjectId && x.TaskId != task.Id).ToListAsync(ct);
+        var projectDeliverables = projectAll.GroupBy(x => x.TaskId).Select(g => g.OrderByDescending(x => x.CreatedAt).First())
+            .Where(x => !shown.Contains(x.Id)).OrderBy(x => x.CreatedAt).Take(50)
+            .Select(x => new { x.Id, Task = x.TaskTitle, x.Title, x.Characters }).ToList();
         var latest = own.FirstOrDefault();
         return ToolResult.Ok(new
         {
@@ -141,6 +150,7 @@ public sealed class TaskContextTool : IAgentTool
             latestDeliverable = latest is null ? null : new { latest.Id, latest.Title, latest.Status, Content = Clip(latest.Content, LatestChars, latest.Id) },
             earlierDeliverables = own.Skip(1).Select(d => new { d.Id, d.Title, d.Status, d.CreatedAt }),
             upstreamDeliverables = upstream,
+            otherProjectDeliverables = projectDeliverables,
         });
     }
 
@@ -148,14 +158,14 @@ public sealed class TaskContextTool : IAgentTool
         : content[..max] + $"\n…[{content.Length - max} more characters: task_read_deliverable with id {id} and offset {max}]";
 }
 
-/// <summary>Reads a deliverable of this task, or of a task it waits for, in pieces.</summary>
+/// <summary>Reads any deliverable of a task in the same project, in pieces.</summary>
 public sealed class ReadDeliverableTool : IAgentTool
 {
     public const string ToolId = "task.read_deliverable";
     private const int Piece = 30_000;
 
     public ToolDescriptor Descriptor { get; } = new(ToolId, "1.0",
-        "Read a deliverable of your task, or of a task it waits for, by its id (from task_read_context). Returns up to 30,000 characters from offset; " +
+        "Read a deliverable of any task in your project by its id (from task_read_context). Returns up to 30,000 characters from offset; " +
         "call again with the next offset to read on.",
         ToolJson.Schema(new { type = "object", properties = new { id = new { type = "string" }, offset = new { type = "integer", minimum = 0 } }, required = new[] { "id" }, additionalProperties = false }),
         TimeSpan.FromSeconds(10), 32_000, RequiresApproval: false, HasSideEffects: false, Purposes: [RunPurpose.Work, RunPurpose.Review, RunPurpose.Plan]);
@@ -164,10 +174,10 @@ public sealed class ReadDeliverableTool : IAgentTool
     {
         if (!input.TryGetProperty("id", out var idEl) || !Guid.TryParse(idEl.GetString(), out var id)) return ToolResult.Fail("id must be a deliverable id.");
         var offset = input.TryGetProperty("offset", out var o) && o.TryGetInt32(out var n) ? Math.Max(0, n) : 0;
-        var allowed = await ctx.Db.TaskDependencies.AsNoTracking().Where(d => d.TaskId == ctx.TaskId).Select(d => d.DependsOnTaskId).ToListAsync(ct);
-        allowed.Add(ctx.TaskId);
-        var d = await ctx.Db.Deliverables.AsNoTracking().Where(x => x.Id == id && allowed.Contains(x.TaskId)).Select(x => new { x.Title, x.Content }).FirstOrDefaultAsync(ct);
-        if (d is null) return ToolResult.Fail("No such deliverable on this task or on a task it waits for.");
+        var d = await ctx.Db.Deliverables.AsNoTracking().Where(x => x.Id == id)
+            .Join(ctx.Db.Tasks, x => x.TaskId, t => t.Id, (x, t) => new { x.Title, x.Content, t.ProjectId })
+            .Where(x => x.ProjectId == ctx.ProjectId).Select(x => new { x.Title, x.Content }).FirstOrDefaultAsync(ct);
+        if (d is null) return ToolResult.Fail("No such deliverable in this project.");
         if (offset >= d.Content.Length) return ToolResult.Fail($"offset is past the end ({d.Content.Length} characters).");
         var end = Math.Min(d.Content.Length, offset + Piece);
         var more = end < d.Content.Length ? $"\n…[{d.Content.Length - end} more characters: call again with offset {end}]" : "\n[end]";
