@@ -1,5 +1,23 @@
 # AI Software House
 
+**English summary.** An operating system for a software company staffed by AI employees, run by a human CEO.
+AI staff plan, build and review work through permitted tools only; the CEO approves every important step.
+
+- **Multi-provider LLM layer** — one interface over **Anthropic Claude, OpenAI, Google Gemini and local Ollama**
+  (`backend/src/OfficeAI.Infrastructure/Ai/*Provider.cs`), with fallback models, per-model cost tracking and a
+  simulated provider for running the full flow without an API key. Keys are entered in the UI and stored encrypted.
+- **Semantic knowledge search** with local embeddings (Ollama `bge-m3`).
+- **Sandboxed code execution** — AI-written code is tested in containers without network; dependency installs may
+  reach only whitelisted package registries through a proxy.
+- **Security** — two-factor authentication, audit log, role-based permissions.
+- **Stack** — ASP.NET Core (.NET, Clean Architecture: Domain / Application / Infrastructure / Api), PostgreSQL 17,
+  Next.js 16 + React 19, Docker Compose, Playwright end-to-end tests. Deployment guide: `docs/DEPLOYMENT.md`.
+
+Built with AI pair-programming (Claude Code); architecture, requirements and review by the author.
+The rest of this README is in Thai.
+
+---
+
 ระบบปฏิบัติการบริษัทซอฟต์แวร์ที่มีพนักงาน AI โดยมี CEO เป็นคน ดูรายละเอียดทั้งหมดได้ใน `AI_Software_House_Master_Prompt.txt`
 
 สถานะปัจจุบัน: **Phase 1–27 เสร็จครบ (v0.32)** — โครงสร้างบริษัท, พนักงาน AI ทำงานผ่านเครื่องมือที่ได้รับอนุญาต, objective ที่ AI วางแผน/ทำ/รีวิวโดย CEO อนุมัติทุกขั้นสำคัญ, ส่งมอบงานลูกค้าครบ 8 ขั้น, โมเดลสำรองเมื่อ AI ตอบไม่ได้, 2FA, ต้นทุนดำเนินงาน, ค้นความรู้ด้วยความหมาย, คุณภาพแยกตามโมเดลและข้อมูลฝึกจากงานจริง, บันทึกเวลาทำงาน (รายละเอียดใน `docs/PROGRESS.md` และหน้า “บันทึกอัปเดต”)
